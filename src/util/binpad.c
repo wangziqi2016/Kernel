@@ -17,7 +17,7 @@ void print_usage() {
   fprintf(stderr, "-h/--help       Print this string\n");
   fprintf(stderr, "-o/--output     Specifies the output file; if not specified then print on stdout\n");
   fprintf(stderr, "-v/--value      Specifies the byte value to pad; if not then pad 0x00\n");
-  fprintf(stderr, "\n")
+  fprintf(stderr, "\n");
   exit(0);
 }
 
@@ -84,7 +84,7 @@ int read_integer(const char *p, const char *purpose) {
   int val = atoi(p);
   sprintf(buffer, "%d", val);
   if(strcmp(buffer, p) != 0) {
-    fprintf(stderr, "%s \"%d\" is not valid\n", purpose, p);
+    fprintf(stderr, "%s \"%s\" is not valid\n", purpose, p);
     exit(1);
   }
 
@@ -116,6 +116,10 @@ char *get_param(char **argv, int index) {
 }
 
 int main(int argc, char **argv) {
+  if(argc < 3) {
+    print_usage();
+  }
+
   for(int i = 3;i < argc;i++) {
     char *arg = argv[i];
     if(strcmp(arg, "--help") == 0 || 
@@ -130,20 +134,27 @@ int main(int argc, char **argv) {
   int target_size = read_integer(argv[2], "Target size");
 
   const char *output_filename = NULL;
+  int pad_value = 0x00;
   for(int i = 3;i < argc;i++) {
     char *arg = argv[i];
     if(strcmp(arg, "--output") == 0 || 
        strcmp(arg, "-o") == 0) {
       // Can be either out of bound or another option
-      output_filename = argv[i + 1];
-      if(output_filename == NULL || output_filename[0] == '-') {
-        fprintf(stderr, "Must specify an output file name\n");
+      output_filename = get_param(argv, i);
+    } else if(strcmp(arg, "--value") == 0 || 
+              strcmp(arg, "-v") == 0) {
+      pad_value = read_integer(get_param(argv, i), "Padded value");
+      if(pad_value <= 0x00 || pad_value >= 0xFF) {
+        fprintf(stderr, "Padded value must be within [0, 255]\n");
         exit(1);
-      }
+      } 
+    } else {
+      // For unknown command, default is to print usage and exit
+      print_usage();
     }
   }
 
-  pad_binary_file(filename, target_size)
+  pad_binary_file(filename, target_size, pad_value, output_filename);
 
   return 0;
 }
