@@ -1,0 +1,48 @@
+
+#
+# This file defines common flags for the make system and GNU tool chain
+#
+# In order for SRC_DIR to work, it should be defined before this file
+# is included
+#
+
+CXX = tcc
+CXXFLAGS = -Wall -Werror -I$(SRC_DIR)/common -I$(SRC_DIR)
+LDFLAGS = 
+MAKE = make
+LD = ld
+RM = rm
+MKDIR = mkdir
+LN = ln
+
+# We can also use DEBUG=1 to specify mode
+ifdef DEBUG
+  ifeq (&(DEBUG), 1)
+    MODE=DEBUG
+  endif
+endif
+
+ifdef MODE
+  ifeq ($(MODE), DEBUG)
+    ifeq ($(MODE_PRINT), 1)
+      $(info = DEBUG MODE)
+    endif
+    CXXFLAGS += -O0 -g
+  else
+    ifeq ($(MODE), RELEASE)
+      ifeq ($(MODE_PRINT), 1)
+        $(info = RELEASE MODE)
+      endif
+      CXXFLAGS += -O3 -DNDEBUG
+    else
+      $(error ERROR: UNKNOWN BUILD MODE "$(MODE)")
+    endif
+  endif
+else
+  ifeq ($(MODE_PRINT), 1)
+    $(info = DEFAULT MODE)
+  endif
+  CXXFLAGS += -O2 -g -DNDEBUG
+endif
+
+MODE_PRINT=0
