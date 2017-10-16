@@ -33,12 +33,37 @@ void print_usage() {
  * 
  * This function loops until the corresponding length is read.
  */
-void read_file_into_buffer(int fd, size_t len, void *buffer) {
+void read_file_into_buffer(int fd, int len, void *buffer) {
+  int ret;
+  while(len != 0) {
+    ret = read(fd, buffer, len);
+    if(ret <= 0) {
+      fprintf(stderr, "When reading the file\n");
+      syscall_err("read");
+    }
 
+    len -= ret;
+  }
+
+  return;
 }
 
-void write_buffer_to_file(int fd, size_t len, void *buffer) {
+/*
+ * write_buffer_to_file() - Writes a buffer to file
+ */
+void write_buffer_to_file(int fd, int len, void *buffer) {
+  int ret;
+  while(len != 0) {
+    ret = write(fd, buffer, len);
+    if(ret <= 0) {
+      fprintf(stderr, "When writing the file\n");
+      syscall_err("write");
+    }
 
+    len -= ret;
+  }
+
+  return;
 }
 
 /*
@@ -56,8 +81,8 @@ void write_buffer_to_file(int fd, size_t len, void *buffer) {
  * We overwrite the given file to pad it
  */
 void pad_binary_file(const char *filename, 
-                     uint8_t pad_value, 
                      int target_size,
+                     uint8_t pad_value, 
                      const char *output_filename,
                      int verbose) {
   struct stat file_status;
@@ -96,6 +121,10 @@ void pad_binary_file(const char *filename,
   if(target_size > file_status.st_size) {
     int padding_size = target_size - file_status.st_size;
     int file_remaining = file_status.st_size;
+    if(verbose) {
+      fprintf(stderr, "Byte to pad: %d\n", padding_size);
+    }
+
     void *p = malloc(PAGE_SIZE);
 
     while(file_remaining >= PAGE_SIZE) {
@@ -111,7 +140,7 @@ void pad_binary_file(const char *filename,
 
     // Init the buffer
     memset(p, pad_value, PAGE_SIZE);
-    
+
     while(padding_size >= PAGE_SIZE) {
       write_buffer_to_file(out_fd, PAGE_SIZE, p);
       padding_size -= PAGE_SIZE;
@@ -130,6 +159,14 @@ void pad_binary_file(const char *filename,
   if(ret != 0) {
     fprintf(stderr, "When closing the file \"%s\"\n", filename);
     syscall_err("close");
+  }
+
+  if(output_filename != NULL) {
+    ret = close(out_fd);
+    if(ret != 0) {
+      fprintf(stderr, "When closing the file \"%s\"\n", output_filename);
+      syscall_err("close");
+    }
   }
 
   return;
