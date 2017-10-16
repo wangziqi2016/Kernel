@@ -7,6 +7,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define syscall_err(str) { perror(__FILE__ ":" TOSTRING(__LINE__) ":" str "()"); exit(1); }
+
 /*
  * print_usage() - Prints the usage string and exit
  */
@@ -38,31 +42,34 @@ void print_usage() {
 void pad_binary_file(const char *filename, 
                      uint8_t pad_value, 
                      size_t target_size,
-                     const char *output_filename) {
+                     const char *output_filename,
+                     int verbose) {
   struct stat file_status;
   int fd = open(filename, O_RDWR);
   if(fd < 0) {
-    perror(NULL);
-    exit(1);
+    fprintf(stderr, "When opening the file \"%s\"\n", filename);
+    syscall_err("open");
   }
 
   int ret = fstat(fd, &file_status);
   if(ret != 0) {
-    perror(NULL);
-    exit(1);
+    fprintf(stderr, "When calling fstat on the file \"%s\"\n", filename);
+    syscall_err("fstat");
   }
 
-  fprintf(stderr, "Basic file info\n");
-  fprintf(stderr, "===============\n");
-  fprintf(stderr, "File mode: 0x%X (regular? - %d)\n", 
-          file_status.st_mode, S_ISREG(file_status.st_mode));
-  fprintf(stderr, "File size: %ld\n", (long)file_status.st_size);
-  fprintf(stderr, "# of blocks: %ld\n", (long)file_status.st_blocks);
+  if(verbose) {
+    fprintf(stderr, "Basic file info\n");
+    fprintf(stderr, "===============\n");
+    fprintf(stderr, "File mode: 0x%X (regular? - %d)\n", 
+            file_status.st_mode, S_ISREG(file_status.st_mode));
+    fprintf(stderr, "File size: %ld\n", (long)file_status.st_size);
+    fprintf(stderr, "# of blocks: %ld\n", (long)file_status.st_blocks);
+  }
 
   ret = close(fd);
   if(ret != 0) {
-    perror(NULL);
-    exit(1);
+    fprintf(stderr, "When closing the file \"%s\"\n", filename);
+    syscall_err("close");
   }
 
   return;
@@ -148,7 +155,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Padded value must be within [0, 255]\n");
         exit(1);
       } 
-    } else {
+    } else if() {
       // For unknown command, default is to print usage and exit
       print_usage();
     }
