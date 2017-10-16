@@ -10,6 +10,8 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define syscall_err(str) { perror(__FILE__ ":" TOSTRING(__LINE__) ":" str "()"); exit(1); }
+#define STDOUT_FD 1
+#define PAGE_SIZE 4096
 
 /*
  * print_usage() - Prints the usage string and exit
@@ -24,6 +26,19 @@ void print_usage() {
   fprintf(stderr, "-s/--silent     Whether to run silently (no output from stderr except for errors)\n");
   fprintf(stderr, "\n");
   exit(0);
+}
+
+/*
+ * read_file_into_buffer() - Read a len chunk into the buffer
+ * 
+ * This function loops until the corresponding length is read.
+ */
+void read_file_into_buffer(int fd, size_t len, void *buffer) {
+
+}
+
+void write_buffer_to_file(int fd, size_t len, void *buffer) {
+
 }
 
 /*
@@ -42,14 +57,24 @@ void print_usage() {
  */
 void pad_binary_file(const char *filename, 
                      uint8_t pad_value, 
-                     size_t target_size,
+                     int target_size,
                      const char *output_filename,
                      int verbose) {
   struct stat file_status;
-  int fd = open(filename, O_RDWR);
+  int fd = open(filename, O_RDONLY);
   if(fd < 0) {
-    fprintf(stderr, "When opening the file \"%s\"\n", filename);
+    fprintf(stderr, "When opening the input file \"%s\"\n", filename);
     syscall_err("open");
+  }
+
+  int out_fd = STDOUT_FD;
+  if(output_filename != NULL) {
+    // Opens the output file or creates a new one; using mode R/W for all
+    out_fd = open(output_filename, O_WRONLY | O_CREAT, 0666);
+    if(out_fd < 0) {
+      fprintf(stderr, "When opening the output file \"%s\"\n", output_filename);
+      syscall_err("open");
+    }
   }
 
   int ret = fstat(fd, &file_status);
@@ -65,6 +90,40 @@ void pad_binary_file(const char *filename,
             file_status.st_mode, S_ISREG(file_status.st_mode));
     fprintf(stderr, "File size: %ld\n", (long)file_status.st_size);
     fprintf(stderr, "# of blocks: %ld\n", (long)file_status.st_blocks);
+  }
+
+  // This branch contains the body of the padding operation
+  if(target_size > file_status.st_size) {
+    int padding_size = target_size - file_status.st_size;
+    int file_remaining = file_status.st_size;
+    void *p = malloc(PAGE_SIZE);
+
+    while(file_remaining >= PAGE_SIZE) {
+      read_file_into_buffer(fd, PAGE_SIZE, p);
+      write_buffer_to_file(out_fd, PAGE_SIZE, p);
+      file_remaining -= PAGE_SIZE;
+    }
+
+    if(file_remaining > 0) {
+      read_file_into_buffer(fd, file_remaining, p);
+      write_buffer_to_file(out_fd, file_remaining, p);
+    }
+
+    // Init the buffer
+    memset(p, pad_value, PAGE_SIZE);
+    
+    while(padding_size >= PAGE_SIZE) {
+      write_buffer_to_file(out_fd, PAGE_SIZE, p);
+      padding_size -= PAGE_SIZE;
+    }
+
+    if(padding_size > 0) {
+      write_buffer_to_file(out_fd, padding_size, p);
+    }
+
+    free(p);
+  } else {
+    fprintf(stderr, "Target size is smaller than file size; do nothing\n");
   }
 
   ret = close(fd);
@@ -140,6 +199,10 @@ int main(int argc, char **argv) {
   // Index == 2: Target length
   const char *filename = argv[1];
   int target_size = read_integer(argv[2], "Target size");
+  if(target_size <= 0) {
+    fprintf(stderr, "Invalid target size: %d\n", target_size);
+    exit(1);
+  }
 
   const char *output_filename = NULL;
   int pad_value = 0x00;
@@ -149,10 +212,10 @@ int main(int argc, char **argv) {
     if(strcmp(arg, "--output") == 0 || 
        strcmp(arg, "-o") == 0) {
       // Can be either out of bound or another option
-      output_filename = get_param(argv, i);
+      output_filename = get_param(argv, i++);
     } else if(strcmp(arg, "--value") == 0 || 
               strcmp(arg, "-v") == 0) {
-      pad_value = read_integer(get_param(argv, i), "Padded value");
+      pad_value = read_integer(get_param(argv, i++), "Padded value");
       if(pad_value <= 0x00 || pad_value >= 0xFF) {
         fprintf(stderr, "Padded value must be within [0, 255]\n");
         exit(1);
@@ -167,13 +230,14 @@ int main(int argc, char **argv) {
   }
 
   if(verbose_flag) {
-    fprintf(stderr, "Operation description: Padding file \"%s\""
-                    " to size %d with value %d; Output to %s\n",
+    fprintf(stderr, "Executing: Padding file \"%s\""
+                    " to size %d with value 0x%02X; Output to %s\n\n",
                     filename, target_size, pad_value, 
-                    output_filename == NULL ? stdout : output_filename);
+                    output_filename == NULL ? "stdout" : output_filename);
   }
 
-  pad_binary_file(filename, target_size, pad_value, output_filename);
+  pad_binary_file(filename, target_size, pad_value, 
+                  output_filename, verbose_flag);
 
   return 0;
 }
