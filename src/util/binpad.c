@@ -1,9 +1,22 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+/*
+ * print_usage() - Prints the usage string and exit
+ */
+void print_usage() {
+  fprintf(stderr, "binpad - Padding binary files\n");
+  fprintf(stderr, "=============================\n");
+  fprintf(stderr, "Usage: binpad [input file] [target length] [optional args]...\n\n");
+  fprintf(stderr, "-h/--help       Print this string\n");
+  fprintf(stderr, "-o/--output     Specifies the output file; if not specified then print on stdout\n");
+  exit(0);
+}
 
 /*
  * pad_binary_file() - Pads a binary file to a given length
@@ -23,7 +36,7 @@ void pad_binary_file(const char *filename,
                      size_t target_size,
                      int overwrite_flag) {
   struct stat file_status;
-  int fd = open(filename, O_RDONLY);
+  int fd = open(filename, O_RDWR);
   if(fd < 0) {
     perror(NULL);
     exit(1);
@@ -52,5 +65,11 @@ void pad_binary_file(const char *filename,
 }
 
 int main(int argc, char **argv) {
-
+  for(int i = 1;i < argc;i++) {
+    char *arg = argv[i];
+    if(strcmp(arg, "--help") == 0 || 
+       strcmp(arg, "-h") == 0) {
+        print_usage();
+    }
+  }
 }
