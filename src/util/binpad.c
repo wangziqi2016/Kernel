@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 /*
@@ -11,7 +12,7 @@
  */
 void print_usage() {
   fprintf(stderr, "binpad - Padding binary files\n");
-  fprintf(stderr, "=============================\n");
+  fprintf(stderr, "=============================\n\n");
   fprintf(stderr, "Usage: binpad [input file] [target length] [optional args]...\n\n");
   fprintf(stderr, "-h/--help       Print this string\n");
   fprintf(stderr, "-o/--output     Specifies the output file; if not specified then print on stdout\n");
@@ -51,9 +52,9 @@ void pad_binary_file(const char *filename,
   fprintf(stderr, "Basic file info\n");
   fprintf(stderr, "===============\n");
   fprintf(stderr, "File mode: 0x%X (regular? - %d)\n", 
-          file_status.st_mode, S_ISREG(m));
-  fprintf(stderr, "File size: %d\n", file_status.st_size);
-  fprintf(stderr, "# of blocks: %d\n", file_status.st_blocks);
+          file_status.st_mode, S_ISREG(file_status.st_mode));
+  fprintf(stderr, "File size: %ld\n", (long)file_status.st_size);
+  fprintf(stderr, "# of blocks: %ld\n", (long)file_status.st_blocks);
 
   ret = close(fd);
   if(ret != 0) {
