@@ -16,6 +16,8 @@ void print_usage() {
   fprintf(stderr, "Usage: binpad [input file] [target length] [optional args]...\n\n");
   fprintf(stderr, "-h/--help       Print this string\n");
   fprintf(stderr, "-o/--output     Specifies the output file; if not specified then print on stdout\n");
+  fprintf(stderr, "-v/--value      Specifies the byte value to pad; if not then pad 0x00\n");
+  fprintf(stderr, "\n")
   exit(0);
 }
 
@@ -87,6 +89,30 @@ int read_integer(const char *p, const char *purpose) {
   }
 
   return val;
+}
+
+/*
+ * get_param() - This function assumes that at argv[index + 1] location
+ *               there is a parameter, and checks whether it is valid or not
+ * 
+ * The paramrter should not be NULL (which indicates the end of argv). It
+ * should not start with '-' because it indicates next option. 
+ * 
+ * Return argv[index + 1] if all checks are passed.
+ */
+char *get_param(char **argv, int index) {
+  char *p = argv[index + 1];
+  if(p == NULL) {
+    fprintf(stderr, "Unexpected end of input when parsing \"%s\"\n",
+            argv[index]);
+    exit(1);
+  } else if(p[0] == '-') {
+    fprintf(stderr, "Unexpected start of the next option when parsing \"%s\"\n",
+            argv[index]);
+    exit(1);
+  }
+
+  return p;
 }
 
 int main(int argc, char **argv) {
