@@ -21,6 +21,7 @@ void print_usage() {
   fprintf(stderr, "-h/--help       Print this string\n");
   fprintf(stderr, "-o/--output     Specifies the output file; if not specified then print on stdout\n");
   fprintf(stderr, "-v/--value      Specifies the byte value to pad; if not then pad 0x00\n");
+  fprintf(stderr, "-s/--silent     Whether to run silently (no output from stderr except for errors)\n");
   fprintf(stderr, "\n");
   exit(0);
 }
@@ -142,6 +143,7 @@ int main(int argc, char **argv) {
 
   const char *output_filename = NULL;
   int pad_value = 0x00;
+  int verbose_flag = 1;
   for(int i = 3;i < argc;i++) {
     char *arg = argv[i];
     if(strcmp(arg, "--output") == 0 || 
@@ -155,10 +157,20 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Padded value must be within [0, 255]\n");
         exit(1);
       } 
-    } else if() {
+    } else if(strcmp(arg, "--silent") == 0 || 
+              strcmp(arg, "-s") == 0) {
+      verbose_flag = 0;
+    } else {
       // For unknown command, default is to print usage and exit
       print_usage();
     }
+  }
+
+  if(verbose_flag) {
+    fprintf(stderr, "Operation description: Padding file \"%s\""
+                    " to size %d with value %d; Output to %s\n",
+                    filename, target_size, pad_value, 
+                    output_filename == NULL ? stdout : output_filename);
   }
 
   pad_binary_file(filename, target_size, pad_value, output_filename);
