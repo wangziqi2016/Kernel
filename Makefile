@@ -23,9 +23,9 @@ $(info = Invoking the main compilation dispatcher...)
 $(info = CXXFLAGS: $(CXXFLAGS))
 $(info = LDFLAGS: $(LDFLAGS))
 
-.PHONY: all util common clean prepare
+.PHONY: all util common bootsect clean prepare
 
-all: common util
+all: common util bootsect
 
 # Note that calling make with -C will also pass the environmental variable set inside and by
 # the shell to the subprocess of make
@@ -37,6 +37,9 @@ common:
 TEST_OBJ = $(patsubst ./src/test/%.c, $(BUILD_DIR)/%.o, $(wildcard ./src/test/*.c))
 util: 
 	@$(MAKE) -C ./src/util
+
+bootsect: 
+	@$(MAKE) -C ./src/bootsect
 
 test-common: common test ./test/test-common.cpp
 	$(info >>> Building binary for test-common)
