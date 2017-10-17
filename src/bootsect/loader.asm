@@ -65,6 +65,46 @@ print_msg_ret:
 
   ; This function prints a character on the stack to the screen
 putchar:
+
+  ; This function copies memory regions that are not overlapped
+  ;   [SP + 0] - Length
+  ;   [SP + 2] - Source offset
+  ;   [SP + 4] - Source segment
+  ;   [SP + 6] - Dest offset
+  ;   [SP + 8] - Dest segment
+memcpy_nonalias:
+  pop cx
+  push ds 
+  push si
+  push es
+  push di
+  mov si, [sp + 8]
+  mov ds, [sp + 10]
+  mov di, [sp + 12]
+  mov es, [sp + 14]
+memcpy_body:  
+  ; Whether we have finished copying
+  test cx, cx
+  je memcpy_ret
+  ; Whether there is only 1 byte left
+  cmp cx, 1
+  je memcpy_last_byte
+  mov ax, [ds:si]
+  mov [es:di], ax
+  sub cx, 2
+  add si, 2
+  add di, 2
+  jmp memcpy_body
+memcpy_last_byte:
+  ; Copy one byte and return
+  mov al, [ds:si]
+  mov [es:di], al
+memcpy_ret:
+  pop di
+  pop es
+  pop si
+  pop ds
+  retn
   
   ; This moves the video cursor to the next char
 video_move_to_next_char:
