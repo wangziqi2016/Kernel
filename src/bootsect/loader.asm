@@ -67,10 +67,10 @@ print_msg_ret:
 putchar:
 
   ; This function copies memory regions that are not overlapped
-  ;   [SP + 0] - Dest segment
-  ;   [SP + 2] - Dest offset
-  ;   [SP + 4] - Source segment
-  ;   [SP + 6] - Source offset
+  ;   [SP + 0] - Dest offset
+  ;   [SP + 2] - Dest segment
+  ;   [SP + 4] - Source offset
+  ;   [SP + 6] - Source segment
   ;   [SP + 8] - Length
 memcpy_nonalias:
   push bp
@@ -81,10 +81,10 @@ memcpy_nonalias:
   push es
   push di
   mov cx, [bp + 12]
-  mov si, [bp + 10]
-  mov ds, [bp + 8]
-  mov di, [bp + 6]
-  mov es, [bp + 4]
+  mov si, [bp + 8]
+  mov ds, [bp + 10]
+  mov di, [bp + 4]
+  mov es, [bp + 6]
 memcpy_body:  
   ; Whether we have finished copying
   test cx, cx
@@ -112,8 +112,8 @@ memcpy_ret:
   retn
 
   ; This function sets a chunk of memory as a given byte value
-  ;   [SP + 0] - Segment
-  ;   [SP + 2] - Offset
+  ;   [SP + 0] - Offset
+  ;   [SP + 2] - Segment
   ;   [SP + 4] - Value (should be a zero-extended byte)
   ;   [SP + 6] - Length
 memset:
@@ -122,8 +122,8 @@ memset:
   push es
   push di
   
-  mov es, [bp + 4]
-  mov di, [bp + 6]
+  mov di, [bp + 4]
+  mov es, [bp + 6]
   mov al, [bp + 8]
   mov ah, al
   mov cx, [bp + 10]
@@ -146,26 +146,49 @@ memset_ret:
   pop bp
   retn
 
+  ; This function computes the offset of a given row
+video_get_row_offset:
+  
+
   ; This function scrolls up by a given number of lines
   ;   [SP + 0] num of lines
 video_scroll_up:
-  pop cx
+  push bp
+  mov bp, sp
+  ; Number of lines to scroll up
+  mov ax, [bp + 4]
   ; If we scroll too much then essentially it is clearing the entire screen
-  cmp cx, [video_max_row]
-  ja video_scroll_up_clear_all
+  cmp ax, [video_max_row]
+  jae video_scroll_up_clear_all
+
+  mov cx, [video_max_row]
+  ; CX is the numbre of rows to shift up
+  sub cx, ax
+  ; We keep AX as the fixed number, and use CX as the counter
+  mov ax, cx
+video_scroll_up_body:
+  test cx, cx
+
 
 video_scroll_up_clear_all:
-  push es
-  push bx
-  xor bx, bx
-  push word VIDEO_SEG
-  pop es
   ; We assume it can be held by a single 16 byte integer
   ; Typically it is just 80 * 25 * 2 = 4000 bytes
   mov ax, [video_max_row]
   mul word [video_max_col]
-  pop bx
-  pop es
+  ; memset - Length
+  push ax
+  ; memset - Value
+  push word 0
+  ; memset - Segment
+  push VIDEO_SEG
+  ; memset - Offset
+  push word 0
+  call memset
+  add sp, 8
+
+video_scroll_up_ret:
+  mov sp, bp
+  pop bp
   ret
 
   ; This moves the video cursor to the next char
@@ -175,7 +198,7 @@ video_move_to_next_char:
   cmp ax, [video_max_col]
   jne video_inc_col
   ; Clear column to zero and then test row
-  mov [video_current_col], 0
+  mov word [video_current_col], 0
   mov ax, [video_current_row]
   inc ax
   cmp ax, [video_max_row]
