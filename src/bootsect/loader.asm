@@ -188,11 +188,8 @@ video_scroll_up:
   cmp ax, [video_max_row]
   jae video_scroll_up_clear_all
 
-  mov cx, [video_max_row]
-  ; CX is the number of rows to shift up
-  sub cx, ax
   ; DX:AX = row:col for computing offset
-  mov dx, cx
+  mov dx, ax
   xor ax, ax
   call video_get_offset
   ; SI is the source offset which is the row that will become the first row
@@ -203,10 +200,17 @@ video_scroll_up:
   ; We know that BX will not be modified by subroutines
   mov bx, [video_max_col]
   shl bx, 1
+
+  ; CX is numer of iterations we need to perform
+  ; in order to move the entire screen up
+  mov cx, [video_max_row]
+  sub cx, [bp + 4]
 video_scroll_up_body:
   test cx, cx
   ; If we have finished copying, then just need to clear
   jz video_scroll_up_clear_remaining
+  ; Save register
+  push cx
   ; Length
   push bx
   ; Source and dest address
@@ -217,6 +221,8 @@ video_scroll_up_body:
   call memcpy_nonalias
   add sp, 10
 
+  ; Restore register
+  pop cx
   dec cx
   add si, bx
   add di, bx
@@ -259,7 +265,7 @@ video_scroll_up_ret:
   pop si
   mov sp, bp
   pop bp
-  ret
+  retn
 
   ; This moves the video cursor to the next char
 video_move_to_next_char:
@@ -301,7 +307,7 @@ putchar:
   mov ax, VIDEO_SEG
   mov es, ax
   mov [es:bx], si
-  
+
   ; Go to next char's position
   call video_move_to_next_char
 
