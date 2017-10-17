@@ -146,11 +146,17 @@ memset_ret:
   pop bp
   retn
 
-  ; This function computes the offset of a given row
+  ; This function computes the offset of a given position
   ; Note that we do not check for the correctness of the row
-  ;   AX = Row ID
-video_get_row_offset:
+  ;   DX:AX = Row ID:Col ID
+  ;   Returns in AX as a byte offset
+video_get_offset:
+  xchg dx, ax
+  ; DX:CX is col ID:row ID now
+  mov cx, dx
+  ; Return (row * max_col + col) * 2
   mul word [video_max_col]
+  add ax, cx
   shl ax, 1
   retn
 
@@ -161,6 +167,7 @@ video_scroll_up:
   mov bp, sp
   push si
   push di
+  push bx
 
   ; Number of lines to scroll up
   mov ax, [bp + 4]
@@ -171,17 +178,51 @@ video_scroll_up:
   mov cx, [video_max_row]
   ; CX is the number of rows to shift up
   sub cx, ax
-  ; dest address is 0
+  ; DX:AX = row:col for computing offset
+  mov dx, cx
+  xor ax, ax
+  call video_get_offset
+  ; SI is the source offset which is the row that will become the first row
+  mov si, ax
+  ; DI is dest offset which is 0
   xor di, di
-
-  
-  ; We keep AX as the fixed number, and use CX as the counter
-  mov ax, cx
-
+  ; BX is the number of bytes per line
+  ; We know that BX will not be modified by subroutines
+  mov bx, [video_max_col]
+  shl bx, 1
 video_scroll_up_body:
   test cx, cx
+  ; If we have finished copying, then just need to clear
+  jz video_scroll_up_clear_remaining
+  ; Length
+  push bx
+  ; Source and dest address
+  push word VIDEO_SEG
+  push si
+  push word VIDEO_SEG
+  push di
+  call memcpy_nonalias
+  add sp, 10
 
-
+  dec cx
+  add si, bx
+  add di, bx
+  jmp video_scroll_up_body
+video_scroll_up_clear_remaining:
+  ; Number of lines to clear (parameter)
+  mov ax, [bp + 4]
+  ; Compute the number of bytes to clear
+  mul word [video_max_col]
+  shl ax, 1
+  ; SI from the previous loop is the starting address
+  ; of the region we are going to clear
+  push ax
+  push word 0
+  push VIDEO_SEG
+  push si
+  call memset
+  add sp, 8
+  jmp video_scroll_up_ret
 video_scroll_up_clear_all:
   ; We assume it can be held by a single 16 byte integer
   ; Typically it is just 80 * 25 * 2 = 4000 bytes
@@ -201,6 +242,7 @@ video_scroll_up_clear_all:
   add sp, 8
 
 video_scroll_up_ret:
+  pop bx
   pop di
   pop si
   mov sp, bp
@@ -220,7 +262,10 @@ video_move_to_next_char:
   cmp ax, [video_max_row]
   jne video_inc_row
   ; We have reached the end of the screen; need to scroll up
+  ; Note that current row in the memory stay unchanged
+  push word 1
   call video_scroll_up
+  add sp, 2
   retn
 video_inc_row:
   mov [video_current_row], ax
