@@ -23,7 +23,7 @@ $(info = Invoking the main compilation dispatcher...)
 $(info = CXXFLAGS: $(CXXFLAGS))
 $(info = LDFLAGS: $(LDFLAGS))
 
-.PHONY: all util common bootsect clean prepare
+.PHONY: all util common bootsect clean prepare run
 
 all: common util bootsect
 
@@ -41,16 +41,8 @@ util:
 bootsect: 
 	@$(MAKE) -C ./src/bootsect
 
-test-common: common test ./test/test-common.cpp
-	$(info >>> Building binary for test-common)
-	$(CXX) -o $(BIN_DIR)/$@ $(COMMON_OBJ) $(TEST_OBJ) ./test/test-common.cpp $(CXXFLAGS) $(LDFLAGS)
-	@$(LN) -sf $(BIN_DIR)/$@ ./$@-bin
-
-test-binary-util: common test ./test/test-binary-util.cpp
-	$(info >>> Building binary for test-binary-util)
-	$(CXX) -o $(BIN_DIR)/$@ $(COMMON_OBJ) $(TEST_OBJ) ./test/test-binary-util.cpp $(CXXFLAGS) $(LDFLAGS)
-	@$(LN) -sf $(BIN_DIR)/$@ ./$@-bin
-
+run: bootsect
+	bochs -q -f ./test/bochs-ubuntu.bxrc
 
 clean:
 	$(info >>> Cleaning files)
