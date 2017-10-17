@@ -35,7 +35,7 @@ section .text
   call print_line
 
   mov si, 400
-  mov di, 5
+  mov di, 4
   mov bx, 0775h
 test_putchar:
   test si, si
@@ -238,7 +238,9 @@ video_scroll_up_clear_remaining:
   push ax
   push word 0
   push VIDEO_SEG
-  push si
+  ; Note that the destination now points exactly to the lines we
+  ; want to clear
+  push di
   call memset
   add sp, 8
   jmp video_scroll_up_ret
