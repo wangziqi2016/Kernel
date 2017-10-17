@@ -1,4 +1,15 @@
 
+;
+; loader.asm - The stage I loader
+;
+; This file provides basic I/O functions. All functions are called
+; with CDECL convention, i.e. AX, CX, DX are caller saved, parameters
+; are pushed from right to left, and the caller is responsible for clearing
+; the stack
+;
+; char must be extended to 16 bit to be push to the stack
+;
+
 section .text
   ; This file is loaded into BX=0200h as the second sector 
 	org	0200h
@@ -51,6 +62,36 @@ print_msg_ret:
 	pop di
   pop es
 	retn
+
+  ; This function prints a character on the stack to the screen
+putchar:
+  
+  ; This moves the video cursor to the next char
+video_move_to_next_char:
+  mov ax, [video_current_col]
+  inc ax
+  cmp ax, [video_max_col]
+  jne video_inc_col
+  ; Clear column to zero and then test row
+  mov [video_current_col] = 0
+  mov ax, [video_current_row]
+  inc ax
+  cmp ax, [video_max_row]
+  jne video_inc_row
+  ; We have reached the end of the screen; need to scroll up
+  call video_scroll_up
+  retn
+video_inc_row:
+  mov [video_current_row], ax
+  retn
+video_inc_col:
+  mov [video_current_col], ax
+  retn
+
+video_current_row: dw 0
+video_current_col: dw 0
+video_max_row:     dw 25
+video_max_col:     dw 80
 
 str_load_success:
   db "Begin stage I", 0
