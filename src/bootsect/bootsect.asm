@@ -18,6 +18,8 @@ section .text
 	jmp	start
 
 start:
+  ; Clear interrupt before we set up the stack
+  cli
 	; AH = 00 - set mode; AL = 03h - 80*25@16
 	mov ax, 0003h
 	int 10h
@@ -29,6 +31,7 @@ start:
 	; Note that this sector is on address 0x07C00 - 0x07DFF
 	mov ss, ax
 	mov sp, 0FFF0h
+  sti
 
   mov si, str1
 	call print_msg
@@ -68,7 +71,10 @@ test_num_sector:
   jne print_verify_sector_error
 
   ; Jump to the code we just loaded
-	jmp die
+  ; Note: Segment is on high address
+  push word LOAD_SEG
+	push word SECTOR_SIZE
+  retf
   
   ; This function reads a sector into ES:BX
   ; using the parameter at the end of this file
