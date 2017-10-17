@@ -67,23 +67,24 @@ print_msg_ret:
 putchar:
 
   ; This function copies memory regions that are not overlapped
-  ;   [SP + 0] - Length
-  ;   [SP + 2] - Source offset
+  ;   [SP + 0] - Dest segment
+  ;   [SP + 2] - Dest offset
   ;   [SP + 4] - Source segment
-  ;   [SP + 6] - Dest offset
-  ;   [SP + 8] - Dest segment
+  ;   [SP + 6] - Source offset
+  ;   [SP + 8] - Length
 memcpy_nonalias:
-  pop cx
-  ; BP points to SP + 2 using entrance point as reference
+  push bp
+  ; BP points to SP using entrance point as reference
   mov bp, sp
   push ds 
   push si
   push es
   push di
-  mov si, [bp + 0]
-  mov ds, [bp + 2]
-  mov di, [bp + 4]
-  mov es, [bp + 6]
+  mov cx, [bp + 12]
+  mov si, [bp + 10]
+  mov ds, [bp + 8]
+  mov di, [bp + 6]
+  mov es, [bp + 4]
 memcpy_body:  
   ; Whether we have finished copying
   test cx, cx
@@ -106,8 +107,67 @@ memcpy_ret:
   pop es
   pop si
   pop ds
+  mov sp, bp
+  pop bp
   retn
+
+  ; This function sets a chunk of memory as a given byte value
+  ;   [SP + 0] - Segment
+  ;   [SP + 2] - Offset
+  ;   [SP + 4] - Value (should be a zero-extended byte)
+  ;   [SP + 6] - Length
+memset:
+  push bp
+  mov bp, sp
+  push es
+  push di
   
+  mov es, [bp + 4]
+  mov di, [bp + 6]
+  mov al, [bp + 8]
+  mov ah, al
+  mov cx, [bp + 10]
+
+memset_body:
+  test cx, cx
+  je memset_ret
+  cmp cx, 1
+  je memset_last_byte
+  mov [es:di], ax  
+  sub cx, 2
+  add di, 2
+  jmp memset_body
+memset_last_byte:
+  mov [es:di], al
+memset_ret:
+  pop di
+  pop es
+  mov sp, bp 
+  pop bp
+  retn
+
+  ; This function scrolls up by a given number of lines
+  ;   [SP + 0] num of lines
+video_scroll_up:
+  pop cx
+  ; If we scroll too much then essentially it is clearing the entire screen
+  cmp cx, [video_max_row]
+  ja video_scroll_up_clear_all
+
+video_scroll_up_clear_all:
+  push es
+  push bx
+  xor bx, bx
+  push word VIDEO_SEG
+  pop es
+  ; We assume it can be held by a single 16 byte integer
+  ; Typically it is just 80 * 25 * 2 = 4000 bytes
+  mov ax, [video_max_row]
+  mul word [video_max_col]
+  pop bx
+  pop es
+  ret
+
   ; This moves the video cursor to the next char
 video_move_to_next_char:
   mov ax, [video_current_col]
