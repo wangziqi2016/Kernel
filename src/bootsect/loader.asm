@@ -33,7 +33,23 @@ section .text
 
   mov si, str_load_success
   call print_line
-  jmp die
+
+  mov si, 400
+  mov di, 5
+  mov bx, 0775h
+test_putchar:
+  test si, si
+  jnz print_char
+  test di, di
+  jz die
+  mov si, 400
+  dec di
+  inc bl
+print_char:
+  mov ax, bx
+  call putchar
+  dec si
+  jmp test_putchar
 
 die:
   jmp die
@@ -62,9 +78,6 @@ print_msg_ret:
 	pop di
   pop es
 	retn
-
-  ; This function prints a character on the stack to the screen
-putchar:
 
   ; This function copies memory regions that are not overlapped
   ;   [SP + 0] - Dest offset
@@ -240,7 +253,6 @@ video_scroll_up_clear_all:
   push word 0
   call memset
   add sp, 8
-
 video_scroll_up_ret:
   pop bx
   pop di
@@ -272,6 +284,30 @@ video_inc_row:
   retn
 video_inc_col:
   mov [video_current_col], ax
+  retn
+
+  ; al:ah is the char:attr to put into the stream
+putchar:
+  push bx 
+  push es
+  push si
+
+  mov si, ax
+  mov dx, [video_current_row]
+  mov ax, [video_current_col]
+  call video_get_offset
+  ; AX is the offset
+  mov bx, ax
+  mov ax, VIDEO_SEG
+  mov es, ax
+  mov [es:bx], si
+  
+  ; Go to next char's position
+  call video_move_to_next_char
+
+  pop si
+  pop es
+  pop bx
   retn
 
 video_current_row: dw 0
