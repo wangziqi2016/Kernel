@@ -74,14 +74,16 @@ putchar:
   ;   [SP + 8] - Dest segment
 memcpy_nonalias:
   pop cx
+  ; BP points to SP + 2 using entrance point as reference
+  mov bp, sp
   push ds 
   push si
   push es
   push di
-  mov si, [sp + 8]
-  mov ds, [sp + 10]
-  mov di, [sp + 12]
-  mov es, [sp + 14]
+  mov si, [bp + 0]
+  mov ds, [bp + 2]
+  mov di, [bp + 4]
+  mov es, [bp + 6]
 memcpy_body:  
   ; Whether we have finished copying
   test cx, cx
@@ -113,7 +115,7 @@ video_move_to_next_char:
   cmp ax, [video_max_col]
   jne video_inc_col
   ; Clear column to zero and then test row
-  mov [video_current_col] = 0
+  mov [video_current_col], 0
   mov ax, [video_current_row]
   inc ax
   cmp ax, [video_max_row]
