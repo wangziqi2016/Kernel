@@ -77,7 +77,10 @@ test_num_sector:
 read_sector:
   push bx
   push cx
+  ; Retry remains
+  push word 3
 
+read_sector_retry:
   mov ax, 0201h
   ; DL = drive ID. DH = disk head
   mov dx, [boot_drive]
@@ -86,16 +89,33 @@ read_sector:
   ; always 0 (only 80 tracks)
   mov cx, [current_sector]
   int 13h
-  jc print_read_sector_error
+  jc read_sector_reset
   ; AL contains the actual # of tracks read
   ; AH contatns the return code (00 = normal)
   cmp ax, 0001h
-  jne print_read_sector_error
-  
+  jne read_sector_reset
+
+  ; Return here normally
+  pop cx
   pop cx
   pop bx
   add bx, SECTOR_SIZE
   retn
+
+read_sector_reset:
+  ; Check whether we have run out of retries
+  pop cx
+  test cx, cx
+  je print_read_sector_error
+  ; AH = 00H to reset the device speficied by DL
+  mov ah, 00h
+  mov dl, [boot_drive]
+  int 13h
+  jc print_read_sector_error
+  ; Decrease this number and continue execution
+  dec cx
+  push cx
+  jmp read_sector_retry
 
   ; This function changes the parameters of the disk
   ;   - Changes AX
