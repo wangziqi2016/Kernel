@@ -3,16 +3,15 @@
 ;
 
 section .text 
-	org	7C00H
+	org	7c00h
 	jmp	start
 
 start:
-  ; boot section goes after
 	; AH = 00 - set mode; AL = 03h - 80*25@16
 	mov ax, 0003h
 	int 10h
 
-  ; Set DS=SS; ES=0B800h
+  ; Set DS=SS; ES undefined
   xor ax, ax
   mov ds, ax
 	; Set up stack end: 0x0FFF0
@@ -20,14 +19,10 @@ start:
 	mov ss, ax
 	mov sp, 0FFF0h
 
-  mov ax, 0b800h
-  mov es, ax
-
   mov si, str1
 	call near print_msg
 
 start_load:
-  jmp start_load
   ; leave space to read disk parameters
   sub sp, 001Eh
 
@@ -36,13 +31,14 @@ start_load:
   mov ah, 48h
 
   int 13h
-  jc print_read_param_error
-
-this_line:
-  jmp this_line
+  jc print_read_sector_error
+	jmp die
 
 print_msg:
+  push es
   push di
+  push word 0b800h
+  pop es
   mov di, [video_offset]
 print_msg_body:
   mov al, [ds:si]
@@ -54,23 +50,42 @@ print_msg_body:
   inc di
   jmp print_msg_body
 print_msg_ret:
-	mov [video_offset], di
+	add word [video_offset], 00A0h
 	pop di
+  pop es
 	retn
 
-print_read_param_error:
+print_read_sector_error:
   mov si, str2
-	;call 
+	call print_msg
+	jmp die
+
+die:
+  jmp die
 
 str1:
   db "Loading boot sectors... ", 0
 str2:
-  db "Error reading disk parameters", 0
-str3:
   db "Error reading sectors", 0
 
+  ; We boot from 00h drive which is the 1st floppy
 boot_drive:
-  db 0
+  db 0h
+  ; 18 sectors per track
+sector_per_track:
+  db 12h
+  ; 80 tracks per disk
+track_per_disk:
+  db 50h
+  
+  ; Disk parameters used by
+current_sector:
+  db 01h
+current_track:
+  db 00h
+current_head:
+  db 00h
+
 video_offset:
   dw 0
 
