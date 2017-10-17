@@ -147,14 +147,21 @@ memset_ret:
   retn
 
   ; This function computes the offset of a given row
+  ; Note that we do not check for the correctness of the row
+  ;   AX = Row ID
 video_get_row_offset:
-  
+  mul word [video_max_col]
+  shl ax, 1
+  retn
 
   ; This function scrolls up by a given number of lines
   ;   [SP + 0] num of lines
 video_scroll_up:
   push bp
   mov bp, sp
+  push si
+  push di
+
   ; Number of lines to scroll up
   mov ax, [bp + 4]
   ; If we scroll too much then essentially it is clearing the entire screen
@@ -162,10 +169,15 @@ video_scroll_up:
   jae video_scroll_up_clear_all
 
   mov cx, [video_max_row]
-  ; CX is the numbre of rows to shift up
+  ; CX is the number of rows to shift up
   sub cx, ax
+  ; dest address is 0
+  xor di, di
+
+  
   ; We keep AX as the fixed number, and use CX as the counter
   mov ax, cx
+
 video_scroll_up_body:
   test cx, cx
 
@@ -175,6 +187,8 @@ video_scroll_up_clear_all:
   ; Typically it is just 80 * 25 * 2 = 4000 bytes
   mov ax, [video_max_row]
   mul word [video_max_col]
+  ; Do not forget to multiply this by 2
+  shl ax, 1
   ; memset - Length
   push ax
   ; memset - Value
@@ -187,6 +201,8 @@ video_scroll_up_clear_all:
   add sp, 8
 
 video_scroll_up_ret:
+  pop di
+  pop si
   mov sp, bp
   pop bp
   ret
