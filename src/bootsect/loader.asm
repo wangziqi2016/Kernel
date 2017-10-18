@@ -41,7 +41,7 @@ test_putchar:
   test si, si
   jnz print_char
   test di, di
-  jz die
+  jz after_test_putchar
   mov si, 400
   dec di
   inc bl
@@ -51,6 +51,8 @@ print_char:
   dec si
   jmp test_putchar
 
+after_test_putchar:
+  call video_move_to_next_line
 die:
   jmp die
 
@@ -292,6 +294,22 @@ video_inc_row:
   retn
 video_inc_col:
   mov [video_current_col], ax
+  retn
+
+  ; Moves the display to the next line (i.e. shifting one line above)
+  ; Also the column is set to 0
+video_move_to_next_line:
+  mov word [video_current_col], 0
+  mov ax, [video_current_row]
+  inc ax
+  cmp ax, [video_max_row]
+  jnz video_move_to_next_line_inc_row
+  push word 1
+  call video_scroll_up
+  add sp, 2
+  retn
+video_move_to_next_line_inc_row:
+  mov [video_current_row], ax
   retn
 
   ; al:ah is the char:attr to put into the stream
