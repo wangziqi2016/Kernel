@@ -104,7 +104,7 @@ memcpy_nonalias:
 .body:  
   ; Whether we have finished copying
   test cx, cx
-  je .ret
+  je .return
   ; Whether there is only 1 byte left
   cmp cx, 1
   je .last_byte
@@ -118,7 +118,7 @@ memcpy_nonalias:
   ; Copy one byte and return
   mov al, [ds:si]
   mov [es:di], al
-.ret:
+.return:
   pop di
   pop es
   pop si
@@ -144,18 +144,18 @@ memset:
   mov ah, al
   mov cx, [bp + 10]
 
-memset_body:
+.body:
   test cx, cx
-  je memset_ret
+  je .return
   cmp cx, 1
-  je memset_last_byte
+  je .last_byte
   mov [es:di], ax  
   sub cx, 2
   add di, 2
-  jmp memset_body
-memset_last_byte:
+  jmp .body
+.last_byte:
   mov [es:di], al
-memset_ret:
+.return:
   pop di
   pop es
   mov sp, bp 
@@ -189,7 +189,7 @@ video_scroll_up:
   mov ax, [bp + 4]
   ; If we scroll too much then essentially it is clearing the entire screen
   cmp ax, [video_max_row]
-  jae video_scroll_up_clear_all
+  jae .clear_all
 
   ; DX:AX = row:col for computing offset
   mov dx, ax
@@ -208,10 +208,10 @@ video_scroll_up:
   ; in order to move the entire screen up
   mov cx, [video_max_row]
   sub cx, [bp + 4]
-video_scroll_up_body:
+.body:
   test cx, cx
   ; If we have finished copying, then just need to clear
-  jz video_scroll_up_clear_remaining
+  jz .clear_remaining
   ; Save register
   push cx
   ; Length
@@ -229,8 +229,8 @@ video_scroll_up_body:
   dec cx
   add si, bx
   add di, bx
-  jmp video_scroll_up_body
-video_scroll_up_clear_remaining:
+  jmp .body
+.clear_remaining:
   ; Number of lines to clear (parameter)
   mov ax, [bp + 4]
   ; Compute the number of bytes to clear
@@ -246,8 +246,8 @@ video_scroll_up_clear_remaining:
   push di
   call memset
   add sp, 8
-  jmp video_scroll_up_ret
-video_scroll_up_clear_all:
+  jmp .return
+.clear_all:
   ; We assume it can be held by a single 16 byte integer
   ; Typically it is just 80 * 25 * 2 = 4000 bytes
   mov ax, [video_max_row]
@@ -264,7 +264,7 @@ video_scroll_up_clear_all:
   push word 0
   call memset
   add sp, 8
-video_scroll_up_ret:
+.return:
   pop bx
   pop di
   pop si
@@ -277,23 +277,23 @@ video_move_to_next_char:
   mov ax, [video_current_col]
   inc ax
   cmp ax, [video_max_col]
-  jne video_inc_col
+  jne .inc_col
   ; Clear column to zero and then test row
   mov word [video_current_col], 0
   mov ax, [video_current_row]
   inc ax
   cmp ax, [video_max_row]
-  jne video_inc_row
+  jne .inc_row
   ; We have reached the end of the screen; need to scroll up
   ; Note that current row in the memory stay unchanged
   push word 1
   call video_scroll_up
   add sp, 2
   retn
-video_inc_row:
+.inc_row:
   mov [video_current_row], ax
   retn
-video_inc_col:
+.inc_col:
   mov [video_current_col], ax
   retn
 
@@ -304,12 +304,12 @@ video_move_to_next_line:
   mov ax, [video_current_row]
   inc ax
   cmp ax, [video_max_row]
-  jnz video_move_to_next_line_inc_row
+  jnz .inc_row
   push word 1
   call video_scroll_up
   add sp, 2
   retn
-video_move_to_next_line_inc_row:
+.inc_row:
   mov [video_current_row], ax
   retn
 
