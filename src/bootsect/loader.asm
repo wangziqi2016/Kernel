@@ -177,6 +177,8 @@ video_get_offset:
   retn
 
   ; This function scrolls up by a given number of lines
+  ; Note that we just modify the video buffer. Current row and col is not 
+  ; changed
   ;   [SP + 0] num of lines
 video_scroll_up:
   push bp
@@ -325,10 +327,18 @@ video_clear_all:
   retn
 
   ; al:ah is the char:attr to put into the stream
+  ; Note that we have special processing for \r and \n. In these two cases
+  ; the attribute is not used
 putchar:
-  push bx 
+  push bx
   push es
   push si
+
+  ; 0A = new line; 0D = carriage return
+  cmp al, 0ah
+  je .process_lf
+  cmp al, 0dh
+  je .process_cr
 
   mov si, ax
   mov dx, [video_current_row]
@@ -342,7 +352,14 @@ putchar:
 
   ; Go to next char's position
   call video_move_to_next_char
-
+  jmp .return
+.process_cr:
+  mov word [video_current_col], 0
+  jmp .return
+.process_lf:
+  call video_move_to_next_line
+  jmp .return
+.return:
   pop si
   pop es
   pop bx
