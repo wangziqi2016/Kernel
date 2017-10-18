@@ -299,7 +299,12 @@ video_scroll_up:
   pop bp
   retn
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Video - Update the cursor
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
   ; This moves the video cursor to the next char
+  ; This function changes cursor offset
 video_move_to_next_char:
   mov ax, [video_current_col]
   inc ax
@@ -316,16 +321,23 @@ video_move_to_next_char:
   push word 1
   call video_scroll_up
   add sp, 2
+  jmp .return
+.inc_col:
+  mov [video_current_col], ax
+  ; Fast path - if we just add column, then the cursor offset can be 
+  ; easily modified
+  add word [video_cursor_offset], 2
   retn
 .inc_row:
   mov [video_current_row], ax
-  retn
-.inc_col:
-  mov [video_current_col], ax
+.return:
+  ; Compute the new offset
+  call video_update_cursor_offset
   retn
 
   ; Moves the display to the next line (i.e. shifting one line above)
   ; Also the column is set to 0
+  ; This function changes cursor offset
 video_move_to_next_line:
   mov word [video_current_col], 0
   mov ax, [video_current_row]
@@ -335,13 +347,23 @@ video_move_to_next_line:
   push word 1
   call video_scroll_up
   add sp, 2
-  retn
+  jmp .return
 .inc_row:
   mov [video_current_row], ax
+.return:
+  call video_update_cursor_offset
   retn
 
-  ; This function clears all contents on the screen, and then resets col and row
-  ; to zero
+  ; This function just moves the cursor to the current line
+  ; The effect is like printing a CR character
+  ; This function updates the cursor offset
+video_move_to_this_line:
+  mov [video_current_col], word 0
+  call video_update_cursor_offset
+  retn
+
+  ; This function clears all contents on the screen, and then resets 
+  ; col and row to zero
 video_clear_all:
   mov ax, [video_max_row]
   push ax
@@ -349,6 +371,7 @@ video_clear_all:
   add sp, 2
   mov word [video_current_col], 0
   mov word [video_current_row], 0
+  mov word [video_cursor_offset], 0
   retn
 
   ; This function draws the cursor at current location
@@ -357,20 +380,37 @@ video_clear_all:
 video_putcursor:
   push es
   push bx
-
   ; Seg video segment, we will use BX later
   mov ax, VIDEO_SEG
   mov es, ax
+  ; BX now points to the word that specifies the character and byte
+  mov bx, [video_cursor_offset]
+  mov [es:bx], word CURSOR_WORD
+  pop bx
+  pop es
+  retn
+  
+  ; This function clears the cursor
+video_clearcursor:
+  push es
+  push bx
+  ; Seg video segment, we will use BX later
+  mov ax, VIDEO_SEG
+  mov es, ax
+  ; BX now points to the word that specifies the character and byte
+  mov bx, [video_cursor_offset]
+  xor ax, ax
+  mov [es:bx], ax
+  pop bx
+  pop es
+  retn
 
+  ; This function updates the cursor offset
+video_update_cursor_offset:
   mov dx, [video_current_row]
   mov ax, [video_current_col]
   call video_get_offset
-  ; BX now points to the word that specifies the character and byte
-  mov bx, ax
-  mov [es:bx], word CURSOR_WORD
-
-  pop bx
-  pop es
+  mov [video_cursor_offset], ax
   retn
 
   ; al:ah is the char:attr to put into the stream
@@ -387,12 +427,12 @@ putchar:
   cmp al, 0dh
   je .process_cr
 
+  ; Protect AX before calling function
   mov si, ax
-  mov dx, [video_current_row]
-  mov ax, [video_current_col]
-  call video_get_offset
-  ; AX is the offset
-  mov bx, ax
+  call video_clearcursor
+
+  ; BX is the offset to write character
+  mov bx, [video_cursor_offset]
   mov ax, VIDEO_SEG
   mov es, ax
   mov [es:bx], si
@@ -401,21 +441,29 @@ putchar:
   call video_move_to_next_char
   jmp .return
 .process_cr:
-  mov word [video_current_col], 0
+  call video_move_to_this_line
   jmp .return
 .process_lf:
   call video_move_to_next_line
-  jmp .return
 .return:
+  ; Restore the cursor here before return
+  call video_putcursor
+
   pop si
   pop es
   pop bx
   retn
 
-video_current_row: dw 0
-video_current_col: dw 0
-video_max_row:     dw 25
-video_max_col:     dw 80
+video_current_row:    dw 0
+video_current_col:    dw 0
+; The offset of the cursor on the video memory
+; Note that this value is not represented in row-col form, because
+; the cursor position is usually a by-product of other computations
+; or easily obtained
+video_cursor_offset:  dw 0
+; These two should be used as constants
+video_max_row:        dw 25
+video_max_col:        dw 80
 
 str_load_success:
   db "Begin stage I", 0
