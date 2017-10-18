@@ -57,30 +57,35 @@ after_test_putchar:
 die:
   jmp die
 
-  ; This function prints a zero-terminated line whose
-  ; length is less than 80; It always starts a new line after printing
-print_line:
+  ; This function prints a line on the current cursor position
+  ; Note that a new line character is always appended
+  ; The line always use default attribute
+  ;   [SP + 0] - String offset
+  ;   [SP + 2] - String segment
+video_putline:
+  push bp
+  mov bp, sp
   push es
-  push di
-  ; Reload ES as the video buffer segment
-  push word VIDEO_SEG
-  pop es
-  mov di, [video_offset]
-print_msg_body:
-  mov al, [ds:si]
+  push bx
+  mov bx, [bp + 4]
+  mov ax, [bp + 6]
+  mov es, ax
+.body:
+  mov al, [es:bx]
   test al, al
-  je print_msg_ret
-  mov [es:di], al
-  inc si
-  inc di
-  inc di
-  jmp print_msg_body
-print_msg_ret:
-  ; Go to the next line
-	add word [video_offset], BUFFER_LEN_PER_LINE
-	pop di
+  jz .return
+  mov ah, 07h
+  call putchar
+  inc bx
+  jmp .body
+.return:
+  ; Add a new line
+  mov al, 0ah
+  call putchar
+
+  pop bx
   pop es
-	retn
+  retn
 
   ; This function copies memory regions that are not overlapped
   ;   [SP + 0] - Dest offset
