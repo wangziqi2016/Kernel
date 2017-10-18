@@ -316,6 +316,23 @@ putchar:
   pop bx
   retn
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Low-level interrupt & hardware mode switching
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ; Initialize the video card to a mode under which this module
+  ; is capable to work
+video_init:
+  ; AH = 00H - switch mode
+  ; AL = 03H - 80*25@16 VGA with B800:0000
+  mov ax, 0003h
+  int 10h
+  ; AH = 01h - Set cursor shape
+  mov ah, 01h
+  ; CX = 2000h - Hide the cursor
+  mov cx, 2000h
+  int 10h
+  retn
+
 video_current_row:    dw 0
 video_current_col:    dw 0
 ; The offset of the cursor on the video memory
@@ -329,6 +346,3 @@ video_max_col:        dw 80
 
 str_load_success:
   db "Begin stage I", 0
-
-video_offset:
-  dw 0000h

@@ -27,8 +27,7 @@ section .text
   sti
 
   ; Refresh the screen
-  mov ax, 0003h
-	int 10h
+  call video_init
 
   mov si, 400
   mov di, 4
