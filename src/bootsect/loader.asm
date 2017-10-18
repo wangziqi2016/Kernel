@@ -53,6 +53,7 @@ print_char:
 
 after_test_putchar:
   call video_move_to_next_line
+  call video_clear_all
 die:
   jmp die
 
@@ -310,6 +311,17 @@ video_move_to_next_line:
   retn
 video_move_to_next_line_inc_row:
   mov [video_current_row], ax
+  retn
+
+  ; This function clears all contents on the screen, and then resets col and row
+  ; to zero
+video_clear_all:
+  mov ax, [video_max_row]
+  push ax
+  call video_scroll_up
+  add sp, 2
+  mov word [video_current_col], 0
+  mov word [video_current_row], 0
   retn
 
   ; al:ah is the char:attr to put into the stream
