@@ -13,8 +13,6 @@
 section .text
   ; This file is loaded into BX=0200h as the second sector 
 	org	0200h
-  VIDEO_SEG equ 0b800h
-  BUFFER_LEN_PER_LINE equ 80 * 2
 
   cli
   ; This is the new segment address
@@ -30,9 +28,6 @@ section .text
   ; Refresh the screen
   mov ax, 0003h
 	int 10h
-
-  mov si, str_load_success
-  call print_line
 
   mov si, 400
   mov di, 4
@@ -54,8 +49,31 @@ print_char:
 after_test_putchar:
   call video_move_to_next_line
   call video_clear_all
+
+  push ds
+  push str_load_success
+  call video_putline
+  call video_putline
+  call video_putline
+  call video_putline
+  add sp, 4
+
 die:
   jmp die
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Video functions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; This is video segment address (i.e. 0xB8000 in 20 bit mode)
+VIDEO_SEG equ 0b800h
+; Number of bytes per row
+BUFFER_LEN_PER_LINE equ 80 * 2
+; 0x70 is the attr byte - foreground gray; background none
+; 0x20 is the space character which we use to represent the cursor
+; as a square block 
+CURSOR_WORD equ 7020h
 
   ; This function prints a line on the current cursor position
   ; Note that a new line character is always appended
@@ -85,6 +103,8 @@ video_putline:
 
   pop bx
   pop es
+  mov sp, bp
+  pop bp
   retn
 
   ; This function copies memory regions that are not overlapped
@@ -329,6 +349,28 @@ video_clear_all:
   add sp, 2
   mov word [video_current_col], 0
   mov word [video_current_row], 0
+  retn
+
+  ; This function draws the cursor at current location
+  ; the cursor is defined as a space character with background
+  ; color set to gray (attr = 0x70)
+video_putcursor:
+  push es
+  push bx
+
+  ; Seg video segment, we will use BX later
+  mov ax, VIDEO_SEG
+  mov es, ax
+
+  mov dx, [video_current_row]
+  mov ax, [video_current_col]
+  call video_get_offset
+  ; BX now points to the word that specifies the character and byte
+  mov bx, ax
+  mov [es:bx], word CURSOR_WORD
+
+  pop bx
+  pop es
   retn
 
   ; al:ah is the char:attr to put into the stream
