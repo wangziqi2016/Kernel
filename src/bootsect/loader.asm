@@ -420,16 +420,17 @@ putchar:
   push bx
   push es
   push si
+  
+  ; Protect AX before calling function
+  mov si, ax
+  call video_clearcursor
+  mov ax, si
 
   ; 0A = new line; 0D = carriage return
   cmp al, 0ah
   je .process_lf
   cmp al, 0dh
   je .process_cr
-
-  ; Protect AX before calling function
-  mov si, ax
-  call video_clearcursor
 
   ; BX is the offset to write character
   mov bx, [video_cursor_offset]
