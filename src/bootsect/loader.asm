@@ -101,24 +101,24 @@ memcpy_nonalias:
   mov ds, [bp + 10]
   mov di, [bp + 4]
   mov es, [bp + 6]
-memcpy_body:  
+.body:  
   ; Whether we have finished copying
   test cx, cx
-  je memcpy_ret
+  je .ret
   ; Whether there is only 1 byte left
   cmp cx, 1
-  je memcpy_last_byte
+  je .last_byte
   mov ax, [ds:si]
   mov [es:di], ax
   sub cx, 2
   add si, 2
   add di, 2
-  jmp memcpy_body
-memcpy_last_byte:
+  jmp .body
+.last_byte:
   ; Copy one byte and return
   mov al, [ds:si]
   mov [es:di], al
-memcpy_ret:
+.ret:
   pop di
   pop es
   pop si
