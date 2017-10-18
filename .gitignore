@@ -2,6 +2,7 @@
 binpad
 *.img
 *.bin
+*.tmp
 
 # Prerequisites
 *.d
