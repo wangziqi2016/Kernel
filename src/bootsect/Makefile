@@ -16,6 +16,9 @@ bootsect.bin: bootsect.asm Makefile
 	$(info >>> bootsect.asm -> bootsect.bin)
 	$(ASM) bootsect.asm -o bootsect.bin
 
+LOADER_ASMS = $(wildcard loader_*.asm)
 loader.bin: loader.asm Makefile
 	$(info >>> loader.asm -> loader.bin)
-	$(ASM) loader.asm -o loader.bin
+	$(CAT) $(LOADER_ASMS) > _loader_modules.tmp
+	$(CAT) loader.asm _loader_modules.tmp > _loader.tmp
+	$(ASM) _loader.tmp -o loader.bin
