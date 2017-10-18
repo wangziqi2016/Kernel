@@ -44,6 +44,9 @@ bootsect:
 run: bootsect
 	bochs -q -f ./test/bochs-ubuntu.bxrc
 
+qemu:
+	qemu-system-x86_64 -fda $(BIN_DIR)/bootdisk.img
+
 clean:
 	$(info >>> Cleaning files)
 	$(RM) -f ./build/*
