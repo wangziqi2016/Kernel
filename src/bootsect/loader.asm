@@ -73,5 +73,14 @@ after_test_putchar:
   call video_puthex8
   add sp, 2
 
+scancode_loop:
+  call get_scancode
+  test ax, ax
+  je scancode_loop
+  push ax
+  call video_putuint16
+  add sp, 2
+  jmp scancode_loop
+
 die:
   jmp die

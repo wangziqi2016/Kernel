@@ -29,7 +29,6 @@ kbd_isr:
   pusha
   push ds
   push es
-
   mov ax, [kbd_scan_code_buffer_size]
   cmp ax, KBD_BUFFER_CAPACITY
   je .full_buffer
@@ -63,9 +62,9 @@ kbd_isr:
   out 20h, al
   jmp .return
 .full_buffer:
-  push word 0FFFFH
-  push word 0
-  retf
+  ;push word 0FFFFH
+  ;push word 0
+  ;retf
   ; Do nothing here temporarily
 .return:
   pop es
@@ -73,6 +72,39 @@ kbd_isr:
   ; Note that SP is ignored
   popa
   iret
+  
+  ; This function is non-blocking
+  ; It returns a scan code from the buffer in AL; If the buffer is empty it 
+  ; returns 0 in AL. AH is cleared to 0
+  ; This function is non-blocking
+get_scancode:
+  ; Must ensure atomicity of this operation
+  cli
+  push bx
+  mov ax, [kbd_scan_code_buffer_size]
+  test ax, ax
+  ; Note that when we do this jump, AX is already zero
+  je .return
+  dec ax
+  mov [kbd_scan_code_buffer_size], ax
+  mov ax, [kbd_scan_code_tail]
+  ; If the tail points to an unreadable location
+  ; we just wrap back and perform the read
+  cmp ax, KBD_BUFFER_CAPACITY
+  jne .fetch_code
+  xor ax, ax
+.fetch_code:
+  mov bx, kbd_scan_code_buffer
+  add bx, ax
+  ; Increment and write back the index first
+  inc ax
+  mov [kbd_scan_code_tail], ax
+  ; Read the scan code
+  movzx ax, byte [bx]
+.return:
+  pop bx
+  sti
+  retn
 
   ; This is the scan code buffer
 kbd_scan_code_buffer: times KBD_BUFFER_CAPACITY db 0
