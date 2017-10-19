@@ -52,10 +52,10 @@ after_test_putchar:
 
   push ds
   push str_load_success
-  call video_putline
-  call video_putline
-  call video_putline
-  call video_putline
+  call video_putstr
+  call video_putstr
+  call video_putstr
+  call video_putstr
   add sp, 4
 
 die:

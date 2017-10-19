@@ -22,7 +22,7 @@ CURSOR_WORD equ 7020h
   ; The line always use default attribute
   ;   [SP + 0] - String offset
   ;   [SP + 2] - String segment
-video_putline:
+video_putstr:
   push bp
   mov bp, sp
   push es
@@ -44,6 +44,49 @@ video_putline:
   mov sp, bp
   pop bp
   retn
+
+  ; This function prints the 16 bit hex value (without leading 0x)
+  ; Note that ABCDEF are all in capitcal case
+  ;   [SP + 0] - Number of bytes in the hex string
+  ;   [SP + 2, 4, ..] - Beginning of the hex string; Small endian
+_video_puthex:
+  push bp
+  mov bp, sp
+  push si
+  push di
+  push bx
+  
+  ; This is the address of the beginning
+  lea si, [bp + 6]
+  mov di, [bp + 4]
+  ; SI now points past to the highest digit
+  add si, di
+  ; BX holds the base of the table
+  mov bx, .char_map
+.body:
+  test di, di
+  jz .return  
+  dec si
+  dec di
+  xor ax, ax
+  ; AL is the byte and AH = 0
+  ; Now we exchange it with SI to use BX-relative addressing
+  mov al, [bp + si]
+  xchg ax, si
+  mov cx, [bx + si]
+  xchg ax, si
+  mov al, cl
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .body
+.return:
+  pop bx
+  pop di
+  pop si
+  mov sp, bp
+  pop bp
+  retn
+.char_map: db "0123456789ABCDEF"
 
   ; This function computes the offset of a given position
   ; Note that we do not check for the correctness of the row
