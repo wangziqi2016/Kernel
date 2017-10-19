@@ -80,11 +80,11 @@ _video_puthex:
   ; Translate 4 byte
   movzx si, al
   and si, 000fh
-  mov al, [.char_map + si]
+  mov al, [video_digit_map + si]
   movzx si, ah
   shr si, 4
   and si, 000fh
-  mov ah, [.char_map + si]
+  mov ah, [video_digit_map + si]
   ; Need to save it here because AX will be changed
   ; during the func call
   mov si, ax
@@ -100,7 +100,6 @@ _video_puthex:
   mov sp, bp
   pop bp
   retn
-.char_map: db "0123456789ABCDEF"
 
   ; This function computes the offset of a given position
   ; Note that we do not check for the correctness of the row
@@ -411,6 +410,8 @@ video_max_col:        dw 80
 ; Note that putchar() does not directly read this
 ; The caller of putchar is responsible
 video_print_attr:     db 07h
+; This maps from value to digit ASCIIs
+video_digit_map:      db "0123456789ABCDEF"
 
 str_load_success:
   db "Begin stage I", 0DH, 0Ah, 00
