@@ -12,7 +12,10 @@ KBD_CAPS_LOCK       equ 08h
 KBD_NUM_LOCK        equ 10h
 ; This flag will be cleared if it is present when an interrupt happens
 ; The correspinding scan code in the buffer, however, will have it set
-KBD_EXTENDED_ON     equ 20
+KBD_EXTENDED_ON     equ 20h
+; Whether a key is down or up. AND with this and if NE then 
+; we know it is up
+KBD_KEY_UP          equ 80h
 
   ; This function intializes the keyboard interrupt
 kbd_init:
@@ -49,32 +52,10 @@ kbd_isr:
   pusha
   push ds
   push es
-  mov ax, [kbd_scan_code_buffer_size]
-  cmp ax, KBD_BUFFER_CAPACITY
-  je .full_buffer
-  inc ax
-  mov [kbd_scan_code_buffer_size], ax
-  ; If head cannot be written into, we wrap back to index = 0
-  ; Otherwise just use head
-  mov ax, [kbd_scan_code_head]
-  cmp ax, KBD_BUFFER_CAPACITY
-  jne .read_port
-  xor ax, ax
-.read_port:
   ; CL holds the old value of the status bit
   ; This is useful
   ; DO NOT MODIFY CL IN THE CODE BENEATH!!
   mov cl, [kbd_status]
-
-  ; Compute the target address in the buffer in BX
-  ;   BX = base + index * 2
-  ; because each entry is 2 byte
-  mov bx, kbd_scan_code_buffer
-  shl ax, 1
-  add bx, ax
-  ; Move the head to the next location and store it back
-  inc ax
-  mov [kbd_scan_code_head], ax
   ; Read from port 0x60
   in al, 60h
   ; Next we process the key and update the current status
@@ -114,6 +95,9 @@ kbd_isr:
   ; NUM LOCK UP
   cmp al, 0c5h
   je .finish_interrupt
+  test al, KBD_KEY_UP
+  je .process_other_down
+  jmp .process_other_up
 .process_extended_flag:
   or byte [kbd_status], KBD_EXTENDED_ON
   jmp .finish_interrupt
@@ -142,6 +126,40 @@ kbd_isr:
 .process_num_lock:
   xor byte [kbd_status], KBD_NUM_LOCK
   jmp .finish_interrupt
+.process_other_down:
+  ; Use DX to hold the value
+  mov dx, ax
+  mov ax, [kbd_scan_code_buffer_size]
+  cmp ax, KBD_BUFFER_CAPACITY
+  je .full_buffer
+  inc ax
+  mov [kbd_scan_code_buffer_size], ax
+  ; If head cannot be written into, we wrap back to index = 0
+  ; Otherwise just use head
+  mov ax, [kbd_scan_code_head]
+  cmp ax, KBD_BUFFER_CAPACITY
+  jne .put_buffer
+  xor ax, ax
+.put_buffer:
+  ; Compute the target address in the buffer in BX
+  ;   BX = base + index * 2
+  ; because each entry is 2 byte
+  mov bx, kbd_scan_code_buffer
+  shl ax, 1
+  add bx, ax
+  ; Move the head to the next location and store it back
+  inc ax
+  mov [kbd_scan_code_head], ax
+  ; Restore AX saved in DX
+  mov dx, ax
+  ; We know DL is the scan code unchanged, and CL is the 
+  ; old status bit
+  ; BX is the address to write
+  ; Read the most up-to-date status into DH
+  mov ah, [kbd_status]
+  mov [bx], ax
+  ; Just return
+.process_other_up:
 .finish_interrupt:
   ; If the extended bit in the old flag is on
   ; here we turn it off before we return from this routine
@@ -149,7 +167,8 @@ kbd_isr:
   ; word into the buffer
   test cl, KBD_EXTENDED_ON
   je .send_io_singal
-  
+  ; Mask off the extended key bit
+  and byte [kbd_status], ~KBD_EXTENDED_ON
 .send_io_singal:
   ; Reset keyboard by reading and writing into 0x61h
   in al, 61h
