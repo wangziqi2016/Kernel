@@ -67,37 +67,36 @@ video_puthex16:
 _video_puthex:
   push bp
   mov bp, sp
-  push si
   push di
-  push bx
-  
-  ; This is the address of the beginning
-  lea si, [bp + 6]
+  ; Number of loops (bytes)
   mov di, [bp + 4]
-  ; SI now points past to the highest digit
-  add si, di
-  ; BX holds the base of the table
-  mov bx, .char_map
 .body:
   test di, di
   jz .return  
-  dec si
   dec di
-  xor ax, ax
-  ; AL is the byte and AH = 0
-  ; Now we exchange it with SI to use BX-relative addressing
-  mov al, [bp + si]
-  xchg ax, si
-  mov cx, [bx + si]
-  xchg ax, si
-  mov al, cl
+  ; Read the byte into AL
+  mov al, [bp + 6 + di]
+  mov ah, al
+  ; Translate 4 byte
+  movzx si, al
+  and si, 000fh
+  mov al, [.char_map + si]
+  movzx si, ah
+  shr si, 4
+  and si, 000fh
+  mov ah, [.char_map + si]
+  ; Need to save it here because AX will be changed
+  ; during the func call
+  mov si, ax
+  mov al, ah
+  mov ah, [video_print_attr]
+  call putchar
+  mov ax, si
   mov ah, [video_print_attr]
   call putchar
   jmp .body
 .return:
-  pop bx
   pop di
-  pop si
   mov sp, bp
   pop bp
   retn

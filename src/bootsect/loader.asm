@@ -58,5 +58,9 @@ after_test_putchar:
   call video_putstr
   add sp, 4
 
+  push word 1234h
+  call video_puthex16
+  add sp, 2
+
 die:
   jmp die
