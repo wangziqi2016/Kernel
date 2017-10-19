@@ -80,6 +80,8 @@ scancode_loop:
   push ax
   call video_putuint16
   add sp, 2
+  mov al, ' '
+  call putchar
   jmp scancode_loop
 
 die:
