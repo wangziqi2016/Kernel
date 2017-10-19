@@ -60,6 +60,10 @@ after_test_putchar:
 
   push word 1234h
   call video_puthex16
+  add sp, 2
+  mov al, 10
+  call putchar
+  push word 10000
   call video_putuint16
   add sp, 2
 

@@ -56,8 +56,6 @@ video_putuint16:
   ; Number of digits we have printed
   xor di, di
 .div_body:
-  test ax, ax
-  jz .print_body
   ; DX:AX / 10
   xor dx, dx
   mov cx, 10d
@@ -68,7 +66,8 @@ video_putuint16:
   push si
   ; One more digit
   inc di
-  jmp .div_body
+  test ax, ax
+  jnz .div_body
 .print_body:
   test di, di
   jz .return
