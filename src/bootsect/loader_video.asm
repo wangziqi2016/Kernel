@@ -17,7 +17,8 @@ CURSOR_WORD equ 7020h
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   ; This function prints a line on the current cursor position
-  ; Note that a new line character is always appended
+  ; Note that there is no newline at the end of the string unless you
+  ; add it yourself
   ; The line always use default attribute
   ;   [SP + 0] - String offset
   ;   [SP + 2] - String segment
@@ -33,15 +34,11 @@ video_putline:
   mov al, [es:bx]
   test al, al
   jz .return
-  mov ah, 07h
+  mov ah, [video_print_attr]
   call putchar
   inc bx
   jmp .body
 .return:
-  ; Add a new line
-  mov al, 0ah
-  call putchar
-
   pop bx
   pop es
   mov sp, bp
@@ -344,5 +341,10 @@ video_cursor_offset:  dw 0
 video_max_row:        dw 25
 video_max_col:        dw 80
 
+; This is the attribute we use while printing
+; Note that putchar() does not directly read this
+; The caller of putchar is responsible
+video_print_attr:     db 07h
+
 str_load_success:
-  db "Begin stage I", 0
+  db "Begin stage I", 0DH, 0Ah, 00
