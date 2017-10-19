@@ -77,14 +77,16 @@ scancode_loop:
   call kbd_getscancode
   test ax, ax
   je scancode_loop
-  movzx dx, al
+  ; Save AX in a safe place
+  mov bx, ax
+  movzx dx, bl
   push dx
   call video_puthex8
   add sp, 2
   mov al, '-'
   mov ah, 07h
   call putchar
-  movzx dx, ah
+  movzx dx, bh
   push dx
   call video_puthex8
   add sp, 2

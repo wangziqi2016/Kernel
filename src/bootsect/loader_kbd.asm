@@ -45,7 +45,7 @@ kbd_init:
   ;   3. Otherwise we ignore the scan code with bit 7 set (UP key)
   ;   4. For ordinary keys, we add the scan code of the key in lower 
   ;      byte, and the status word in higher byte
-  ; Note that for (1) we cannot do it in one call, because they are sent via 2
+  ; Note that for (1), we cannot do it in one call, because they are sent via 2
   ; interupts. We just set the extended flag, and clear it after we have 
   ; received the second byte in a later interrupt
 kbd_isr:
@@ -100,7 +100,10 @@ kbd_isr:
   jmp .process_other_up
 .process_extended_flag:
   or byte [kbd_status], KBD_EXTENDED_ON
-  jmp .finish_interrupt
+  ; Note that since we set the flag on in this interupr,
+  ; we just clear it in the next interrupt, so we should skip
+  ; the part that clears the EXTENDED flag
+  jmp .finish_interrrupt_with_extend_flag
 .process_shift_down:
   or byte [kbd_status], KBD_SHIFT_ON
   jmp .finish_interrupt
@@ -162,15 +165,9 @@ kbd_isr:
   ; Just return
 .process_other_up:
 .finish_interrupt:
-  ; If the extended bit in the old flag is on
-  ; here we turn it off before we return from this routine
-  ; Note that this has to be done after we pushed the new 
-  ; word into the buffer
-  test cl, KBD_EXTENDED_ON
-  je .send_io_singal
   ; Mask off the extended key bit
   and byte [kbd_status], ~KBD_EXTENDED_ON
-.send_io_singal:
+.finish_interrrupt_with_extend_flag:
   ; Reset keyboard by reading and writing into 0x61h
   in al, 61h
   or al, 80h
@@ -238,6 +235,7 @@ kbd_flush:
   mov word [kbd_scan_code_head], 0
   mov word [kbd_scan_code_tail], 0
   mov word [kbd_scan_code_buffer_size], 0
+  mov byte [kbd_status], 0
   sti
   retn
 
