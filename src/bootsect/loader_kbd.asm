@@ -62,6 +62,9 @@ kbd_isr:
   out 20h, al
   jmp .return
 .full_buffer:
+  push word 0FFFFH
+  push word 0
+  retf
   ; Do nothing here temporarily
 .return:
   pop es

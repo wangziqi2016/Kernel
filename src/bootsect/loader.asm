@@ -28,6 +28,7 @@ section .text
 
   ; Refresh the screen
   call video_init
+  call kbd_init
 
   mov si, 400
   mov di, 4

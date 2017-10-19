@@ -98,6 +98,21 @@ video_puthex16:
   pop bp
   retn
 
+  ; Puts 8 bit hex number on screen
+  ;   [SP + 0] The 16 bit number to print (low 8 bit)
+video_puthex8:
+  push bp
+  mov bp, sp
+  mov ax, [bp + 4]
+  ; Push high bytes first (trivial for 16 bit as it is already small endian)
+  push ax
+  push word 1
+  call _video_puthex
+  add sp, 4
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function prints the 16 bit hex value (without leading 0x)
   ; Note that ABCDEF are all in capitcal case
   ;   [SP + 0] - Number of bytes in the hex string
