@@ -45,6 +45,45 @@ video_putstr:
   pop bp
   retn
 
+  ; This function prints 16 bit unsigned dec numbers
+  ;   [SP + 0] The 16 bit number to print
+video_putuint16:
+  push bp
+  mov bp, sp
+  push si
+  push di
+  mov ax, [bp + 4]
+  ; Number of digits we have printed
+  xor di, di
+.div_body:
+  test ax, ax
+  jz .print_body
+  ; DX:AX / 10
+  xor dx, dx
+  mov cx, 10d
+  div cx
+  ; Remainder is in DX
+  mov si, dx
+  mov si, [video_digit_map + si]
+  push si
+  ; One more digit
+  inc di
+  jmp .div_body
+.print_body:
+  test di, di
+  jz .return
+  dec di
+  pop ax
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .print_body
+.return:
+  pop di
+  pop si
+  mov sp, bp
+  pop bp
+  retn
+
   ; A wrapper around _video_puthex()
   ;   [SP + 0] The 16 bit number to print
 video_puthex16:
