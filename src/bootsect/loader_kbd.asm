@@ -61,6 +61,11 @@ kbd_isr:
   jne .read_port
   xor ax, ax
 .read_port:
+  ; CL holds the old value of the status bit
+  ; This is useful
+  ; DO NOT MODIFY CL IN THE CODE BENEATH!!
+  mov cl, [kbd_status]
+
   ; Compute the target address in the buffer in BX
   ;   BX = base + index * 2
   ; because each entry is 2 byte
@@ -91,6 +96,24 @@ kbd_isr:
   je .process_ctrl_down
   cmp al, 9dh
   je .process_ctrl_up
+  ; Left ALT
+  cmp al, 38h
+  je .process_alt_down
+  cmp al, 0b8h
+  je .process_alt_up
+  ; CAPS LOCK; Note that for this we just toggle its bit using XOR
+  ; Also we ignore the UP of this key
+  cmp al, 3ah
+  je .process_caps_lock
+  ; CAPS LOCK UP
+  cmp al, 0bah
+  je .finish_interrupt
+  ; NUM LOCK DOWN
+  cmp al, 45h
+  je .process_num_lock
+  ; NUM LOCK UP
+  cmp al, 0c5h
+  je .finish_interrupt
 .process_extended_flag:
   or byte [kbd_status], KBD_EXTENDED_ON
   jmp .finish_interrupt
@@ -107,8 +130,27 @@ kbd_isr:
 .process_ctrl_up:
   and byte [kbd_status], ~KBD_CTRL_ON
   jmp .finish_interrupt
-.process_ctrl_up:
-.finish_interrupt
+.process_alt_down:
+  or byte [kbd_status], KBD_ALT_ON
+  jmp .finish_interrupt
+.process_alt_up:
+  and byte [kbd_status], ~KBD_ALT_ON
+  jmp .finish_interrupt
+.process_caps_lock:
+  xor byte [kbd_status], KBD_CAPS_LOCK
+  jmp .finish_interrupt
+.process_num_lock:
+  xor byte [kbd_status], KBD_NUM_LOCK
+  jmp .finish_interrupt
+.finish_interrupt:
+  ; If the extended bit in the old flag is on
+  ; here we turn it off before we return from this routine
+  ; Note that this has to be done after we pushed the new 
+  ; word into the buffer
+  test cl, KBD_EXTENDED_ON
+  je .send_io_singal
+  
+.send_io_singal:
   ; Reset keyboard by reading and writing into 0x61h
   in al, 61h
   or al, 80h
