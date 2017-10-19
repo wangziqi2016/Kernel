@@ -109,9 +109,9 @@ get_scancode:
   ; This is the scan code buffer
 kbd_scan_code_buffer: times KBD_BUFFER_CAPACITY db 0
   ; This always points to the next location to push new code
-kbd_scan_code_head:        db 0
+kbd_scan_code_head:        dw 0
   ; This always points to the oldest valid code
-kbd_scan_code_tail:        db 0
+kbd_scan_code_tail:        dw 0
 kbd_scan_code_buffer_size: dw 0
 
 ; Only the first 127 entries are useful
