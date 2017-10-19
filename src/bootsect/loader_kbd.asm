@@ -10,14 +10,15 @@ kbd_init:
   push es
   push bx
   cli
-
+  ; Make ES ponits to the first segment
+  push word 0
+  pop es
   ; This is the offset of INT 9h
   mov bx, 9h * 4
   mov ax, cs
   ; Install the offset on lower address and CS segment on higher address
   mov [es:bx + 2], ax
   mov word [es:bx], kbd_isr
-
   sti
   pop bx
   pop es
@@ -28,7 +29,7 @@ kbd_isr:
   pusha
   push ds
   push es
-  
+
   mov ax, [kbd_scan_code_buffer_size]
   cmp ax, KBD_BUFFER_CAPACITY
   je .full_buffer
