@@ -243,6 +243,10 @@ video_putcursor:
   mov es, ax
   ; BX now points to the word that specifies the character and byte
   mov bx, [video_cursor_offset]
+  ; Save the content underneath first
+  mov ax, [es:bx]
+  mov [video_cursor_saved], ax
+  ; Then write the actual cursor character
   mov [es:bx], word CURSOR_WORD
   pop bx
   pop es
@@ -257,7 +261,8 @@ video_clearcursor:
   mov es, ax
   ; BX now points to the word that specifies the character and byte
   mov bx, [video_cursor_offset]
-  xor ax, ax
+  ; Use the saved value
+  mov ax, [video_cursor_saved]
   mov [es:bx], ax
   pop bx
   pop es
@@ -337,6 +342,10 @@ video_current_col:    dw 0
 ; the cursor position is usually a by-product of other computations
 ; or easily obtained
 video_cursor_offset:  dw 0
+; This is the saved value under the location of the cursor
+; We save it here when we draw the cursor, and restore it when
+; we undraw the cursor
+video_cursor_saved:   dw 0
 ; These two should be used as constants
 video_max_row:        dw 25
 video_max_col:        dw 80
