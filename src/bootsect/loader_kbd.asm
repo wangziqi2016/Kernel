@@ -148,10 +148,11 @@ kbd_isr:
   shl ax, 1
   add bx, ax
   ; Move the head to the next location and store it back
+  shr ax, 1
   inc ax
   mov [kbd_scan_code_head], ax
   ; Restore AX saved in DX
-  mov dx, ax
+  mov ax, dx
   ; We know DL is the scan code unchanged, and CL is the 
   ; old status bit
   ; BX is the address to write
@@ -186,6 +187,7 @@ kbd_isr:
   mov word [kbd_scan_code_head], 0
   mov word [kbd_scan_code_tail], 0
   mov word [kbd_scan_code_buffer_size], 0
+  mov byte [kbd_status], 0
 .return:
   pop es
   pop ds
@@ -219,6 +221,7 @@ kbd_getscancode:
   shl ax, 1
   add bx, ax
   ; Increment and write back the index first
+  shr ax, 1
   inc ax
   mov [kbd_scan_code_tail], ax
   ; Read the scan code
