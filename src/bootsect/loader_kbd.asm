@@ -62,10 +62,10 @@ kbd_isr:
   out 20h, al
   jmp .return
 .full_buffer:
-  ;push word 0FFFFH
-  ;push word 0
-  ;retf
-  ; Do nothing here temporarily
+  ; Clear the buffer when it overflows
+  mov word [kbd_scan_code_head], 0
+  mov word [kbd_scan_code_tail], 0
+  mov word [kbd_scan_code_buffer_size], 0
 .return:
   pop es
   pop ds
@@ -77,7 +77,7 @@ kbd_isr:
   ; It returns a scan code from the buffer in AL; If the buffer is empty it 
   ; returns 0 in AL. AH is cleared to 0
   ; This function is non-blocking
-get_scancode:
+kbd_getscancode:
   ; Must ensure atomicity of this operation
   cli
   push bx
@@ -103,6 +103,16 @@ get_scancode:
   movzx ax, byte [bx]
 .return:
   pop bx
+  sti
+  retn
+
+  ; Flush the keyboard buffer
+  ; This function is always executed atomically
+kbd_flush:
+  cli
+  mov word [kbd_scan_code_head], 0
+  mov word [kbd_scan_code_tail], 0
+  mov word [kbd_scan_code_buffer_size], 0
   sti
   retn
 

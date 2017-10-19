@@ -74,7 +74,7 @@ after_test_putchar:
   add sp, 2
 
 scancode_loop:
-  call get_scancode
+  call kbd_getscancode
   test ax, ax
   je scancode_loop
   push ax
