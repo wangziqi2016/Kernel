@@ -195,7 +195,7 @@ kbd_isr:
   
   ; This function is non-blocking
   ; It returns a scan code from the buffer in AL; If the buffer is empty it 
-  ; returns 0 in AL. AH is cleared to 0
+  ; returns 0 in AL. AH is the status bit when the key is pushed down
   ; This function is non-blocking
 kbd_getscancode:
   ; Must ensure atomicity of this operation
@@ -214,13 +214,15 @@ kbd_getscancode:
   jne .fetch_code
   xor ax, ax
 .fetch_code:
+  ; BX = base + AX * 2
   mov bx, kbd_scan_code_buffer
+  shl ax, 1
   add bx, ax
   ; Increment and write back the index first
   inc ax
   mov [kbd_scan_code_tail], ax
   ; Read the scan code
-  movzx ax, byte [bx]
+  mov ax, word [bx]
 .return:
   pop bx
   sti
