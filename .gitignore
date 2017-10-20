@@ -3,6 +3,8 @@ binpad
 *.img
 *.bin
 *.tmp
+*.pyc
+
 
 # Prerequisites
 *.d

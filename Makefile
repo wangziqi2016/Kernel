@@ -47,6 +47,9 @@ run: bootsect
 qemu: bootsect
 	qemu-system-x86_64 -fda $(BIN_DIR)/bootdisk.img
 
+peekline: 
+	python $(SRC_DIR)/util/peek_line.py $(SRC_DIR)/bootsect "loader*.asm" _loader.tmp $(LINE)
+
 clean:
 	$(info >>> Cleaning files)
 	$(RM) -f ./build/*
