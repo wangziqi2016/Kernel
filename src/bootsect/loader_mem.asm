@@ -25,7 +25,7 @@ mem_init:
   call video_putstr_near
 .detect_high_addr:
   ; Store the value in memory
-  call mem_init_high_addr
+  call mem_detect_conventional
   mov ax, mem_high_end_str
   call video_putstr_near
   mov ax, [mem_high_end]
@@ -40,13 +40,11 @@ mem_init:
 
   ; This function queries the BIOS for the highest address currently
   ; addressable in the system and store it in mem_high_end
-mem_init_high_addr:
+mem_detect_conventional:
   xor ax, ax
   ; No param
   int 12h
   jc .error
-  ; Since the return value is KB, we need to multiply with 1024
-  shl ax, 10
   mov [mem_high_end], ax
   retn
 .error:
@@ -204,7 +202,7 @@ memset:
 mem_a20_closed_str: db "A20 gate is by default closed.", 0ah, 00h
 mem_a20_opened_str: db "A20 gate is now activated.", 0ah, 00h
 mem_a20_failed_str: db "Cannot activate A20 gate. Die.", 0ah, 00h
-mem_high_end_str:   db "Conventional memory size: ", 00h
+mem_high_end_str:   db "Conventional memory size (KiB): ", 00h
 mem_int12h_err_str: db "INT12H error", 0ah, 00h
 
 ; This defines the system high end between 0 and 1MB range
