@@ -23,7 +23,8 @@ video_putstr_near:
   push ds
   push ax
   call video_putstr
-  add sp, 4
+  pop ax
+  pop ax
   retn
 
   ; This function prints a line on the current cursor position
