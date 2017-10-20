@@ -5,6 +5,13 @@
 
   ; This function initializes memory management
 mem_init:
+  ;in al, 0x92
+  ;or al, 2
+  ;out 0x92, al
+
+  ;mov     ax,2401h                ;--- A20-Gate Activate ---
+  ;int     15h
+
   ; If A20 is enabled, then we continue with other jobs
   call mem_check_a20
   test ax, ax
@@ -26,7 +33,10 @@ mem_init:
   ; The way we check it is to verify that the memory address
   ; with wrap-around (using ES=0xFFFF) and without (using DS=0x0000)
   ; are actually the same. To be convenient, we use the bootloader's
-  ; 0xAA55 flag as an anchor
+  ; 0xAA55 flag as an anchor.
+  ;
+  ; Note that QEMU and Bochs will automatically enable A20, while
+  ; VirtualBox does not.
   ;
   ; Returns AX=0 if not enabled; Otherwise AX=1
 mem_check_a20:
@@ -46,14 +56,14 @@ mem_check_a20:
   mov bx, 7e0eh
   mov dx, [es:bx]
   cmp cx, dx
-  jne .return_no_a20
+  jne .return_has_a20
   ; Second test is to use another value
   mov bx, 7dfeh
   mov word [ds:bx], 1234h
   mov bx, 7e0eh
   mov dx, [es:bx]
   cmp dx, 1234h
-  jne .return_no_a20
+  je .return_no_a20
   jmp .return_has_a20
 .return_no_a20:
   xor ax, ax
