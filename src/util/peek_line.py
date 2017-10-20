@@ -28,7 +28,6 @@ def init():
   global CWD, SINGLE_FILE_PATTERN, COMBINED_FILE_NAME, LINE_NUMBER
 
   argv = sys.argv
-  print argv
   if len(argv) != 5:
     print("Usage: python peek_line.py [working dir] [file pattern] [combined file name] [line # in combined file to peek]")
     sys.exit()
