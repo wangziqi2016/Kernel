@@ -52,10 +52,6 @@ kbd_isr:
   pusha
   push ds
   push es
-  ; CL holds the old value of the status bit
-  ; This is useful
-  ; DO NOT MODIFY CL IN THE CODE BENEATH!!
-  mov cl, [kbd_status]
   ; Read from port 0x60
   in al, 60h
   ; Next we process the key and update the current status
