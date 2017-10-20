@@ -3,6 +3,62 @@
 ; loader_mem.asm - This file contains memory functions
 ;
 
+  ; This function initializes memory management
+mem_init:
+  ; If A20 is enabled, then we continue with other jobs
+  call mem_check_a20
+  test ax, ax
+  jnz a20_ok
+  
+  
+.a20_ok:
+  retn
+
+  ; This function checks whether A20 is there
+  ; The way we check it is to verify that the memory address
+  ; with wrap-around (using ES=0xFFFF) and without (using DS=0x0000)
+  ; are actually the same. To be convenient, we use the bootloader's
+  ; 0xAA55 flag as an anchor
+  ;
+  ; Returns AX=0 if not enabled; Otherwise AX=1
+mem_check_a20:
+  push ds
+  push es
+  push bx
+  ; DS = 0; ES = 0xFFFF
+  xor ax, ax
+  push ax 
+  pop ds
+  push word 0ffffh
+  pop es
+  ; This is the location of the bootloader's 0xAA55
+  mov bx, 7dfeh
+  ; CX, DX holds values from DS ans ES respectively
+  mov cx, [ds:bx]
+  mov bx, 7e0eh
+  mov dx, [es:bx]
+  cmp cx, dx
+  jne .return_noa20
+  ; Second test is to use another value
+  mov bx, 7dfeh
+  mov word [ds:bx], 1234h
+  mov bx, 7e0eh
+  mov dx, [es:bx]
+  cmp dx, 1234h
+  jne .return_no_a20
+  jmp .return_has_a20
+.return_no_a20:
+  xor ax, ax
+  jmp .return
+.return_has_a20:
+  xor ax, ax
+  inc ax
+.return:
+  pop bx
+  pop es
+  pop ds
+  retn
+
   ; This function copies memory regions that are not overlapped
   ;   [SP + 0] - Dest offset
   ;   [SP + 2] - Dest segment

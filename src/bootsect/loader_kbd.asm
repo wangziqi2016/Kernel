@@ -296,6 +296,8 @@ kbd_scan_code_buffer_size: dw 0
 kbd_status:                db 0
 
 ; Only the first 127 entries are useful
+; We currently only have 64 entries; In the future this table can be extended to
+; support more
 kbd_unshifted_scan_code_map: 
 ;  0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
 db 00h, 00h, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 00h, 00h   ; 0 
