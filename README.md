@@ -45,6 +45,9 @@ Dependency
 =========
 
 **nasm**: The assembler we use to translate the bootloader into a binary file
+
 **Bochs**: The emulation tool for debugging real mode code and protected mode code
+
 **QEMU**: An alternative to Bochs
+
 **Python**: To run some of the utility tools
