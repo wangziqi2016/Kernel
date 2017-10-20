@@ -11,9 +11,9 @@ CWD = None
 LINE_NUMBER = None
 # It maps the first line to file name
 FILE_MAP = {}
-
-files = glob.glob(SINGLE_FILE_PATTERN)
-print(files)
+# It maps the file name to starting line number in the
+# combined file
+LINE_MAP = {}
 
 def init():
   """
@@ -28,7 +28,8 @@ def init():
   global CWD, SINGLE_FILE_PATTERN, COMBINED_FILE_NAME, LINE_NUMBER
 
   argv = sys.argv
-  if len(argv) != 4:
+  print argv
+  if len(argv) != 5:
     print("Usage: python peek_line.py [working dir] [file pattern] [combined file name] [line # in combined file to peek]")
     sys.exit()
   
@@ -53,17 +54,56 @@ def build_file_map():
   
   for file_name in file_list:
     fp = open(file_name, "r")
-    line = fp.readline()
-    if line[-1] == '\n':
-      line = line.strip()
-      if len(line) == 0:
-        raise ValueError("The first line of file \"%s\" is empty!")
-      elif line in FILE_MAP:
-        old_file = FILE_MAP[line]
-        raise ValueError("The line \"%s\" is identical for file \"%s\" and \"%s\"" % 
-                         (line, old_file, file_name))
+    line = fp.readline().strip()
+    if len(line) == 0:
+      raise ValueError("The first line of file \"%s\" is empty!")
+    elif line in FILE_MAP:
+      old_file = FILE_MAP[line]
+      raise ValueError("The line \"%s\" is identical for file \"%s\" and \"%s\"" % 
+                        (line, old_file, file_name))
+      
+    FILE_MAP[line] = file_name
     
     fp.close()
+  
+  fp = open(COMBINED_FILE_NAME, "r")
+  line_number = 1
+  for line in fp:
+    line = line.strip()
+    if line in FILE_MAP:
+      # If the line does come from a file then we know we have seen
+      # the starting of a file
+      file_name = FILE_MAP[line]
+      # And then map the starting number to the file name
+      LINE_MAP[line_number] = file_name
+    
+    line_number += 1
+
+  fp.close()
+  
+  return
+
+def peek_file():
+  """
+  This function peeks the file using a line number in the combined file and
+  translate that to a line number in each individual files
+  """
+  current_min = None
+  current_min_file = None
+  for start_line, file_name in LINE_MAP.items():
+    if LINE_NUMBER < start_line:
+      continue
+
+    delta = LINE_NUMBER - start_line
+    if current_min is None or delta < current_min:
+      current_min = delta
+      current_min_file = file_name
+  
+  assert(current_min_file is not None)
+  print("Line %d in file %s" % (current_min + 1, current_min_file))
+
+  return
 
 init()
 build_file_map()
+peek_file()
