@@ -13,6 +13,10 @@ KBD_NUM_LOCK        equ 10h
 ; This flag will be cleared if it is present when an interrupt happens
 ; The correspinding scan code in the buffer, however, will have it set
 KBD_EXTENDED_ON     equ 20h
+; This is not set by the ISR, but when we try to convert a scan code 
+; to a char, and the scan code is not a char, we just set this flag in
+; the status byte (i.e. AH)
+KBD_UNPRINTABLE     equ 40h
 ; Whether a key is down or up. AND with this and if NE then 
 ; we know it is up
 KBD_KEY_UP          equ 80h
@@ -31,6 +35,7 @@ kbd_init:
   ; Install the offset on lower address and CS segment on higher address
   mov [es:bx + 2], ax
   mov word [es:bx], kbd_isr
+
   sti
   pop bx
   pop es
@@ -190,7 +195,7 @@ kbd_isr:
   
   ; This function is non-blocking
   ; It returns a scan code from the buffer in AL; If the buffer is empty it 
-  ; returns 0 in AL. AH is the status bit when the key is pushed down
+  ; returns 0 in AX. AH is the status bit when the key is pushed down
   ; This function is non-blocking
 kbd_getscancode:
   ; Must ensure atomicity of this operation
@@ -235,6 +240,13 @@ kbd_flush:
   sti
   retn
 
+  ; This function converts a AH:AL scan code and its status byte
+  ; to a printable character.
+  ; If the scan code does not represent a printable char, then we set
+  ; KBD_UNPRINTABLE bit in the status byte (i.e. AH)
+kbd_tochar:
+  
+
   ; This is the scan code buffer (128 byte, 64 entries currently)
 kbd_scan_code_buffer: times KBD_BUFFER_CAPACITY dw 0
   ; This always points to the next location to push new code
@@ -246,9 +258,20 @@ kbd_scan_code_buffer_size: dw 0
 kbd_status:                db 0
 
 ; Only the first 127 entries are useful
-kbd_scan_code_map: 
+kbd_unshifted_scan_code_map: 
 ;  1    2    3    4    5    6    7    8    9    A    B    C    D    E
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 1 
+db 00h, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 00h   ; 1 
+db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 2
+db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 3
+db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 4
+db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 5
+db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 6
+db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 7
+db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 8
+
+kbd_shifted_scan_code_map: 
+;  1    2    3    4    5    6    7    8    9    A    B    C    D    E
+db 00h, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 00h   ; 1 
 db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 2
 db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 3
 db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 4
