@@ -241,11 +241,38 @@ kbd_flush:
   retn
 
   ; This function converts a AH:AL scan code and its status byte
-  ; to a printable character.
+  ; to a printable character. AH is not affected.
   ; If the scan code does not represent a printable char, then we set
   ; KBD_UNPRINTABLE bit in the status byte (i.e. AH)
 kbd_tochar:
-  
+  push bx
+  ; Do not support extended keys and control sequence
+  test ah, KBD_EXTENDED_ON
+  jne .return_not_a_char
+  test ah, KBD_CTRL_ON
+  jne .return_not_a_char
+  test ah, KBD_CAPS_LOCK
+  jne .use_shift_table
+  test ah, KBD_SHIFT_ON
+  jne .use_shift_table
+  mov bx, kbd_unshifted_scan_code_map
+  jmp .translate
+.use_shift_table:
+  mov bx, kbd_shifted_scan_code_map
+  ; Before entering this part, BX must hold the address of the table
+.translate:
+  add bx, al
+  mov bl, byte [bx]
+  test bl, bl
+  je return_not_a_char
+  mov al, bl
+.return:
+  pop bx
+  retn
+  ; This branch sets the unprintable flag and return
+.return_not_a_char:
+  or ah, KBD_UNPRINTABLE
+  jmp .return
 
   ; This is the scan code buffer (128 byte, 64 entries currently)
 kbd_scan_code_buffer: times KBD_BUFFER_CAPACITY dw 0
