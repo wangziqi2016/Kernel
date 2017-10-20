@@ -10,7 +10,7 @@ mem_init:
   test ax, ax
   jnz .a20_ok
   push ds
-  push word mem_a20_closed
+  push word mem_a20_closed_str
   call video_putstr
   add sp, 4
   call mem_enable_a20_via_8042
@@ -18,17 +18,38 @@ mem_init:
   test ax, ax
   jnz .a20_ok
   push ds
-  push word mem_a20_failed
+  push word mem_a20_failed_str
   call video_putstr
   ; If A20 cannot be activalted just die here
 .die:
   jmp die
 .a20_ok:
   push ds
-  push word mem_a20_opened
+  push word mem_a20_opened_str
   call video_putstr
   add sp, 4
+
+  call mem_init_high_addr
+  push ds
+  push mem_high_end_str
+  call video_putstr
+  add sp, 4
+  mov ax, [mem_high_end]
+  push ax
+  call video_putuint16
+  add sp, 2
+
 .after_a20:
+  retn
+
+  ; This function queries the BIOS for the highest address currently
+  ; addressable in the system and store it in mem_high_end
+mem_init_high_addr:
+  ; No param
+  int 12h
+  ; Since the return value is KB, we need to multiply with 1024
+  shl ax, 10
+  mov [mem_high_end], ax
   retn
 
   ; This function checks whether A20 is there
@@ -176,6 +197,12 @@ memset:
   pop bp
   retn
 
-mem_a20_closed: db "A20 gate is by default closed.", 0ah, 00h
-mem_a20_opened: db "A20 gate is now activated.", 0ah, 00h
-mem_a20_failed: db "Cannot activate A20 gate. Die."
+mem_a20_closed_str: db "A20 gate is by default closed.", 0ah, 00h
+mem_a20_opened_str: db "A20 gate is now activated.", 0ah, 00h
+mem_a20_failed_str: db "Cannot activate A20 gate. Die.", 0ah, 00h
+mem_high_end_str:   db "Conventional memory size: ", 00h
+
+; This defines the system high end between 0 and 1MB range
+; 0xA0000 is a reasonable guess, but we will use INT15H to decide
+; the actual value on mem initialization
+mem_high_end:   dw 0A0000h
