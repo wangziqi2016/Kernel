@@ -77,6 +77,13 @@ scancode_loop:
   call kbd_getscancode
   test ax, ax
   je scancode_loop
+  call kbd_tochar
+  test ah, KBD_UNPRINTABLE
+  jne print_unprintable
+  mov ah, 07h
+  call putchar
+  jmp scancode_loop
+print_unprintable:
   ; Save AX in a safe place
   mov bx, ax
   movzx dx, bl
