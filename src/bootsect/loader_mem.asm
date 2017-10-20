@@ -5,13 +5,6 @@
 
   ; This function initializes memory management
 mem_init:
-  ;in al, 0x92
-  ;or al, 2
-  ;out 0x92, al
-
-  ;mov     ax,2401h                ;--- A20-Gate Activate ---
-  ;int     15h
-
   ; If A20 is enabled, then we continue with other jobs
   call mem_check_a20
   test ax, ax
@@ -20,7 +13,16 @@ mem_init:
   push word mem_a20_closed
   call video_putstr
   add sp, 4
-  jmp .after_a20
+  call mem_enable_a20_via_8042
+  call mem_check_a20
+  test ax, ax
+  jnz .a20_ok
+  push ds
+  push word mem_a20_failed
+  call video_putstr
+  ; If A20 cannot be activalted just die here
+.die:
+  jmp die
 .a20_ok:
   push ds
   push word mem_a20_opened
@@ -75,6 +77,23 @@ mem_check_a20:
   pop bx
   pop es
   pop ds
+  retn
+
+  ; This function ebales A20 gate using keyboard 8042 MIC
+  ; http://www.win.tue.nl/~aeb/linux/kbd/A20.html
+mem_enable_a20_via_8042:
+  call .empty_8042
+  mov al, 0d1h
+  out 64h, al
+  call .empty_8042
+  mov al, 0dfh
+  out 60h, al
+  call .empty_8042
+  retn
+.empty_8042:
+  in al, 64h
+  test al, 02h
+  jnz .empty_8042
   retn
 
   ; This function copies memory regions that are not overlapped
@@ -159,3 +178,4 @@ memset:
 
 mem_a20_closed: db "A20 gate is by default closed.", 0ah, 00h
 mem_a20_opened: db "A20 gate is now activated.", 0ah, 00h
+mem_a20_failed: db "Cannot activate A20 gate. Die."
