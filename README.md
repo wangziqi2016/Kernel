@@ -23,3 +23,20 @@ In addition, you can also use VirtualBox to load the boot image as the first flo
 the virtual machine. VirtualBox provides a slightly different environment, which is closer to a real
 physical machine. For example, VirtualBox does not enable A20 gate at system startup, while both Bochs
 and QEMU by default enables A20. This forces programmers to check and activate it manually in the bootloader. 
+
+Utility
+=======
+Under ./src/util directory, there are a few tools that are developed to aid the development of this project.
+
+binpatch
+--------
+This utility tool patchs a given binary file to a specified length, with optionally custom padding value. 
+We use this tool to make a 1.44MB floppy disk out of the compiled bootloader image.
+
+peek\_line.py
+------------
+Due to the way we assemble the bootloader (use "cat" command to conbine separate source files into a single flat file
+before calling the assembler), when nasm finds an error in the source file, it reports the line number in the 
+combined file, which is nonsense. In order to translate the combined line number into individual files, we developed
+the peek\_line.py tool to scan each file and remember their starting line and compare the lines in the combined
+source and locate each file's offset. 
