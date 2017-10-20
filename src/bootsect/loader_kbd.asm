@@ -251,8 +251,7 @@ kbd_tochar:
   jne .return_not_a_char
   test ah, KBD_CTRL_ON
   jne .return_not_a_char
-  test ah, KBD_CAPS_LOCK
-  jne .use_shift_table
+  ; If shift is on we use the other table
   test ah, KBD_SHIFT_ON
   jne .use_shift_table
   mov bx, kbd_unshifted_scan_code_map
@@ -267,6 +266,17 @@ kbd_tochar:
   test bl, bl
   je .return_not_a_char
   mov al, bl
+  ; Check whether caps lock for letters is on; If not just
+  ; return. Otherwise, we check first whether it is [a, z],
+  ; and if it is, we then convert it to capital
+  test ah, KBD_CAPS_LOCK
+  je .return
+  ; Then test whether it is a character
+  cmp al, 'a'
+  jb .return
+  cmp al, 'z'
+  ja .return
+  and al, 0DFh
 .return:
   pop bx
   retn
@@ -290,20 +300,20 @@ kbd_unshifted_scan_code_map:
 ;  0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
 db 00h, 00h, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 00h, 00h   ; 0 
 db 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', 00h, 00h, 'a', 's'   ; 1
-db 'd', 'f', 'g', 'h', 'j', 'k', 'l', 3bh, 27h, '`', 00h, 5ch, 00h, 00h, 00h, 00h   ; 2
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 3
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 4
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 5
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 6
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 7
+db 'd', 'f', 'g', 'h', 'j', 'k', 'l', 3bh, 27h, '`', 00h, 5ch, 'z', 'x', 'c', 'v'   ; 2
+db 'b', 'n', 'm', ',', '.', '/', 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 3
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 4
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 5
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 6
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 7
 
 kbd_shifted_scan_code_map: 
 ;  0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
 db 00h, 00h, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 00h, 00h   ; 0 
 db 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', 00h, 00h, 'A', 'S'   ; 1
-db 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', 22h, '~', 00h, '|', 00h, 00h, 00h, 00h   ; 2
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 3
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 4
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 5
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 6
-db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 7
+db 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', 22h, '~', 00h, '|', 'Z', 'X', 'C', 'V'   ; 2
+db 'B', 'N', 'M', '<', '>', '?', 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 3
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 4
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 5
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 6
+;db 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h, 00h   ; 7
