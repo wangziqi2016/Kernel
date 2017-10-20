@@ -8,10 +8,18 @@ mem_init:
   ; If A20 is enabled, then we continue with other jobs
   call mem_check_a20
   test ax, ax
-  jnz a20_ok
-  
-  
+  jnz .a20_ok
+  push ds
+  push word mem_a20_closed
+  call video_putstr
+  add sp, 4
+  jmp .after_a20
 .a20_ok:
+  push ds
+  push word mem_a20_opened
+  call video_putstr
+  add sp, 4
+.after_a20:
   retn
 
   ; This function checks whether A20 is there
@@ -38,7 +46,7 @@ mem_check_a20:
   mov bx, 7e0eh
   mov dx, [es:bx]
   cmp cx, dx
-  jne .return_noa20
+  jne .return_no_a20
   ; Second test is to use another value
   mov bx, 7dfeh
   mov word [ds:bx], 1234h
@@ -138,3 +146,6 @@ memset:
   mov sp, bp 
   pop bp
   retn
+
+mem_a20_closed: db "A20 gate is by default closed.", 0ah, 00h
+mem_a20_opened: db "A20 gate is now activated.", 0ah, 00h

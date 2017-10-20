@@ -31,48 +31,48 @@ section .text
   call mem_init
   call kbd_init
 
-  mov si, 400
-  mov di, 4
-  mov bx, 0775h
-test_putchar:
-  test si, si
-  jnz print_char
-  test di, di
-  jz after_test_putchar
-  mov si, 400
-  dec di
-  inc bl
-print_char:
-  mov ax, bx
-  call putchar
-  dec si
-  jmp test_putchar
+;  mov si, 400
+;  mov di, 4
+;  mov bx, 0775h
+;test_putchar:
+;  test si, si
+;  jnz print_char
+;  test di, di
+;  jz after_test_putchar
+;  mov si, 400
+;  dec di
+;  inc bl
+;print_char:
+;  mov ax, bx
+;  call putchar
+;  dec si
+;  jmp test_putchar
+;
+;after_test_putchar:
+;  call video_move_to_next_line
+;  call video_clear_all
 
-after_test_putchar:
-  call video_move_to_next_line
-  call video_clear_all
-
-  push ds
-  push str_load_success
-  call video_putstr
-  call video_putstr
-  call video_putstr
-  call video_putstr
-  add sp, 4
-
-  push word 1234h
-  call video_puthex16
-  add sp, 2
-  mov al, 10
-  call putchar
-  push word 10000
-  call video_putuint16
-  add sp, 2
-  mov al, 10
-  call putchar
-  push word 00FEh
-  call video_puthex8
-  add sp, 2
+;  push ds
+;  push str_load_success
+;  call video_putstr
+;  call video_putstr
+;  call video_putstr
+;  call video_putstr
+;  add sp, 4
+;
+;  push word 1234h
+;  call video_puthex16
+;  add sp, 2
+;  mov al, 10
+;  call putchar
+;  push word 10000
+;  call video_putuint16
+;  add sp, 2
+;  mov al, 10
+;  call putchar
+;  push word 00FEh
+;  call video_puthex8
+;  add sp, 2
 
 scancode_loop:
   call kbd_getscancode
