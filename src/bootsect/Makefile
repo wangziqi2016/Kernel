@@ -1,5 +1,6 @@
 
 ASM = nasm
+ASM_FLAGS = -f bin
 SRC_DIR = ../
 BIN_DIR = ../../bin
 CAT = cat
@@ -13,11 +14,11 @@ disk: bootsect.bin loader.bin
 
 bootsect.bin: bootsect.asm Makefile
 	$(info >>> bootsect.asm -> bootsect.bin)
-	$(ASM) bootsect.asm -o bootsect.bin
+	$(ASM) $(ASM_FLAGS) bootsect.asm -o bootsect.bin
 
 LOADER_ASMS = $(wildcard loader_*.asm)
 loader.bin: loader.asm Makefile $(LOADER_ASMS)
 	$(info >>> loader.asm -> loader.bin)
 	$(CAT) $(LOADER_ASMS) > _loader_modules.tmp
 	$(CAT) loader.asm _loader_modules.tmp > _loader.tmp
-	$(ASM) _loader.tmp -o loader.bin
+	$(ASM) $(ASM_FLAGS) _loader.tmp -o loader.bin
