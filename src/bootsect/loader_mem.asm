@@ -1,4 +1,4 @@
-
+_loader_mem_start:
 ;
 ; loader_mem.asm - This file contains memory functions
 ;

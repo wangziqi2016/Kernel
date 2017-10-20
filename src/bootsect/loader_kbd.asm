@@ -1,4 +1,4 @@
-
+_loader_kbd_start:
 ;
 ; loader_kbd.asm - This file implements the keyboard driver
 ;

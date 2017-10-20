@@ -1,4 +1,4 @@
-
+_loader_start:
 ;
 ; loader.asm - The stage I loader
 ;
@@ -10,6 +10,18 @@
 ; Note that this function has several modules, which are concatenated to
 ; this file during the compilation stage. 
 ;
+; Some other rules for writing the loader module:
+;   1. Each file should end with a new line. This is to avoid "cat" mixing 
+;      lines from two files
+;   2. At line #1 of each file, there must be a "_[file name]_start" label. This
+;      label is used by the parser to translate a line # in the combined
+;      file to a line # in the corresponding file
+;   3. Do not define any segment
+;   4. Each module should always name their own label using a unique prefix,
+;      e.g. video_, kbd_, mem_, etc.
+;
+
+[map all loader.map]
 
 section .text
   ; This file is loaded into BX=0200h as the second sector 

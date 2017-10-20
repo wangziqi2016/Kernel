@@ -1,4 +1,4 @@
-
+_loader_video_start:
 ;
 ; loader_video.asm - This file contains character mode video related functions
 ;
