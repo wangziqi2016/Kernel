@@ -16,6 +16,16 @@ CURSOR_WORD equ 7020h
 ; Printing functions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+  ; Near wrapper of the far version of putstr; Offset is in AX
+  ; This function pushes the current DS
+video_putstr_near:
+  ; Always assume this is the data segment
+  push ds
+  push ax
+  call video_putstr
+  add sp, 4
+  retn
+
   ; This function prints a line on the current cursor position
   ; Note that there is no newline at the end of the string unless you
   ; add it yourself
