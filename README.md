@@ -40,3 +40,11 @@ before calling the assembler), when nasm finds an error in the source file, it r
 combined file, which is nonsense. In order to translate the combined line number into individual files, we developed
 the peek\_line.py tool to scan each file and remember their starting line and compare the lines in the combined
 source and locate each file's offset. 
+
+Dependency
+=========
+
+**nasm**: The assembler we use to translate the bootloader into a binary file
+**Bochs**: The emulation tool for debugging real mode code and protected mode code
+**QEMU**: An alternative to Bochs
+**Python**: To run some of the utility tools
