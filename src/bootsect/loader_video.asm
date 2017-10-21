@@ -281,6 +281,38 @@ video_scroll_up:
 ; Video - Update the cursor
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+  ; This moves the video cursor to the previous char
+  ; Specification is the same as video_move_to_next_char() except that
+  ; it moves backward, and that it stops when both row and col are 0x00
+  ; Note that this function is simpler, as there are only two cases:
+  ;   1. Offset -= 2
+  ;   2. Offset not change
+video_move_to_prev_char:
+  mov ax, [video_current_col]
+  test ax, ax
+  jnz .dec_col
+  mov ax, [video_current_row]
+  ; If column is 0 and row is 0, we just return
+  ; This is different from next char case where we 
+  ; just shift lines
+  test ax, ax
+  je .already_left_top
+  ; Current row -= 1
+  dec ax
+  mov [video_current_row], ax
+  ; Current col = max col - 1
+  mov ax, [video_max_col]
+  dec ax
+  mov [video_current_col], ax
+  jmp .return
+.dec_col:
+  dec ax
+  mov [video_current_col], ax
+.return:
+  sub word [video_cursor_offset], 2
+.already_left_top:
+  retn
+
   ; This moves the video cursor to the next char
   ; This function changes cursor offset, but does not draw
   ; or clear the cursor (caller should handle this)
@@ -306,6 +338,7 @@ video_move_to_next_char:
   ; Fast path - if we just add column, then the cursor offset can be 
   ; easily modified
   add word [video_cursor_offset], 2
+  ; Return here without recalculating the offset
   retn
 .inc_row:
   mov [video_current_row], ax
