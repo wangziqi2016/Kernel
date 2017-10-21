@@ -282,7 +282,8 @@ video_scroll_up:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   ; This moves the video cursor to the next char
-  ; This function changes cursor offset
+  ; This function changes cursor offset, but does not draw
+  ; or clear the cursor (caller should handle this)
 video_move_to_next_char:
   mov ax, [video_current_col]
   inc ax
@@ -335,7 +336,7 @@ video_move_to_next_line:
   ; This function just moves the cursor to the current line
   ; The effect is like printing a CR character
   ; This function updates the cursor offset
-video_move_to_this_line:
+video_move_to_line_head:
   mov [video_current_col], word 0
   call video_update_cursor_offset
   retn
@@ -367,7 +368,8 @@ video_putcursor:
   mov ax, [es:bx]
   mov [video_cursor_saved], ax
   ; Then write the actual cursor character
-  mov [es:bx], word CURSOR_WORD
+  ;mov [es:bx], word CURSOR_WORD
+  mov [es:bx + 1], byte 70h
   pop bx
   pop es
   retn
@@ -388,7 +390,8 @@ video_clearcursor:
   pop es
   retn
 
-  ; This function updates the cursor offset
+  ; This function updates the cursor offset to be consistent
+  ; with the current row and col
 video_update_cursor_offset:
   mov dx, [video_current_row]
   mov ax, [video_current_col]
@@ -425,7 +428,7 @@ putchar:
   call video_move_to_next_char
   jmp .return
 .process_cr:
-  call video_move_to_this_line
+  call video_move_to_line_head
   jmp .return
 .process_lf:
   call video_move_to_next_line
