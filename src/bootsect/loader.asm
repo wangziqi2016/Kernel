@@ -21,8 +21,6 @@ _loader_start:
 ;      e.g. video_, kbd_, mem_, etc.
 ;
 
-[map all loader.map]
-
 section .text
   ; This file is loaded into BX=0200h as the second sector 
 	org	0200h
@@ -91,10 +89,30 @@ scancode_loop:
   test ax, ax
   je scancode_loop
   call kbd_tochar
+  test ah, KBD_EXTENDED_ON
+  jne process_extended
+test_unprintable:
   test ah, KBD_UNPRINTABLE
   jne print_unprintable
   mov ah, 07h
   call putchar
+  jmp scancode_loop
+process_extended:
+  ; Left arrow
+  cmp al, KBD_EXTENDED_ARROW_LEFT
+  je process_left_arrow
+  cmp al, KBD_EXTENDED_ARROW_RIGHT
+  je process_right_arrow
+  jmp test_unprintable
+process_left_arrow:
+  call video_clearcursor
+  call video_move_to_prev_char
+  call video_putcursor
+  jmp scancode_loop
+process_right_arrow:
+  call video_clearcursor
+  call video_move_to_next_char
+  call video_putcursor
   jmp scancode_loop
 print_unprintable:
   ; Save AX in a safe place
