@@ -21,6 +21,11 @@ KBD_UNPRINTABLE     equ 40h
 ; we know it is up
 KBD_KEY_UP          equ 80h
 
+KBD_EXTENDED_ARROW_LEFT  equ 4bh
+KBD_EXTENDED_ARROW_RIGHT equ 4dh
+KBD_EXTENDED_ARROW_UP    equ 48h
+KBD_EXTENDED_ARROW_DOWN  equ 50h
+
   ; This function intializes the keyboard interrupt
 kbd_init:
   push es
