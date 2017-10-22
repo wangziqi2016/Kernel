@@ -91,12 +91,21 @@ getline_loop:
   push ax
   call kbd_getinput
   add sp, 8
+  cmp ax, 0ffffh
+  je .interupted
   mov ax, test_buffer
   call video_putstr_near
+  jmp .continue
+.continue:
   mov al, 0ah
   call putchar
   jmp getline_loop
+.interupted:
+  mov ax, str_interrupted
+  call video_putstr_near
+  jmp getline_loop
 test_buffer: times 64 db 0
+str_interrupted: db "CTRL+C", 0ah, 00h
 scancode_loop:
   call kbd_getscancode
   test ax, ax
