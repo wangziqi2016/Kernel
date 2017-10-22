@@ -303,13 +303,13 @@ kbd_tochar:
   ;   (1) This function does not append '\n' at the end. But it appends '\0'
   ;       and the buffer should be long enough to hold the '\0'
   ;   (2) Returns 0 if exited normally; Otherwise interrupted (CTRL+C)
-  ;   (3) TAB is treated as a single '\t', but we print it as four spaces
+  ;   (3) TAB is ignored; SPACE works as always
   ;   (4) You can use BACKSPACE to go back one character (until the buffer is 
   ;       empty). You can also use LEFT and RIGHT arrow keys to move between
   ;       characters. Existing characters will be shifted if you type.
   ;   (5) CTRL+C Interrupts the process and this function returns 0xFFFF
   ;       Otherwise it returns the actual number of bytes
-  ;   [SP + 0] Whether to echo back
+  ;   [SP + 0] Whether to echo back; 0 means echo, 1 means not
   ;   [SP + 2] Length of the buffer (also the max. character count, 
   ;            including '\0')
   ;   [SP + 4] Offset of the buffer
@@ -335,27 +335,52 @@ kbd_getinput:
   ; If CTRL is on then process CTRL
   test ah, KBD_CTRL_ON
   jne .process_ctrl
+  test ah, KBD_EXTENDED_ON
+  jne .process_extended
   ; If it is ENTER we simply return
   cmp al, 1ch
   je .normal_return
-  
-  jne
-
+  ; Translate the scan code to a printable character
+  call kbd_tochar
+  ; Ignore unprintable characters, including TAB
+  test al, KBD_UNPRINTABLE
+  jne .next_scancode
+  ; Compute the length of (the current string + 1) and the 
+  ; the buffer length. If they equal just ignore everything
+  mov dx, bx
+  sub dx, [bp + 8]
+  inc dx
+  cmp dx, [bp + 6]
+  je .next_scancode
+  ; Otherwise, put the char into the buffer and move the pointer
+  mov [es:bx], al
+  inc bx
+  ; Then test echo back flag before printing it (if non-zero then do not print)
+  mov dx, [bp + 4]
+  test dx, dx
+  jne .next_scancode
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .next_scancode
+.process_extended:
+  ;cmp al, 
+  jmp .next_scancode
 .process_ctrl:
-  ; CTRL + C
-
+  ; CTRL + C (note that this is raw scan code)
+  cmp al, 2eh
+  je .ctrl_c_return
   ; By default just ignore it
   jmp .next_scancode
 .ctrl_c_return:
-  ; Set the output var to 
+  ; Set AX = 0xFFFF
   xor ax, ax
   dec ax
   jmp .return
 .normal_return:
   ; Terminate the string
   mov byte [es:bx], 0
-  mov ax, bx
   ; Compute the actual number we have read
+  mov ax, bx
   sub ax, [bp + 10]
 .return:
   pop si

@@ -84,6 +84,13 @@ section .text
 ;  call video_puthex8
 ;  add sp, 2
 
+push ds
+push test_buffer
+push word 64
+xor ax, ax
+push ax
+call kbd_getinput
+test_buffer: times 64 db 0
 scancode_loop:
   call kbd_getscancode
   test ax, ax
