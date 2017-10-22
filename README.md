@@ -39,7 +39,8 @@ Due to the way we assemble the bootloader (use "cat" command to conbine separate
 before calling the assembler), when nasm finds an error in the source file, it reports the line number in the 
 combined file, which is nonsense. In order to translate the combined line number into individual files, we developed
 the peek\_line.py tool to scan each file and remember their starting line and compare the lines in the combined
-source and locate each file's offset. 
+source and locate each file's offset. Run "make peek\_line LINE=ddd" where "ddd" is the line number in combined
+loader source file. 
 
 Dependency
 =========
