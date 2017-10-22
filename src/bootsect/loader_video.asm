@@ -482,7 +482,6 @@ putchar:
 .return:
   ; Restore the cursor here before return
   call video_putcursor
-
   pop si
   pop es
   pop bx

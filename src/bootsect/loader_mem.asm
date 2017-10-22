@@ -125,7 +125,12 @@ mem_enable_a20_via_8042:
   ;   [SP + 4] - Source offset
   ;   [SP + 6] - Source segment
   ;   [SP + 8] - Length
+  ; Note that this function must be executed atomically, because we 
+  ; changed the DS register. If an interrupt comes when this function is
+  ; being executed, then the interrupt will use the wrong DS register
+  ; to generate address for static data structures
 memcpy_nonalias:
+  cli
   push bp
   ; BP points to SP using entrance point as reference
   mov bp, sp
@@ -160,6 +165,28 @@ memcpy_nonalias:
   pop es
   pop si
   pop ds
+  mov sp, bp
+  pop bp
+  sti
+  retn
+
+  ; This function shifts a region by some given amount
+  ; Note that we assume the data to be shifted are in the same segment
+  ; and therefore, only one segment argument is required
+  ;   [SP + 0] - Offset
+  ;   [SP + 2] - Segment
+  ;   [SP + 4] - Length
+  ;   [SP + 6] - Shift amount (to higher address)
+memshift_tohigh:
+  push bp
+  mov bp, sp
+  push es
+  push si
+  push di
+
+  pop di
+  pop si
+  pop es
   mov sp, bp
   pop bp
   retn
