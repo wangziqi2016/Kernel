@@ -19,8 +19,10 @@ KBD_EXTENDED_ON     equ 20h
 KBD_UNPRINTABLE     equ 40h
 
 ; Whether a key is down or up. AND with this and if NE then 
-; we know it is up
+; we know it is up - NOTE it is a mask NOT a scancode
 KBD_KEY_UP          equ 80h
+; This is the scan code for backspace key
+KBD_KEY_BKSP        equ 0eh
 
 KBD_EXTENDED_ARROW_LEFT  equ 4bh
 KBD_EXTENDED_ARROW_RIGHT equ 4dh
@@ -340,6 +342,9 @@ kbd_getinput:
   ; If it is ENTER we simply return
   cmp al, 1ch
   je .normal_return
+  ; If it is backspace we need to move back
+  cmp al, KBD_KEY_BKSP
+  je .process_bksp
   ; Translate the scan code to a printable character
   call kbd_tochar
   ; Ignore unprintable characters, including TAB
@@ -355,11 +360,23 @@ kbd_getinput:
   ; Otherwise, put the char into the buffer and move the pointer
   mov [es:bx], al
   inc bx
+  ; Also need to change the cursor position
+  inc si
   ; Then test echo back flag before printing it (if non-zero then do not print)
   mov dx, [bp + 4]
   test dx, dx
   jne .next_scancode
   mov ah, [video_print_attr]
+  call putchar
+  jmp .next_scancode
+.process_bksp:
+  ; If we are already at the beginning of the buffer just ignore this
+  cmp bx, [bp + 8]
+  je .next_scancode
+  dec bx
+  dec si
+  ; Print BKSP character
+  mov al, KBD_KEY_BKSP
   call putchar
   jmp .next_scancode
 .process_extended:
