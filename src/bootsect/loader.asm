@@ -93,7 +93,8 @@ getline_loop:
   add sp, 8
   mov ax, test_buffer
   call video_putstr_near
-  call video_move_to_next_line
+  mov al, 0ah
+  call putchar
   jmp getline_loop
 test_buffer: times 64 db 0
 scancode_loop:
