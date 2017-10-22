@@ -383,8 +383,10 @@ kbd_getinput:
   mov ax, bx
   sub ax, [bp + 10]
 .return:
+  push ax
   mov al, 0ah
   call putchar
+  pop ax
   pop si
   pop bx
   pop es
