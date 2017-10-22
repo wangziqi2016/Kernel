@@ -17,6 +17,7 @@ KBD_EXTENDED_ON     equ 20h
 ; to a char, and the scan code is not a char, we just set this flag in
 ; the status byte (i.e. AH)
 KBD_UNPRINTABLE     equ 40h
+
 ; Whether a key is down or up. AND with this and if NE then 
 ; we know it is up
 KBD_KEY_UP          equ 80h
@@ -289,6 +290,80 @@ kbd_tochar:
 .return_not_a_char:
   or ah, KBD_UNPRINTABLE
   jmp .return
+
+  ; This function blocks on the keyboard and receives printable characters.
+  ; The received characters are put into a given buffer, until ENTER or
+  ; CTRL+C is pressed. The former ends this process, and returns with status 
+  ; flag indicating that the function returns normally. Otherwise, we return
+  ; status indicating that the process was interrupted
+  ; If the number of characters exceeds the given length, then we stop
+  ; putting anything into the buffer, but the function does not return.
+  ;
+  ; Note:
+  ;   (1) This function does not append '\n' at the end. But it appends '\0'
+  ;       and the buffer should be long enough to hold the '\0'
+  ;   (2) Returns 0 if exited normally; Otherwise interrupted (CTRL+C)
+  ;   (3) TAB is treated as a single '\t', but we print it as four spaces
+  ;   (4) You can use BACKSPACE to go back one character (until the buffer is 
+  ;       empty). You can also use LEFT and RIGHT arrow keys to move between
+  ;       characters. Existing characters will be shifted if you type.
+  ;   (5) CTRL+C Interrupts the process and this function returns 0xFFFF
+  ;       Otherwise it returns the actual number of bytes
+  ;   [SP + 0] Whether to echo back
+  ;   [SP + 2] Length of the buffer (also the max. character count, 
+  ;            including '\0')
+  ;   [SP + 4] Offset of the buffer
+  ;   [SP + 6] Segment of the buffer
+kbd_getinput:
+  push bp
+  mov bp, sp
+  push es
+  push bx
+  push si
+  ; Load ES with the target buffer segment
+  mov ax, [bp + 10]
+  mov es, ax
+  ; ES:BX is the offset of the buffer. It always points to the next
+  ; character location
+  mov bx, [bp + 8]
+  ; SI is the cursor offset from the start of the buffer
+  xor si, si
+.next_scancode:
+  call kbd_getscancode
+  test ax, ax
+  je .next_scancode
+  ; If CTRL is on then process CTRL
+  test ah, KBD_CTRL_ON
+  jne .process_ctrl
+  ; If it is ENTER we simply return
+  cmp al, 1ch
+  je .normal_return
+  
+  jne
+
+.process_ctrl:
+  ; CTRL + C
+
+  ; By default just ignore it
+  jmp .next_scancode
+.ctrl_c_return:
+  ; Set the output var to 
+  xor ax, ax
+  dec ax
+  jmp .return
+.normal_return:
+  ; Terminate the string
+  mov byte [es:bx], 0
+  mov ax, bx
+  ; Compute the actual number we have read
+  sub ax, [bp + 10]
+.return:
+  pop si
+  pop bx
+  pop es
+  mov sp, bp
+  pop bp
+  retn
 
   ; This is the scan code buffer (128 byte, 64 entries currently)
 kbd_scan_code_buffer: times KBD_BUFFER_CAPACITY dw 0
