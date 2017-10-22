@@ -442,7 +442,6 @@ putchar:
   push bx
   push es
   push si
-  
   ; Protect AX before calling function
   mov si, ax
   call video_clearcursor
@@ -455,14 +454,17 @@ putchar:
   cmp al, KBD_KEY_BKSP
   je .process_bksp
   ; Before entering here, SI must contain the character we want to draw
-.print_si:
+.print_ax:
+  mov dx, ax
   ; BX is the offset to write character
   mov bx, [video_cursor_offset]
   mov ax, VIDEO_SEG
   mov es, ax
-  mov [es:bx], si
-  ; If we got here from .process_bksp then do not move the cursor
-  cmp al, 0eh
+  mov ax, dx
+  mov [es:bx], ax
+  mov ax, si
+  ; For bksp we do not go forward
+  cmp al, KBD_KEY_BKSP
   je .return
   ; Otherwise go to next char's position
   call video_move_to_next_char
@@ -470,8 +472,8 @@ putchar:
 .process_bksp:
   call video_move_to_prev_char
   ; SI = 0x0700 to print normal attr with null
-  mov si, 0700h
-  jmp .print_si
+  mov ax, 0700h
+  jmp .print_ax
 .process_cr:
   call video_move_to_line_head
   jmp .return
