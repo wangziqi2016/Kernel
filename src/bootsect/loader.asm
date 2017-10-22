@@ -83,13 +83,18 @@ section .text
 ;  push word 00FEh
 ;  call video_puthex8
 ;  add sp, 2
-
-push ds
-push test_buffer
-push word 64
-xor ax, ax
-push ax
-call kbd_getinput
+getline_loop:
+  push ds
+  push test_buffer
+  push word 64
+  xor ax, ax
+  push ax
+  call kbd_getinput
+  add sp, 8
+  mov ax, test_buffer
+  call video_putstr_near
+  call video_move_to_next_line
+  jmp getline_loop
 test_buffer: times 64 db 0
 scancode_loop:
   call kbd_getscancode

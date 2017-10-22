@@ -343,7 +343,7 @@ kbd_getinput:
   ; Translate the scan code to a printable character
   call kbd_tochar
   ; Ignore unprintable characters, including TAB
-  test al, KBD_UNPRINTABLE
+  test ah, KBD_UNPRINTABLE
   jne .next_scancode
   ; Compute the length of (the current string + 1) and the 
   ; the buffer length. If they equal just ignore everything
