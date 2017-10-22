@@ -433,7 +433,10 @@ video_update_cursor_offset:
   retn
 
   ; al:ah is the char:attr to put into the stream
-  ; Note that we have special processing for \r and \n. In these two cases
+  ; Note that we have special processing for the following characters: 
+  ;   1. \r - Jump to the head of the line 
+  ;   2. \n - Jump to next line. Scroll lines up if necessary
+  ;   3. 0x0E - Jump to previous char and clear the location
   ; the attribute is not used
 putchar:
   push bx
@@ -444,22 +447,31 @@ putchar:
   mov si, ax
   call video_clearcursor
   mov ax, si
-
   ; 0A = new line; 0D = carriage return
   cmp al, 0ah
   je .process_lf
   cmp al, 0dh
   je .process_cr
-
+  cmp al, KBD_KEY_BKSP
+  je .process_bksp
+  ; Before entering here, SI must contain the character we want to draw
+.print_si:
   ; BX is the offset to write character
   mov bx, [video_cursor_offset]
   mov ax, VIDEO_SEG
   mov es, ax
   mov [es:bx], si
-
-  ; Go to next char's position
+  ; If we got here from .process_bksp then do not move the cursor
+  cmp al, 0eh
+  je .return
+  ; Otherwise go to next char's position
   call video_move_to_next_char
   jmp .return
+.process_bksp:
+  call video_move_to_prev_char
+  ; SI = 0x0700 to print normal attr with null
+  mov si, 0700h
+  jmp .print_si
 .process_cr:
   call video_move_to_line_head
   jmp .return
