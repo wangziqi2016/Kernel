@@ -408,6 +408,7 @@ video_putcursor:
   retn
   
   ; This function clears the cursor
+  ; This function is idempotent
 video_clearcursor:
   push es
   push bx

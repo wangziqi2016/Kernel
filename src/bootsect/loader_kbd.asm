@@ -322,14 +322,15 @@ kbd_getinput:
   push es
   push bx
   push si
+  push di
   ; Load ES with the target buffer segment
   mov ax, [bp + 10]
   mov es, ax
   ; ES:BX is the offset of the buffer. It always points to the next
   ; character location
   mov bx, [bp + 8]
-  ; SI is the cursor offset from the start of the buffer
-  xor si, si
+  ; SI is the address also, but it denotes the current cursor position
+  mov si, bx
 .next_scancode:
   call kbd_getscancode
   test ax, ax
@@ -357,6 +358,10 @@ kbd_getinput:
   inc dx
   cmp dx, [bp + 6]
   je .next_scancode
+  ; If the cursor is currently not at the end of the input, we need to shift
+  ; the memory buffer right, and then refresh the latter part
+  cmp si, bx
+  jne .shift_right
   ; Otherwise, put the char into the buffer and move the pointer
   mov [es:bx], al
   inc bx
@@ -393,6 +398,48 @@ kbd_getinput:
   xor ax, ax
   dec ax
   jmp .return
+  ; Before entering this, AL contains the scan code
+.shift_right:
+  ; DX = the # of chars need to shift
+  mov dx, bx
+  sub dx, si
+  ; Amount
+  push word 1
+  ; Length
+  push dx
+  ; Segment
+  push es
+  ; Starting offset
+  push si
+  ; Protect AX
+  mov di, ax
+  call memshift_tohigh
+  add sp, 8
+  ; AL is the scan code
+  mov ax, di
+  mov [es:si], al
+  ; Use DI as loop var to print
+  mov di, si
+.shift_right_loop_body:
+  cmp di, bx
+  je .shift_right_change_cursor
+  mov al, [es:di]
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .shift_right_loop_body
+  ; Move the cursor back to the new location
+.shift_right_change_cursor:
+  call video_clearcursor
+  mov di, si
+.shift_right_change_cursor_body:
+  test di, bx
+  je .after_shift_right_change_cursor
+  inc di
+  call video_move_to_prev_char
+  jmp .shift_right_change_cursor_body
+.after_shift_right_change_cursor:
+  call video_putcursor
+  jmp .next_scancode
 .normal_return:
   ; Terminate the string
   mov byte [es:bx], 0
@@ -400,16 +447,26 @@ kbd_getinput:
   mov ax, bx
   sub ax, [bp + 10]
 .return:
-  push ax
+  ; Protect return value
+  mov si, ax
   mov al, 0ah
   call putchar
-  pop ax
+  mov ax, si
+  pop di
   pop si
   pop bx
   pop es
   mov sp, bp
   pop bp
   retn
+  ; This subroutine is private to the function; We use it to clear the buffer
+  ; backwards (char by char, in case the screen scrolls up), and then
+  ; print the new content of the buffer
+.refresh_string:
+  push si
+  mov si, bx
+  call video_clearcursor
+  pop si
 
   ; This is the scan code buffer (128 byte, 64 entries currently)
 kbd_scan_code_buffer: times KBD_BUFFER_CAPACITY dw 0
