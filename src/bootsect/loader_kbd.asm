@@ -385,7 +385,18 @@ kbd_getinput:
   call putchar
   jmp .next_scancode
 .process_extended:
-  ;cmp al, 
+  cmp al, KBD_EXTENDED_ARROW_LEFT
+  je .process_left_arrow
+  jmp .next_scancode
+.process_left_arrow:
+  ; If we are already at the beginning of the line, then ignore
+  cmp si, [bp + 8]
+  je .next_scancode
+  call video_clearcursor
+  call video_move_to_prev_char
+  call video_putcursor
+  ; Also decrement SI to reflect the fact
+  dec si
   jmp .next_scancode
 .process_ctrl:
   ; CTRL + C (note that this is raw scan code)
@@ -403,21 +414,23 @@ kbd_getinput:
   ; DX = the # of chars need to shift
   mov dx, bx
   sub dx, si
-  ; Amount
-  push word 1
-  ; Length
-  push dx
-  ; Segment
-  push es
-  ; Starting offset
-  push si
   ; Protect AX
   mov di, ax
+  ; Amount, length, segment and offset
+  push word 1
+  push dx
+  push es
+  push si
   call memshift_tohigh
   add sp, 8
   ; AL is the scan code
   mov ax, di
   mov [es:si], al
+  ; After adding the data, check whether each is allowed; if not
+  ; continue with the next char
+  mov dx, [bp + 4]
+  test dx, dx
+  jne .next_scancode 
   ; Use DI as loop var to print
   mov di, si
 .shift_right_loop_body:
@@ -426,13 +439,14 @@ kbd_getinput:
   mov al, [es:di]
   mov ah, [video_print_attr]
   call putchar
+  inc di
   jmp .shift_right_loop_body
   ; Move the cursor back to the new location
 .shift_right_change_cursor:
   call video_clearcursor
   mov di, si
 .shift_right_change_cursor_body:
-  test di, bx
+  cmp di, bx
   je .after_shift_right_change_cursor
   inc di
   call video_move_to_prev_char
