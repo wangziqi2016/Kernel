@@ -183,7 +183,6 @@ memshift_tohigh:
   push es
   push si
   push di
-
   mov ax, [bp + 6]
   mov es, ax
   ; SI = source end DI = dest end
@@ -223,7 +222,6 @@ memshift_tolow:
   push es
   push si
   push di
-
   mov ax, [bp + 6]
   mov es, ax
   ; SI = source end DI = dest end

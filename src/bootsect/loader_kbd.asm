@@ -387,6 +387,8 @@ kbd_getinput:
 .process_extended:
   cmp al, KBD_EXTENDED_ARROW_LEFT
   je .process_left_arrow
+  cmp al, KBD_EXTENDED_ARROW_RIGHT
+  je .process_right_arrow
   jmp .next_scancode
 .process_left_arrow:
   ; If we are already at the beginning of the line, then ignore
@@ -397,6 +399,15 @@ kbd_getinput:
   call video_putcursor
   ; Also decrement SI to reflect the fact
   dec si
+  jmp .next_scancode
+.process_right_arrow:
+  ; If we are already on the last location then ignore it
+  cmp si, bx
+  je .next_scancode
+  call video_clearcursor
+  call video_move_to_next_char
+  call video_putcursor
+  inc si
   jmp .next_scancode
 .process_ctrl:
   ; CTRL + C (note that this is raw scan code)
