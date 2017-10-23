@@ -439,6 +439,7 @@ kbd_getinput:
   mov dx, [bp + 4]
   test dx, dx
   jne .next_scancode
+  call video_clearcursor
   call video_move_to_prev_char
   mov di, si
 .shift_left_loop_body:
@@ -455,7 +456,9 @@ kbd_getinput:
   ; Clear the last character also
   mov ax, 0700h
   mov cx, di
+  sub cx, si
   call video_raw_put
+  call video_putcursor
   jmp .next_scancode
   ; Before entering this, AL contains the scan code
 .shift_right:

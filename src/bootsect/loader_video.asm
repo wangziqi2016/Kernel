@@ -438,13 +438,8 @@ video_update_cursor_offset:
   ; Note that the caller must guarantee the target address is witin
   ; the bound. This function does not provide bound check
   ;
-  ; Note that this function clears and restores the cursor
+  ; Note that this function does not clear cursor
 video_raw_put:
-  push ax
-  push cx
-  call video_clearcursor
-  pop cx
-  pop ax
   push bx
   push es
   push word VIDEO_SEG
@@ -455,7 +450,6 @@ video_raw_put:
   mov [es:bx], ax
   pop es
   pop bx
-  call video_putcursor
   retn
 
   ; al:ah is the char:attr to put into the stream
