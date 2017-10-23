@@ -438,7 +438,8 @@ video_update_cursor_offset:
   ; Note that the caller must guarantee the target address is witin
   ; the bound. This function does not provide bound check
   ;
-  ; Note that this function does not clear cursor
+  ; Note that this function does not clear cursor. The caller should
+  ; clear cursor first
 video_raw_put:
   push bx
   push es

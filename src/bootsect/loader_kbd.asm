@@ -484,30 +484,25 @@ kbd_getinput:
   mov dx, [bp + 4]
   test dx, dx
   jne .next_scancode
+  ; Clear cursor to prepare for the loop
+  call video_clearcursor
   ; Use DI as loop var to print
   mov di, si
 .shift_right_loop_body:
   cmp di, bx
-  je .shift_right_change_cursor
+  je .shift_right_after_loop_body
   mov al, [es:di]
   mov ah, [video_print_attr]
-  call putchar
+  mov cx, di
+  sub cx, si
+  call video_raw_put
   inc di
   jmp .shift_right_loop_body
   ; Move the cursor back to the new location
-.shift_right_change_cursor:
-  call video_clearcursor
+.shift_right_after_loop_body:
   ; Cursor also moves right by one together with the char
   inc si
-  mov di, si
-  ; Move back cursor to the right position
-.shift_right_change_cursor_body:
-  cmp di, bx
-  je .after_shift_right_change_cursor
-  inc di
-  call video_move_to_prev_char
-  jmp .shift_right_change_cursor_body
-.after_shift_right_change_cursor:
+  call video_move_to_next_char
   call video_putcursor
   jmp .next_scancode
 .normal_return:
