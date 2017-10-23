@@ -433,6 +433,20 @@ video_update_cursor_offset:
   mov [video_cursor_offset], ax
   retn
 
+  ; Put AX into the current location without moving the cursor
+video_raw_put:
+  call video_clearcursor
+  push bx
+  push es
+  mov ax, VIDEO_SEG
+  mov es, ax
+  mov bx, [video_cursor_offset]
+  mov [es:bx], ax
+  pop es
+  pop bx
+  call video_putcursor
+  retn
+
   ; al:ah is the char:attr to put into the stream
   ; Note that we have special processing for the following characters: 
   ;   1. \r - Jump to the head of the line 
