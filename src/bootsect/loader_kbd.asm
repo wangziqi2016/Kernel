@@ -378,6 +378,8 @@ kbd_getinput:
   ; If we are already at the beginning of the buffer just ignore this
   cmp bx, [bp + 8]
   je .next_scancode
+  cmp bx, si
+  jne .shift_left
   dec bx
   dec si
   ; Print BKSP character
@@ -420,6 +422,41 @@ kbd_getinput:
   xor ax, ax
   dec ax
   jmp .return
+  ; This branch handles the backspace in the middle of the input
+  ; buffer. We just shift everything on and after the location pointed to by SI
+.shift_left:
+  mov dx, bx
+  sub dx, si
+  push word 1
+  push dx
+  push es
+  push si
+  call memshift_tolow
+  add sp, 8
+  dec bx
+  dec si
+  ; Check ECHO flag
+  mov dx, [bp + 4]
+  test dx, dx
+  jne .next_scancode
+  call video_move_to_prev_char
+  mov di, si
+.shift_left_loop_body:
+  cmp di, bx
+  je .shift_left_after_loop
+  mov al, [es:di]
+  mov ah, [video_print_attr]
+  mov cx, di
+  sub cx, si
+  call video_raw_put
+  inc di
+  jmp .shift_left_loop_body
+.shift_left_after_loop:
+  ; Clear the last character also
+  mov ax, 0700h
+  mov cx, di
+  call video_raw_put
+  jmp .next_scancode
   ; Before entering this, AL contains the scan code
 .shift_right:
   ; DX = the # of chars need to shift
@@ -443,7 +480,7 @@ kbd_getinput:
   ; continue with the next char
   mov dx, [bp + 4]
   test dx, dx
-  jne .next_scancode 
+  jne .next_scancode
   ; Use DI as loop var to print
   mov di, si
 .shift_right_loop_body:

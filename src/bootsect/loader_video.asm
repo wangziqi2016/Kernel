@@ -434,13 +434,24 @@ video_update_cursor_offset:
   retn
 
   ; Put AX into the current location without moving the cursor
+  ;     CX is either 0, or the offset to the current location
+  ; Note that the caller must guarantee the target address is witin
+  ; the bound. This function does not provide bound check
+  ;
+  ; Note that this function clears and restores the cursor
 video_raw_put:
+  push ax
+  push cx
   call video_clearcursor
+  pop cx
+  pop ax
   push bx
   push es
-  mov ax, VIDEO_SEG
-  mov es, ax
-  mov bx, [video_cursor_offset]
+  push word VIDEO_SEG
+  pop es
+  shl cx, 1
+  add cx, [video_cursor_offset]
+  mov bx, cx
   mov [es:bx], ax
   pop es
   pop bx
