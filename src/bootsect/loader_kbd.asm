@@ -426,7 +426,9 @@ kbd_getinput:
   ; AL is the scan code
   mov ax, di
   mov [es:si], al
-  ; After adding the data, check whether each is allowed; if not
+  ; Also increase the length of the buffer
+  inc bx
+  ; After inserting the data, check whether each is allowed; if not
   ; continue with the next char
   mov dx, [bp + 4]
   test dx, dx
@@ -444,7 +446,10 @@ kbd_getinput:
   ; Move the cursor back to the new location
 .shift_right_change_cursor:
   call video_clearcursor
+  ; Cursor also moves right by one together with the char
+  inc si
   mov di, si
+  ; Move back cursor to the right position
 .shift_right_change_cursor_body:
   cmp di, bx
   je .after_shift_right_change_cursor

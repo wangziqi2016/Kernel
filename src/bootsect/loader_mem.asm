@@ -187,12 +187,12 @@ memshift_tohigh:
   mov ax, [bp + 6]
   mov es, ax
   ; SI = source end DI = dest end
-  ; CX = shift amount
+  ; CX = length of the source
   mov si, [bp + 4]
-  add si, [bp + 8]
+  mov cx, [bp + 8]
+  add si, cx
   mov di, si
-  mov cx, [bp + 10]
-  add di, cx
+  add di, [bp + 10]
   ; We copy from high to low
   ; Also there is no word-optimization
 .body:
