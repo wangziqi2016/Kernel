@@ -212,6 +212,45 @@ memshift_tohigh:
   pop bp
   retn
 
+  ; Same as memshift_tohigh() except that it shifts towards the lower address
+  ;   [SP + 0] - Offset
+  ;   [SP + 2] - Segment
+  ;   [SP + 4] - Length
+  ;   [SP + 6] - Shift amount (to lower address)
+memshift_tolow:
+  push bp
+  mov bp, sp
+  push es
+  push si
+  push di
+
+  mov ax, [bp + 6]
+  mov es, ax
+  ; SI = source end DI = dest end
+  ; CX = length of the source
+  mov si, [bp + 4]
+  mov cx, [bp + 8]
+  mov di, si
+  sub di, [bp + 10]
+  ; We copy from high to low
+  ; Also there is no word-optimization
+.body:
+  test cx, cx
+  je .return
+  mov al, [es:si]
+  mov [es:di], al
+  dec cx
+  inc si
+  inc di
+  jmp .body
+.return:
+  pop di
+  pop si
+  pop es
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function sets a chunk of memory as a given byte value
   ;   [SP + 0] - Offset
   ;   [SP + 2] - Segment
