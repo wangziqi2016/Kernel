@@ -86,7 +86,7 @@ section .text
 getline_loop:
   push ds
   push test_buffer
-  push word 64
+  push word 100
   xor ax, ax
   push ax
   call kbd_getinput

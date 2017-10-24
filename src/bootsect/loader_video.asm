@@ -436,7 +436,8 @@ video_update_cursor_offset:
   ; Put AX into the current location without moving the cursor
   ;     CX is either 0, or the offset to the current location
   ; Note that the caller must guarantee the target address is witin
-  ; the bound. This function does not provide bound check
+  ; the bound. This function does not provide bound check, and also 
+  ; does not scroll up the screen
   ;
   ; Note that this function does not clear cursor. The caller should
   ; clear cursor first
@@ -451,6 +452,40 @@ video_raw_put:
   mov [es:bx], ax
   pop es
   pop bx
+  retn
+
+  ; This function moves the cursor forward or backward depending on the arument
+  ; This function handles screen scrolling up
+  ; Note that this function does not clear and redraw the cursor
+  ;   [SP + 0] - Amount. If positive then forward; otherwise backward
+video_move_cursor:
+  push bp
+  mov bp, sp
+  push si
+  mov si, [bp + 4]
+  ; Compare SI with 0 using signed comparison
+  xor ax, ax
+  cmp si, ax
+  je .return
+  jl .move_back
+.move_forward_body:
+  test si, si
+  jz .return
+  dec si, si
+  call video_move_to_next_char
+  jmp .move_forward_body
+.move_back:
+  neg si
+.move_back_body:
+  test si, si
+  je .return
+  dec si
+  call video_move_to_prev_char
+  jmp .move_back_body
+.return:
+  pop si
+  mov sp, bp
+  pop bp
   retn
 
   ; al:ah is the char:attr to put into the stream
