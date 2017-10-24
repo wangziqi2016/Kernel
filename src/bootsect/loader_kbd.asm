@@ -517,10 +517,20 @@ kbd_getinput:
   sub ax, [bp + 10]
 .return:
   ; Protect return value
-  mov si, ax
+  mov di, ax
+  ; First we need to movre cursor to the end of the input
+  call video_clearcursor
+  mov ax, bx
+  sub ax, si
+  push ax
+  call video_move_cursor
+  pop ax
+  call video_putcursor
+  ; Then print a new line
   mov al, 0ah
   call putchar
-  mov ax, si
+  ; Restore value
+  mov ax, di
   pop di
   pop si
   pop bx
@@ -528,14 +538,6 @@ kbd_getinput:
   mov sp, bp
   pop bp
   retn
-  ; This subroutine is private to the function; We use it to clear the buffer
-  ; backwards (char by char, in case the screen scrolls up), and then
-  ; print the new content of the buffer
-.refresh_string:
-  push si
-  mov si, bx
-  call video_clearcursor
-  pop si
 
   ; This is the scan code buffer (128 byte, 64 entries currently)
 kbd_scan_code_buffer: times KBD_BUFFER_CAPACITY dw 0
