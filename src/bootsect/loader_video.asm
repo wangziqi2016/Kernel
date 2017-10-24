@@ -471,7 +471,7 @@ video_move_cursor:
 .move_forward_body:
   test si, si
   jz .return
-  dec si, si
+  dec si
   call video_move_to_next_char
   jmp .move_forward_body
 .move_back:
