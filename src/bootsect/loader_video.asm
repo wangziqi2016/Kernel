@@ -2,6 +2,10 @@ _loader_video_start:
 ;
 ; loader_video.asm - This file contains character mode video related functions
 ;
+; 1. All routines in this file do not assume ES. This implies that ES must
+;    be saved and loaded with the video seg address. Also, ISR could safely
+;    call routines in this file without loading ES
+;
 
 ; This is video segment address (i.e. 0xB8000 in 20 bit mode)
 VIDEO_SEG equ 0b800h
@@ -435,7 +439,7 @@ video_update_cursor_offset:
 
   ; Put AX into the current location without moving the cursor
   ;     CX is either 0, or the offset to the current location
-  ; Note that the caller must guarantee the target address is witin
+  ; Note that the caller must guarantee the target address is within
   ; the bound. This function does not provide bound check, and also 
   ; does not scroll up the screen
   ;
