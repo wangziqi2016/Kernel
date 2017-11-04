@@ -19,19 +19,29 @@ _loader_start:
 ;   3. Do not define any segment
 ;   4. Each module should always name their own label using a unique prefix,
 ;      e.g. video_, kbd_, mem_, etc.
+;   5. For asynchronous interrupt service routines, do not assume what DS and
+;      ES and SS would be; instead, if you need to access data via DS,
+;      the ISR should save the old segment register and load them with the 
+;      corresponding registers
+;   6. For system routines other than ISR, always assume that DS points to 
+;      the system data segment, but do not assume about ES or SS
+;      If these routines are called by user programs, the common prologue
+;      should ensure that the condition holds true
 ;
 
+  SYS_DS equ 1000h
+  SYS_SS equ 0h
 section .text
   ; This file is loaded into BX=0200h as the second sector 
 	org	0200h
 
   cli
-  ; This is the new segment address
-  push cs
-  push cs
-  ; DS and ES are both the same as CS because we can only do segment addressing
-  pop ds
-  pop es
+  ; DS = system segment address
+  mov ax, SYS_DS
+  mov ds, ax
+  ; Initialize SS and SP to point to the end of the first 64K segment
+  mov ax, SYS_SS
+  mov ss, ax
   ; Reset the stack pointer to 0000:FFF0, i.e. the end of the first segment
   mov sp, 0FFF0h
   sti
