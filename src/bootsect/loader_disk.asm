@@ -6,6 +6,19 @@ _loader_disk_start:
 ; The maximum numbre of hardware devices we could support
 DISK_MAX_DEVICE equ 8
 
+; This defines the structure of the disk parameter table
+struc disk_param
+  ; The BIOS assigned number for the device
+  .number resb 1
+  ; The letter we use to represent the device
+  ; which requires a translation
+  ; This letter - 'A' is the index of this element in the table
+  .letter resb 1
+  .sector resw 1
+  .head   resw 1
+  .track  resw 1
+endstruc
+
   ; This function detects all floppy and hard disks using BIOS routine
 disk_init:
   cli
