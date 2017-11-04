@@ -125,12 +125,9 @@ mem_enable_a20_via_8042:
   ;   [SP + 4] - Source offset
   ;   [SP + 6] - Source segment
   ;   [SP + 8] - Length
-  ; Note that this function must be executed atomically, because we 
-  ; changed the DS register. If an interrupt comes when this function is
-  ; being executed, then the interrupt will use the wrong DS register
-  ; to generate address for static data structures
+  ; Note that this function changes the DS register. This is fine for ISR
+  ; as ISR will save DS and load it with sys DS value.
 memcpy_nonalias:
-  cli
   push bp
   ; BP points to SP using entrance point as reference
   mov bp, sp
@@ -167,7 +164,6 @@ memcpy_nonalias:
   pop ds
   mov sp, bp
   pop bp
-  sti
   retn
 
   ; This function shifts a region by some given amount
@@ -265,7 +261,6 @@ memset:
   mov al, [bp + 8]
   mov ah, al
   mov cx, [bp + 10]
-
 .body:
   test cx, cx
   je .return
