@@ -65,6 +65,9 @@ kbd_isr:
   pusha
   push ds
   push es
+  ; Reload DS with system segment
+  mov ax, SYS_DS
+  mov ds, ax
   ; Read from port 0x60
   in al, 60h
   ; Next we process the key and update the current status
