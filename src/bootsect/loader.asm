@@ -29,8 +29,9 @@ _loader_start:
 ;      should ensure that the condition holds true
 ;
 
-  SYS_DS equ 1000h
-  SYS_SS equ 0h
+SYS_DS equ 1000h
+SYS_SS equ 0h
+
 section .text
   ; This file is loaded into BX=0200h as the second sector 
 	org	0200h
@@ -46,10 +47,11 @@ section .text
   mov sp, 0FFF0h
   sti
 
-  ; Refresh the screen
+  ; Call initialization routines
   call video_init
   call mem_init
   call kbd_init
+  call disk_init
 
 ;  mov si, 400
 ;  mov di, 4
