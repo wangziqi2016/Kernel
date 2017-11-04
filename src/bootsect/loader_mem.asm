@@ -279,6 +279,29 @@ memset:
   pop bp
   retn
 
+  ; This function allocates some memory for uninitialized static data
+  ; at the end of the system data segment
+  ; No overflow checking except for wrap-back
+  ;   AX = number of bytes to allocate
+  ; Return：
+  ;   AX = 0FFFFh if fails, AX = offset of start if succeeds
+mem_get_sys_bss:
+  ; If the number of bytes exceeds whet was left then print error
+  cmp ax, [mem_sys_bss]
+  ja .bss_overflow
+  ; CX = requested byte
+  ; AX = BSS pointer before and after subtraction
+  mov cx, ax
+  mov ax, [mem_sys_bss]
+  sub ax, cx
+  mov [mem_sys_bss], ax
+  jmp .return
+.bss_overflow:
+  xor ax, ax
+  dec ax
+.return:
+  retn
+
 mem_a20_closed_str: db "A20 gate is by default closed.", 0ah, 00h
 mem_a20_opened_str: db "A20 gate is now activated.", 0ah, 00h
 mem_a20_failed_str: db "Cannot activate A20 gate. Die.", 0ah, 00h
@@ -289,3 +312,8 @@ mem_int12h_err_str: db "INT12H error", 0ah, 00h
 ; 0xA0000 is a reasonable guess, but we will use INT15H to decide
 ; the actual value on mem initialization
 mem_high_end:   dw 0280h
+; This is the static data in-segment offset. When we allocate memory
+; for this routine, we decrement this counter
+; Note that this area is located at the end of the system data segment
+; and never frees (holds static system data)
+mem_sys_bss:    dw 0FFFEh
