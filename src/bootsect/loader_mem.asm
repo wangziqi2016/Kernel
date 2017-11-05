@@ -286,6 +286,7 @@ memset:
   ; Return：
   ;   AX = 0FFFFh if fails, AX = offset of start if succeeds
 mem_get_sys_bss:
+  cli
   ; If the number of bytes exceeds whet was left then print error
   cmp ax, [mem_sys_bss]
   ja .bss_overflow
@@ -300,6 +301,7 @@ mem_get_sys_bss:
   xor ax, ax
   dec ax
 .return:
+  sti
   retn
 
 mem_a20_closed_str: db "A20 gate is by default closed.", 0ah, 00h

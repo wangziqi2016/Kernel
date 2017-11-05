@@ -9,14 +9,17 @@ DISK_MAX_DEVICE equ 8
 ; This defines the structure of the disk parameter table
 struc disk_param
   ; The BIOS assigned number for the device
-  .number resb 1
+  .number: resb 1
   ; The letter we use to represent the device
   ; which requires a translation
   ; This letter - 'A' is the index of this element in the table
-  .letter resb 1
-  .sector resw 1
-  .head   resw 1
-  .track  resw 1
+  .letter: resb 1
+  .type:   resb 1
+  .head:   resb 1
+  .sector: resb 1
+  .unused: resb 1
+  .track:  resw 1
+  .size:
 endstruc
 
   ; This function detects all floppy and hard disks using BIOS routine
@@ -53,11 +56,44 @@ disk_init:
   ; Can either because we finished enumarating floppy disks,
   ; harddisks, or a real error - jump to the routine to check
   jc .error_13h
+  ; Save these three to protect them
+  push cx
+  push dx
+  mov ax, disk_param.size
+  ; Allocate a system static data chunk
+  ; if fail just print error message
+  call mem_get_sys_bss
+  cmp ax, 0FFFFh
+  je .error_unrecoverable
+  ; AL = device type; BX = starting offset
+  xchg ax, bx
+  ; Save disk type
+  mov [bx + disk_param.type], al
+  pop dx
+  pop cx
+  ; Save head num
+  mov [bx + disk_param.head], dh
+  ; AX = CL[7:6]CH[7:0]
+  mov al, ch
+  mov ah, cl
+  shr ah, 6
+  ; Save number of tracks
+  mov [bx + disk_param.track], ax
+  and cl, 03fh
+  ; Save number of sectors
+  mov [bx + disk_param.sector], cl
+  ; Finally save the disk num and letter assignment
+  ; Note that since number and letter has the same layout, we 
+  ; just move them using one mov inst
+  mov ax, [bp + .CURRENT_DISK_NUMBER]
+  mov [bx + disk_param.number], ax
   ; Register will be destroyed in this routine
   call .print_found
   ; Increment the current letter and device number
   inc byte [bp + .CURRENT_DISK_NUMBER]
   inc byte [bp + .CURRENT_DISK_LETTER]
+  ; Also increament the number of mappings
+  inc word [disk_mapping_num]
   jmp .body
 .return:
   mov sp, bp
@@ -75,6 +111,7 @@ disk_init:
   push ax
   call video_puthex8
   pop ax
+  mov ax, disk_init_chs_str
   mov al, 0ah
   call putchar
   retn
@@ -99,7 +136,8 @@ disk_init:
   jmp die
 
 disk_init_error_str: db "Error initializing disk parameters", 0ah, 00h
-disk_init_found:     db "Found new disk: ", 00h
+disk_init_found:     db "Found disk: ", 00h
+disk_init_chs_str:       db " C/H/S: ", 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
