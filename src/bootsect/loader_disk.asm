@@ -57,6 +57,12 @@ disk_init:
   ; Can either because we finished enumarating floppy disks,
   ; harddisks, or a real error - jump to the routine to check
   jc .error_13h
+  ; If the current disk num & 0x7F >= DH
+  ; then we know we are also in trouble
+  mov al, [bp + .CURRENT_DISK_NUMBER]
+  and al, 7fh
+  cmp dl, al
+  jle .error_13h
   ; Save these three to protect them
   push cx
   push dx
@@ -109,6 +115,11 @@ disk_init:
   ; Just prints what was found
   ; Do not save any register
 .print_found:
+  mov al, [bp + .CURRENT_DISK_LETTER]
+  mov ah, 07h
+  call putchar
+  mov ax, 0720h
+  call putchar
   mov ax, disk_init_found
   call video_putstr_near
   mov ax, [bp + .CURRENT_DISK_NUMBER]
