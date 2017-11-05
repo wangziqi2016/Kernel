@@ -70,10 +70,13 @@ section .text
   .printf_near_str: db "NEAR", 00h
   .printf_far_str: db "FAR", 00h
 test_disk_param:
-  push word 'A'
+  push word 'D'
   call disk_get_size
   add sp, 2
-  
+  push dx
+  push ax
+  call video_putuint32
+  add sp, 4
   jmp getline_loop
 getline_loop:
   push ds

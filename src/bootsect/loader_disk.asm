@@ -179,6 +179,7 @@ disk_get_size:
   ; AX = head * sector
   mul ah
   mov cx, [bx + disk_param.track]
+  inc cx
   ; DX:AX = head * sector * track, in 512 byte sectors
   mul cx
   jmp .return
@@ -209,9 +210,10 @@ disk_get_param:
   xchg ah, al
   sub al, ah
   dec al
-  ; Afer this AL is the index in the array of disk_param
+  ; Before this AL is the index in the array of disk_param
   ; and the result of the mul is in AX
-  mul byte disk_param.size
+  mov ah, disk_param.size
+  mul ah
   ; Add with the base address
   add ax, [disk_mapping]
   jmp .return
