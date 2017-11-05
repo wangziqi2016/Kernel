@@ -153,6 +153,44 @@ disk_init:
 .die:
   jmp die
 
+  ; This function returns the raw byte size of a disk given its
+  ; letter number
+  ; Size is returned in DX:AX as 512 byte sectors since it may exceeds 
+  ; the 16 bit limit
+  ; Under the CHS addressing scheme, the maximum possible sector is 24 bit
+  ; Return 0 if the letter does not exist
+  ;   [BP + 4] - Letter
+disk_get_size:
+  push bp
+  mov bp, sp
+  push bx
+  mov ax, [bp + 4]
+  push ax
+  call disk_get_param
+  test ax, ax
+  je .return_fail
+  mov bx, ax
+  pop ax
+  ; 8 bit
+  mov al, [bx + disk_param.head]
+  inc al
+  ; 6 bit
+  mov ah, [bx + disk_param.sector]
+  ; AX = head * sector
+  mul ah
+  mov cx, [bx + disk_param.track]
+  ; DX:AX = head * sector * track, in 512 byte sectors
+  mul cx
+  jmp .return
+.return_fail:
+  pop ax
+  xor ax, ax
+.return:  
+  pop bx
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function returns a pointer to the disk param block
   ; of the given disk letter
   ;   [BP + 4] - The disk letter (low byte)
