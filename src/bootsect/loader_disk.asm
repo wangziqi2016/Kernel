@@ -53,6 +53,8 @@ disk_init:
   ; Can either because we finished enumarating floppy disks,
   ; harddisks, or a real error - jump to the routine to check
   jc .error_13h
+  ; Register will be destroyed in this routine
+  call .print_found
   ; Increment the current letter and device number
   inc byte [bp + .CURRENT_DISK_NUMBER]
   inc byte [bp + .CURRENT_DISK_LETTER]
@@ -63,6 +65,18 @@ disk_init:
   pop di
   pop es
   sti
+  retn
+  ; Just prints what was found
+  ; Do not save any register
+.print_found:
+  mov ax, disk_init_found
+  call video_putstr_near
+  mov ax, [bp + .CURRENT_DISK_NUMBER]
+  push ax
+  call video_puthex8
+  pop ax
+  mov al, 0ah
+  call putchar
   retn
   ; Just change the disk number and then try again
 .finish_checking_floppy:
@@ -85,6 +99,7 @@ disk_init:
   jmp die
 
 disk_init_error_str: db "Error initializing disk parameters", 0ah, 00h
+disk_init_found:     db "Found new disk: ", 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
