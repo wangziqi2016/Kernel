@@ -192,6 +192,67 @@ disk_get_size:
   pop bp
   retn
 
+  ; This function returns the CHS representation given a linear sector ID
+  ; and the drive letter
+  ;   [BP + 4] - Device letter
+  ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
+  ; Return:
+  ;   DH = head
+  ;   CH = low 8 bits of cylinder
+  ;   CL[6:7] = high 2 bits of cylinder
+  ;   CL[0:5] = sector
+  ; AX = 0 when success
+  ; AX = non-zero when error
+disk_get_chs:
+  push bp
+  mov bp, sp
+  push bx
+  mov ax, [bp + 4]
+  call disk_get_param
+  test ax, ax
+  mov bx, ax
+  pop ax
+  je .return_fail
+  ; AX = AH * AL i.e. number of sectors in a track
+  mov ah, [bx + disk_param.head]
+  inc ah
+  mov al, [bx + disk_param.sector] 
+  mul ah
+  ; AX = sector per cylinder; We know the track ID will fit into 16 bits
+  ; there will not be an overflow
+  mov cx, ax
+  mov ax, [bp + 6]
+  mov dx, [bp + 8]
+  div cx
+  ; Now AX = in-cylinder offset
+  ;     DX = cylinder ID
+  ; after the exchange
+  xchg ax, dx
+  mov cl, [bx + disk_param.sector]
+  div cl
+  ; Now AH = sector offset (starting from 0)
+  ;     AL = head ID
+  ;     DX = cylinder ID
+  inc ah
+  ; Make the high 2 bits of CL the bit 8 and 9 of the cylinder number
+  mov cl, dh
+  shl cl, 6
+  ; CH is the low 8 bits of the cylinder
+  mov ch, dl
+  ; Make DH the head
+  mov dh, al
+  ; Make the low 6 bits of CL the sector ID starting from 1
+  or cl, ah
+  jmp .return
+.return_fail:
+  xor ax, ax
+  inc ax
+.return:
+  pop bx
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function returns a pointer to the disk param block
   ; of the given disk letter
   ;   [BP + 4] - The disk letter (low byte)
