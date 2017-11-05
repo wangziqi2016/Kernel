@@ -169,6 +169,39 @@ _video_puthex:
   pop bp
   retn
 
+  ; This function is a modified/simplified version of printf
+  ; Interface: void printf(const char *fmt, ...);
+  ; Format string specification:
+  ;   - %d 16 bit integer
+  ;   - %x 16 bit hex (always upper case, like traditional %X)
+  ;   - %y 8  bit hex (always upper case); Need to push it as 16 bit
+  ;   - %c a character; Need to push it as 16 bit
+  ;   - %s a near string, using the system segment
+  ;   - %S a far string, using the provided offset:segment notation
+  ;   - %% The percent sign itself
+  ; As the normal printf() implementation, the caller should clear the 
+  ; stack, and parameters are pushed from right to left, all 16 bit aligned
+  ;   [BP + 4] - The format string
+video_printf:
+  push bp
+  mov bp, sp
+  push es
+  push bx
+  push si
+  push di
+  
+  pop di
+  pop si 
+  pop bx
+  pop es
+  mov sp, bp
+  pop bp
+  retn
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Video - Manage the buffer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
   ; This function computes the offset of a given position
   ; Note that we do not check for the correctness of the row
   ;   DX:AX = Row ID:Col ID
