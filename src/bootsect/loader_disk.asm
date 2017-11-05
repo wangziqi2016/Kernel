@@ -42,15 +42,42 @@ disk_compute_param:
   cli
   push bx
   push si
+  push di
   mov si, [disk_mapping_num]
 .body:
   test si, si
-  
+  je .return
+  dec si
+  ; Start from the last
+  xor ax, ax
+  mov al, 'A'
+  add ax, si
+  ; Save a copy of the disk letter in DI also
+  mov di, ax
+  push ax
+  ; Do not check because we know the disk must be valid
+  call disk_get_param
+  mov bx, ax
+  pop ax
+  test bx, bx
+  je .invalid_letter
+  ; BX is the base address of the param table
 .return:    
+  pop di
   pop si
   pop bx
   sti
   retn
+.invalid_letter:
+  ; We know DI saves the copy of disk letter
+  push di
+  push di
+  push ds
+  push disk_invalid_letter
+  call video_printf
+  add sp, 8
+.die:
+  jmp .die
 
   ; This function detects all floppy and hard disks using BIOS routine
 disk_probe:
@@ -326,6 +353,7 @@ disk_get_param:
 
 disk_init_error_str: db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
 disk_init_found:     db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
+disk_invalid_letter: db "Invalid disk letter: %c (%y)", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
