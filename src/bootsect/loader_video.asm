@@ -161,6 +161,7 @@ _video_puthex:
   push bp
   mov bp, sp
   push di
+  push si
   ; Number of loops (bytes)
   mov di, [bp + 4]
 .body:
@@ -189,6 +190,7 @@ _video_puthex:
   call putchar
   jmp .body
 .return:
+  pop si
   pop di
   mov sp, bp
   pop bp
