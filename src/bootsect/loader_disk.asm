@@ -55,13 +55,24 @@ disk_compute_param:
   ; Save a copy of the disk letter in DI also
   mov di, ax
   push ax
-  ; Do not check because we know the disk must be valid
+  ; Need to check return value - although it should not fail in practice
   call disk_get_param
   mov bx, ax
   pop ax
   test bx, bx
   je .invalid_letter
-  ; BX is the base address of the param table
+  ; 1. Compute the capacity of the disk, in # of sectors
+  ;   BX is the base address of the param table
+  ;   DI is the letter we are doing computation for
+  push di
+  call disk_get_size
+  pop cx
+  ; Note that this function sets the CF if it fails
+  jc .invalid_letter
+  ; DX:AX contains the capacity in sectors
+  mov [bx + disk_param.capacity], ax
+  mov [bx + disk_param.capacity + 2], dx
+  
 .return:    
   pop di
   pop si
@@ -211,7 +222,7 @@ disk_probe:
   ; Size is returned in DX:AX as 512 byte sectors since it may exceeds 
   ; the 16 bit limit
   ; Under the CHS addressing scheme, the maximum possible sector is 24 bit
-  ; Return 0 if the letter does not exist
+  ; Set CF if the letter is invalid
   ;   [BP + 4] - Letter
 disk_get_size:
   push bp
@@ -220,10 +231,10 @@ disk_get_size:
   mov ax, [bp + 4]
   push ax
   call disk_get_param
-  test ax, ax
-  je .return_fail
   mov bx, ax
+  test ax, ax
   pop ax
+  je .return_fail
   ; 8 bit
   mov al, [bx + disk_param.head]
   inc al
@@ -235,10 +246,10 @@ disk_get_size:
   inc cx
   ; DX:AX = head * sector * track, in 512 byte sectors
   mul cx
+  clc
   jmp .return
 .return_fail:
-  pop ax
-  xor ax, ax
+  setc
 .return:  
   pop bx
   mov sp, bp
