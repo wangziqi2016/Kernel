@@ -85,8 +85,55 @@ video_putint16:
   pop bp
   retn
 
+  ; This function prints 32 bit unsigned dec numbers
+  ; Note that since we use 32 bit code here, the stack opand 
+  ; size changes also
+video_putuint32:
+  push ebp
+  mov ebp, esp
+  push esi
+  push edi
+  ; 4 byte EBP and 2 byte return address since we are now using
+  ; mixed 32 bit and 16 bit mode
+  mov eax, [ebp + 6]
+  ; Number of digits we have printed
+  xor edi, edi
+.div_body:
+  ; DX:AX / 10
+  xor edx, edx
+  mov ecx, 10d
+  div ecx
+  ; Remainder is in DX
+  mov esi, edx
+  mov esi, [video_digit_map + esi]
+  ; 16 bit push
+  push si
+  ; One more digit
+  inc edi
+  test eax, eax
+  jnz .div_body
+.print_body:
+  test edi, edi
+  jz .return
+  dec edi
+  ; 16 bit pop
+  pop ax
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .print_body
+.return:
+  pop edi
+  pop esi
+  mov esp, ebp
+  pop ebp
+  retn
+
   ; This function prints 16 bit unsigned dec numbers
   ;   [SP + 0] The 16 bit number to print
+  ; Note that since we can only get digits from low-to-high, but
+  ; need to print them from high-to-low, what we can actually do here
+  ; is to use the stack to store the digits first, and then
+  ; pop them
 video_putuint16:
   push bp
   mov bp, sp

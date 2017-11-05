@@ -211,7 +211,7 @@ disk_get_param:
   dec al
   ; Afer this AL is the index in the array of disk_param
   ; and the result of the mul is in AX
-  mul al, disk_param.size
+  mul byte disk_param.size
   ; Add with the base address
   add ax, [disk_mapping]
   jmp .return

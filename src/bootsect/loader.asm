@@ -65,52 +65,16 @@ section .text
   push .printf_test_str
   call video_printf
   add sp, 16
-  jmp getline_loop
+  jmp test_disk_param
   .printf_test_str: db "This is a test to printf %u %d %x %y %q %c %s %S %% %", 0ah, 00h
   .printf_near_str: db "NEAR", 00h
   .printf_far_str: db "FAR", 00h
-;  mov si, 400
-;  mov di, 4
-;  mov bx, 0775h
-;test_putchar:
-;  test si, si
-;  jnz print_char
-;  test di, di
-;  jz after_test_putchar
-;  mov si, 400
-;  dec di
-;  inc bl
-;print_char:
-;  mov ax, bx
-;  call putchar
-;  dec si
-;  jmp test_putchar
-;
-;after_test_putchar:
-;  call video_move_to_next_line
-;  call video_clear_all
-
-;  push ds
-;  push str_load_success
-;  call video_putstr
-;  call video_putstr
-;  call video_putstr
-;  call video_putstr
-;  add sp, 4
-;
-;  push word 1234h
-;  call video_puthex16
-;  add sp, 2
-;  mov al, 10
-;  call putchar
-;  push word 10000
-;  call video_putuint16
-;  add sp, 2
-;  mov al, 10
-;  call putchar
-;  push word 00FEh
-;  call video_puthex8
-;  add sp, 2
+test_disk_param:
+  push word 'A'
+  call disk_get_size
+  add sp, 2
+  
+  jmp getline_loop
 getline_loop:
   push ds
   push test_buffer
