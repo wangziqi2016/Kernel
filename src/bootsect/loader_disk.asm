@@ -115,37 +115,20 @@ disk_init:
   ; Just prints what was found
   ; Do not save any register
 .print_found:
-  mov al, [bp + .CURRENT_DISK_LETTER]
-  mov ah, 07h
-  call putchar
-  mov ax, 0720h
-  call putchar
-  mov ax, disk_init_found
-  call video_putstr_near
-  mov ax, [bp + .CURRENT_DISK_NUMBER]
-  push ax
-  call video_puthex8
-  pop ax
-  mov ax, disk_init_chs_str
-  call video_putstr_near
-  mov bx, [disk_mapping]
-  mov ax, [bx + disk_param.track]
-  push ax
-  call video_puthex16
-  mov ax, 072fh
-  call putchar
-  mov ax, [bx + disk_param.head]
-  push ax
-  call video_puthex8
-  mov ax, 072fh
-  call putchar
   mov ax, [bx + disk_param.sector]
   push ax
-  call video_puthex8
-  ; Clear stack for three func calls
-  add sp, 6
-  mov al, 0ah
-  call putchar
+  mov ax, [bx + disk_param.head]
+  push ax
+  mov ax, [bx + disk_param.track]
+  push ax
+  mov ax, [bp + .CURRENT_DISK_NUMBER]
+  push ax
+  mov al, [bp + .CURRENT_DISK_LETTER]
+  push ax
+  push ds
+  push disk_init_found
+  call video_printf
+  add sp, 14
   retn
   ; Just change the disk number and then try again
 .finish_checking_floppy:
@@ -162,14 +145,16 @@ disk_init:
   cmp ax, .STATUS_CHECK_HDD
   jmp .return
 .error_unrecoverable:
-  mov ax, disk_init_error_str
-  call video_putstr_near
+  push ax
+  push ds
+  push disk_init_error_str
+  call video_printf
+  add sp, 6
 .die:
   jmp die
 
-disk_init_error_str: db "Error initializing disk parameters", 0ah, 00h
-disk_init_found:     db "Found disk: ", 00h
-disk_init_chs_str:   db "; Maximum C/H/S (HEX): ", 00h
+disk_init_error_str: db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
+disk_init_found:     db "Disk %c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
