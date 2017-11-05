@@ -53,6 +53,7 @@ section .text
   call kbd_init
   call disk_init
   
+  push -2468
   push 12345
   push ds
   push .printf_test_str

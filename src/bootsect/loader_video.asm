@@ -246,14 +246,34 @@ video_printf:
   ; %d - 16 bit integer
   cmp al, 'u'
   je .process_percent_u
+  cmp al, 'd'
+  je .process_percent_d
   ; If there is an unknown percent specifier, we just print these two out
   jmp .unknown_percent
   ; For unknown percent, just print a percent character and the char after it
 .process_percent_u:
+  mov cx, video_putuint16
+  jmp .process_common_pattern
+.process_percent_d:
+  mov cx, video_putint16
+  jmp .process_common_pattern
+  ; Common pattern:
+  ;   1. Get 2 bytes from the param list
+  ;   2. push
+  ;   3. call a function in the current segment
+  ;   4. clear the stack
+  ;   5. jump to the body
+  ; When entering this block, cx should be the address of the function
+  ; to be called
+.process_common_pattern:
   mov ax, [bp + si]
   add si, 2
   push ax
-  push video_putuint16
+  push .common_pattern_ret_addr
+  push cx
+  ; Indirect call to the register CX's address
+  retn
+.common_pattern_ret_addr:
   pop ax
   jmp .body
 .unknown_percent:
