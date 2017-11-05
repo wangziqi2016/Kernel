@@ -60,6 +60,31 @@ video_putstr:
   pop bp
   retn
 
+  ; This function prints 16 bit signed dec numbers
+  ; This is just a wrapper around uint printing
+video_putint16:
+  push bp
+  mov bp, sp
+  mov ax, [bp + 4]
+  cmp ax, 0
+  ; >= 0 just print it; Otherwise print a minus sign and then
+  ; print the negated number 
+  jge .print_body
+  ; Protect AX
+  push ax
+  mov al, '-'
+  mov ah, [video_print_attr]
+  call putchar
+  pop ax
+  neg ax
+.print_body:
+  push ax
+  call video_putuint16
+  pop ax
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function prints 16 bit unsigned dec numbers
   ;   [SP + 0] The 16 bit number to print
 video_putuint16:
