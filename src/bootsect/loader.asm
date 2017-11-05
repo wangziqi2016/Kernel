@@ -53,6 +53,9 @@ section .text
   call kbd_init
   call disk_init
   
+  push ds
+  push .printf_far_str
+  push .printf_near_str
   push word '@'
   push word 0abh
   push word 0cdefh
@@ -61,9 +64,11 @@ section .text
   push ds
   push .printf_test_str
   call video_printf
-  add sp, 14
+  add sp, 16
   jmp getline_loop
-  .printf_test_str: db "This is a test to printf %u %d %x %y %q %x %", 0ah, 00h
+  .printf_test_str: db "This is a test to printf %u %d %x %y %q %c %s %S %", 0ah, 00h
+  .printf_near_str: db "NEAR", 00h
+  .printf_far_str: db "FAR", 00h
 ;  mov si, 400
 ;  mov di, 4
 ;  mov bx, 0775h
