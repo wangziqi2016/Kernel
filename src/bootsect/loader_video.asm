@@ -243,20 +243,38 @@ video_printf:
   inc di
   test al, al
   je .last_char_is_percent
-  ; %d - 16 bit integer
-  cmp al, 'u'
-  je .process_percent_u
-  cmp al, 'd'
-  je .process_percent_d
+  ; First check whether AL is a member of the common pattern table
+  mov bx, .common_pattern_addr_table
+.check_common_pattern_loop:
+  ; Check whether the common pattern's identidier
+  ; is the current percent character. If it is 0 which means
+  ; the end of the table we just fall back to the brute force
+  ; approach of using branches
+  mov ah, [bx]
+  test ah, ah
+  je .not_common_pattern
+  cmp ah, al
+  jne .check_common_pattern_loop_next
+  ; CX is the address we will call
+  mov cx, [bx + 1]
+  jmp .process_common_pattern
+.check_common_pattern_loop_next:
+  add bx, 3
+  jmp .check_common_pattern_loop
+.not_common_pattern: 
   ; If there is an unknown percent specifier, we just print these two out
   jmp .unknown_percent
-  ; For unknown percent, just print a percent character and the char after it
-.process_percent_u:
-  mov cx, video_putuint16
-  jmp .process_common_pattern
-.process_percent_d:
-  mov cx, video_putint16
-  jmp .process_common_pattern
+  ; Should not enter this block
+.common_pattern_addr_table:
+  db 'u'
+  dw video_putuint16
+  db 'd'
+  dw video_putint16
+  db 'x'
+  dw video_puthex16
+  db 'y'
+  dw video_puthex8
+  db 00h
   ; Common pattern:
   ;   1. Get 2 bytes from the param list
   ;   2. push
@@ -269,13 +287,12 @@ video_printf:
   mov ax, [bp + si]
   add si, 2
   push ax
-  push .common_pattern_ret_addr
-  push cx
+  mov ax, cx
   ; Indirect call to the register CX's address
-  retn
-.common_pattern_ret_addr:
+  call ax
   pop ax
   jmp .body
+  ; For unknown percent, just print a percent character and the char after it
 .unknown_percent:
   mov al, '%'
   mov ah, [video_print_attr]

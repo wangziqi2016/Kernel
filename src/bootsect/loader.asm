@@ -53,14 +53,16 @@ section .text
   call kbd_init
   call disk_init
   
+  push word 0abh
+  push 0cdefh
   push -2468
   push 12345
   push ds
   push .printf_test_str
   call video_printf
-  add sp, 6
+  add sp, 12
   jmp getline_loop
-  .printf_test_str: db "This is a test to printf %u %d %", 0ah, 00h
+  .printf_test_str: db "This is a test to printf %u %d %x %y %", 0ah, 00h
 ;  mov si, 400
 ;  mov di, 4
 ;  mov bx, 0775h
