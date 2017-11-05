@@ -19,14 +19,41 @@ struc disk_param
   .sector: resb 1
   .unused: resb 1
   .track:  resw 1
+  ; These two are derived from the above parameters
+  .capacity:            resd 1
+  .sector_per_cylinder: resw 1
   .size:
 endstruc
 
-  ; This function detects all floppy and hard disks using BIOS routine
+  ; This function probes all disks installed on the system
+  ; and then computes disk parameters
 disk_init:
   ; Must disable all interrupts to avoid having non-consecutive disk 
   ; param table in the BSS segment
   cli
+  call disk_probe
+  call disk_compute_param
+  sti
+  retn
+  
+  ; This function computes some frequently used parameters for all disks
+  ; and store them in the corresponding entries of the disk parameter mapping
+disk_compute_param:
+  cli
+  push bx
+  push si
+  mov si, [disk_mapping_num]
+.body:
+  test si, si
+  
+.return:    
+  pop si
+  pop bx
+  sti
+  retn
+
+  ; This function detects all floppy and hard disks using BIOS routine
+disk_probe:
   push es
   push di
   push bx
@@ -110,7 +137,6 @@ disk_init:
   pop bx
   pop di
   pop es
-  sti
   retn
   ; Just prints what was found
   ; Do not save any register
