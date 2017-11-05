@@ -255,26 +255,54 @@ video_printf:
   je .not_common_pattern
   cmp ah, al
   jne .check_common_pattern_loop_next
-  ; CX is the address we will call
-  mov cx, [bx + 1]
-  jmp .process_common_pattern
+  ; CX is the address we will call or jump to
+  mov cx, [bx + 2]
+  mov ah, [bx + 1]
+  test ah, ah
+  jne .process_common_pattern
+  mov ax, cx
+  jmp ax
 .check_common_pattern_loop_next:
-  add bx, 3
+  add bx, 4
   jmp .check_common_pattern_loop
 .not_common_pattern: 
+  cmp al, 's'
+  je .process_percent_s
+  cmp al, 'c'
+  je .process_percent_c
   ; If there is an unknown percent specifier, we just print these two out
   jmp .unknown_percent
   ; Should not enter this block
 .common_pattern_addr_table:
-  db 'u'
+  ; The first byte is the percent specifier
+  ; The second byte is whether to call using the comon pattern, or
+  ; directly jump to the address
+  db 'u', 1
   dw video_putuint16
-  db 'd'
+  db 'd', 1
   dw video_putint16
-  db 'x'
+  db 'x', 1
   dw video_puthex16
-  db 'y'
+  db 'y', 1
   dw video_puthex8
+  db 's', 0
+  dw .process_percent_s
+  db 'c', 0
+  dw .process_percent_c
   db 00h
+.process_percent_s:
+  mov ax, [bp + si]
+  add si, 2
+  push ax
+  call video_putstr_near
+  pop ax
+  jmp .body
+.process_percent_c:
+  mov ax, [bp + si]
+  add si, 2
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .body
   ; Common pattern:
   ;   1. Get 2 bytes from the param list
   ;   2. push
