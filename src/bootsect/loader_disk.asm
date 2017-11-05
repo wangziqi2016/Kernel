@@ -29,6 +29,7 @@ disk_init:
   cli
   push es
   push di
+  push bx
   push bp
   mov bp, sp
   sub sp, 4
@@ -65,6 +66,8 @@ disk_init:
   call mem_get_sys_bss
   cmp ax, 0FFFFh
   je .error_unrecoverable
+  ; Save this everytime
+  mov [disk_mapping], ax
   ; AL = device type; BX = starting offset
   xchg ax, bx
   ; Save disk type
@@ -98,6 +101,7 @@ disk_init:
 .return:
   mov sp, bp
   pop bp
+  pop bx
   pop di
   pop es
   sti
@@ -112,6 +116,23 @@ disk_init:
   call video_puthex8
   pop ax
   mov ax, disk_init_chs_str
+  call video_putstr_near
+  mov bx, [disk_mapping]
+  mov ax, [bx + disk_param.track]
+  push ax
+  call video_puthex16
+  mov ax, 072fh
+  call putchar
+  mov ax, [bx + disk_param.head]
+  push ax
+  call video_puthex8
+  mov ax, 072fh
+  call putchar
+  mov ax, [bx + disk_param.sector]
+  push ax
+  call video_puthex8
+  ; Clear stack for three func calls
+  add sp, 6
   mov al, 0ah
   call putchar
   retn
@@ -137,7 +158,7 @@ disk_init:
 
 disk_init_error_str: db "Error initializing disk parameters", 0ah, 00h
 disk_init_found:     db "Found disk: ", 00h
-disk_init_chs_str:       db " C/H/S: ", 00h
+disk_init_chs_str:   db "; Maximum C/H/S (HEX): ", 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
