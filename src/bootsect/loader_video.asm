@@ -181,7 +181,11 @@ _video_puthex:
   ;   - %% The percent sign itself
   ; As the normal printf() implementation, the caller should clear the 
   ; stack, and parameters are pushed from right to left, all 16 bit aligned
-  ;   [BP + 4] - The format string
+  ;   [BP + 4] - The format string offset
+  ;   [BP + 6] - The format string segment
+  ; We keep the following invariant:
+  ;   [ES:DI] always points to the next character to print before the main loop
+  ;   [SS:BP + SI] always points to the 16 bit aligned next parameter
 video_printf:
   push bp
   mov bp, sp
@@ -189,7 +193,26 @@ video_printf:
   push bx
   push si
   push di
-  
+  ; Set ES:DI to point to the format string
+  mov ax, [bp + 6]
+  mov es, ax
+  mov di, [bp + 4]
+  ; Set SI to be the relative distance from SS:BP to the next argument
+  mov si, 8
+.body:
+  ; If the next char is NUL then just return
+  mov al, [es:di]
+  inc di
+  test al, al
+  je .return
+  cmp al, '%'
+  je .process_format
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .body
+.process_format:
+  jmp .body
+.return:
   pop di
   pop si 
   pop bx
