@@ -172,7 +172,8 @@ _video_puthex:
   ; This function is a modified/simplified version of printf
   ; Interface: void printf(const char *fmt, ...);
   ; Format string specification:
-  ;   - %d 16 bit integer
+  ;   - %d 16 bit signed integer
+  ;   - %u 16 bit unsigned integer
   ;   - %x 16 bit hex (always upper case, like traditional %X)
   ;   - %y 8  bit hex (always upper case); Need to push it as 16 bit
   ;   - %c a character; Need to push it as 16 bit
@@ -217,8 +218,19 @@ video_printf:
   inc di
   test al, al
   je .last_char_is_percent
+  ; %d - 16 bit integer
+  cmp al, 'u'
+  je .process_percent_u
   ; If there is an unknown percent specifier, we just print these two out
   jmp .unknown_percent
+  ; For unknown percent, just print a percent character and the char after it
+.process_percent_u:
+  mov ax, [bp + si]
+  add si, 2
+  push ax
+  push video_putuint16
+  pop ax
+  jmp .body
 .unknown_percent:
   mov al, '%'
   mov ah, [video_print_attr]
