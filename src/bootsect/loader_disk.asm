@@ -153,6 +153,37 @@ disk_init:
 .die:
   jmp die
 
+  ; This function returns a pointer to the disk param block
+  ; of the given disk letter
+  ;   [BP + 4] - The disk letter (low byte)
+  ; Returns in AX; Returns NULL if letter is invalid
+disk_get_param:
+  push bp
+  mov bp, sp
+  mov al, [bp + 4]
+  cmp al, 'A'
+  jb .return_invalid
+  sub al, 'A'
+  ; If al - 'A' >= mapping num it is also invalid
+  cmp al, [disk_mapping_num]
+  jae .return_invalid
+  mov ah, [disk_mapping_num]
+  xchg ah, al
+  sub al, ah
+  dec al
+  ; Afer this AL is the index in the array of disk_param
+  ; and the result of the mul is in AX
+  mul al, disk_param.size
+  ; Add with the base address
+  add ax, [disk_mapping]
+  jmp .return
+.return_invalid:
+  xor ax, ax
+.return:  
+  mov sp, bp
+  pop bp
+  retn
+
 disk_init_error_str: db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
 disk_init_found:     db "Disk %c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
 
