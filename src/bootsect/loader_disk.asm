@@ -249,7 +249,7 @@ disk_get_size:
   clc
   jmp .return
 .return_fail:
-  setc
+  stc
 .return:  
   pop bx
   mov sp, bp

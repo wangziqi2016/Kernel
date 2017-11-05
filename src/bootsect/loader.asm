@@ -76,14 +76,20 @@ section .text
   .printf_near_str: db "NEAR", 00h
   .printf_far_str: db "FAR", 00h
 test_disk_param:
-  push word 'D'
+  push word 'A'
   call disk_get_size
-  add sp, 2
+  pop cx
+  jc disk_size_error
   push dx
   push ax
   call video_putuint32
   add sp, 4
   jmp getline_loop
+disk_size_error:
+  mov ax, .get_disk_size_error_str
+  call video_putstr_near
+  jmp getline_loop
+  .get_disk_size_error_str: db "Disk size error", 0ah, 00h
 getline_loop:
   push ds
   push test_buffer
