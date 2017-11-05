@@ -72,7 +72,15 @@ disk_compute_param:
   ; DX:AX contains the capacity in sectors
   mov [bx + disk_param.capacity], ax
   mov [bx + disk_param.capacity + 2], dx
-  
+  ; 2. Compute sector per cylinder which is frequently used during
+  ;    CHS computation, and put it back to sector_per_cylinder
+  mov al, [bx + disk_param.head]
+  mov ah, [bx + disk_param.sector]
+  ; Must use head + 1 as its count
+  inc al
+  mul ah
+  mov [bx + disk_param.sector_per_cylinder], ax
+  jmp .body
 .return:    
   pop di
   pop si
