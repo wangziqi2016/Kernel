@@ -286,19 +286,13 @@ disk_get_chs:
   test ax, ax
   je .return_fail
   mov bx, ax
-  ; AX = AH * AL i.e. number of sectors in a track
-  mov ah, [bx + disk_param.head]
-  inc ah
-  mov al, [bx + disk_param.sector] 
-  mul ah
-  ; AX = sector per cylinder; We know the track ID will fit into 16 bits
-  ; there will not be an overflow
-  mov cx, ax
+  ; CX = sector per cylinder
+  mov cx, [bx + disk_param.sector_per_cylinder]
   mov ax, [bp + 6]
   mov dx, [bp + 8]
   div cx
   ; Now AX = in-cylinder offset
-  ;     DX = cylinder ID
+  ;     DX = cylinder ID,
   ; after the exchange
   xchg ax, dx
   mov cl, [bx + disk_param.sector]
@@ -307,7 +301,8 @@ disk_get_chs:
   ;     AL = head ID
   ;     DX = cylinder ID
   inc ah
-
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ; Uncomment the following to print CHS values that we will return
   ;movzx cx, ah
   ;push cx
   ;movzx cx, al
@@ -317,7 +312,10 @@ disk_get_chs:
   ;push .test_string
   ;call video_printf
   ;add sp, 10
-
+  ;jmp .after_debugging:
+  ;.test_string: db "CHS = %x %y %y", 0ah, 00h
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.after_debugging:
   ; Make the high 2 bits of CL the bit 8 and 9 of the cylinder number
   mov cl, dh
   shl cl, 6
@@ -336,7 +334,6 @@ disk_get_chs:
   mov sp, bp
   pop bp
   retn
-.test_string: db "CHS = %x %y %y", 0ah, 00h
 
   ; This function returns a pointer to the disk param block
   ; of the given disk letter
