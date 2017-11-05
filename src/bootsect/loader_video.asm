@@ -293,7 +293,14 @@ video_printf:
   dw .process_percent_c
   db 'S', 0
   dw .process_percent_S
+  db '%', 0
+  dw .process_percent_percent
   db 00h
+.process_percent_percent:
+  mov al, '%'
+  mov ah, [video_print_attr]
+  call putchar
+  jmp .body
 .process_percent_S:
   mov ax, [bp + si + 2]
   push ax

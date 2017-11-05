@@ -66,7 +66,7 @@ section .text
   call video_printf
   add sp, 16
   jmp getline_loop
-  .printf_test_str: db "This is a test to printf %u %d %x %y %q %c %s %S %", 0ah, 00h
+  .printf_test_str: db "This is a test to printf %u %d %x %y %q %c %s %S %% %", 0ah, 00h
   .printf_near_str: db "NEAR", 00h
   .printf_far_str: db "FAR", 00h
 ;  mov si, 400
