@@ -236,15 +236,15 @@ disk_get_chs:
   ;     DX = cylinder ID
   inc ah
 
-  movzx cx, ah
-  push cx
-  movzx cx, al
-  push cx
-  push dx
-  push ds
-  push .test_string
-  call video_printf
-  add sp, 10
+  ;movzx cx, ah
+  ;push cx
+  ;movzx cx, al
+  ;push cx
+  ;push dx
+  ;push ds
+  ;push .test_string
+  ;call video_printf
+  ;add sp, 10
 
   ; Make the high 2 bits of CL the bit 8 and 9 of the cylinder number
   mov cl, dh
