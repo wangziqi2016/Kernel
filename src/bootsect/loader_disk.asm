@@ -339,6 +339,7 @@ disk_get_chs:
   ; of the given disk letter
   ;   [BP + 4] - The disk letter (low byte)
   ; Returns in AX; Returns NULL if letter is invalid
+  ; We also set CF if fail; You can choose one to check
 disk_get_param:
   push bp
   mov bp, sp
@@ -359,9 +360,11 @@ disk_get_param:
   mul ah
   ; Add with the base address
   add ax, [disk_mapping]
+  clc
   jmp .return
 .return_invalid:
   xor ax, ax
+  stc
 .return:  
   mov sp, bp
   pop bp
