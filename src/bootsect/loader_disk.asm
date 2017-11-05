@@ -208,11 +208,12 @@ disk_get_chs:
   mov bp, sp
   push bx
   mov ax, [bp + 4]
+  push ax
   call disk_get_param
+  add sp, 2
   test ax, ax
-  mov bx, ax
-  pop ax
   je .return_fail
+  mov bx, ax
   ; AX = AH * AL i.e. number of sectors in a track
   mov ah, [bx + disk_param.head]
   inc ah
@@ -234,6 +235,17 @@ disk_get_chs:
   ;     AL = head ID
   ;     DX = cylinder ID
   inc ah
+
+  movzx cx, ah
+  push cx
+  movzx cx, al
+  push cx
+  push dx
+  push ds
+  push .test_string
+  call video_printf
+  add sp, 10
+
   ; Make the high 2 bits of CL the bit 8 and 9 of the cylinder number
   mov cl, dh
   shl cl, 6
@@ -252,6 +264,7 @@ disk_get_chs:
   mov sp, bp
   pop bp
   retn
+.test_string: db "CHS = %x %y %y", 0ah, 00h
 
   ; This function returns a pointer to the disk param block
   ; of the given disk letter
@@ -286,7 +299,7 @@ disk_get_param:
   retn
 
 disk_init_error_str: db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
-disk_init_found:     db "Disk %c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
+disk_init_found:     db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space

@@ -52,6 +52,12 @@ section .text
   call mem_init
   call kbd_init
   call disk_init
+
+  push word 0
+  push word 2879
+  push word 'A'
+  call disk_get_chs
+  add sp, 6
   
   push ds
   push .printf_far_str
