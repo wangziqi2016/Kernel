@@ -52,7 +52,12 @@ section .text
   call mem_init
   call kbd_init
   call disk_init
-
+  
+  push ds
+  push .printf_test_str
+  call video_printf
+  jmp getline_loop
+  .printf_test_str: db "This is a test to printf", 0ah, 00h
 ;  mov si, 400
 ;  mov di, 4
 ;  mov bx, 0775h
