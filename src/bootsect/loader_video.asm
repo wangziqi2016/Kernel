@@ -211,7 +211,26 @@ video_printf:
   call putchar
   jmp .body
 .process_format:
+  ; Get the char after percent sign, if it is NUL then just print percent and
+  ; done
+  mov al, [es:di]
+  inc di
+  test al, al
+  je .last_char_is_percent
+  ; If there is an unknown percent specifier, we just print these two out
+  jmp .unknown_percent
+.unknown_percent:
+  mov al, '%'
+  mov ah, [video_print_attr]
+  call putchar
+  mov al, [es:di - 1]
+  mov ah, [video_print_attr]
+  call putchar
   jmp .body
+.last_char_is_percent:
+  mov al, '%'
+  mov ah, [video_print_attr]
+  call putchar
 .return:
   pop di
   pop si 
