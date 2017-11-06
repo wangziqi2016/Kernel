@@ -274,8 +274,9 @@ disk_get_size:
   ;   CH = low 8 bits of cylinder
   ;   CL[6:7] = high 2 bits of cylinder
   ;   CL[0:5] = sector
-  ; AX = 0 when success
-  ; AX = non-zero when error
+  ;   AX = 0x0201 which is the param for reading 1 sector using INT 13h
+  ; CF is clear when success
+  ; CF is set when error
 disk_get_chs:
   push bp
   mov bp, sp
@@ -326,11 +327,14 @@ disk_get_chs:
   mov dh, al
   ; Make the low 6 bits of CL the sector ID starting from 1
   or cl, ah
+  ; DL is the device number. For floppy it is from 
+  ; 0x00 and for HDD it is from 0x80
   mov dl, [bx + disk_param.number]
+  mov ax, 0201h
+  clc
   jmp .return
 .return_fail:
-  xor ax, ax
-  inc ax
+  stc
 .return:
   pop bx
   mov sp, bp
