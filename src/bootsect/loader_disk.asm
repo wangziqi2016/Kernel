@@ -11,6 +11,7 @@ DISK_MAX_RETRY  equ 3
 ; Error code for disk_read_lba
 DISK_ERR_WRONG_LETTER   equ 1
 DISK_ERR_INT13H_FAIL    equ 2
+DISK_ERR_RESET_ERROR    equ 3
 
 ; This defines the structure of the disk parameter table
 struc disk_param
@@ -354,20 +355,21 @@ disk_get_chs:
 disk_write_lba:
 
 
-  ; This function reads LBA of a given disk
+  ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
   ; for three times. If all are not successful we just return fail
   ;   int disk_read_lba(char letter, uint32_t lba, void far *buffer);
   ;   [BP + 4] - Disk letter
   ;   [BP + 6][BP + 8] - low and high word of the LBA
   ;   [BP + 10][BP + 12] - Far pointer to the buffer
+  ;   [BP + 14] - 8 bit opcode on lower byte; 0x02 for read; 0x03 for write 
   ; Return value:
   ;   CF cleared if success
   ;   CF set if error
   ; AX = 0 if success
   ; AX = DISK_ERR_WRONG_LETTER   if the letter is wrong
   ; AX = DISK_ERR_INT13H_FAIL    if INT 13h fails after 0 or more retries
-disk_read_lba:
+disk_op_lba:
   push bp
   mov bp, sp
 .RETRY_COUNTER equ -2
@@ -402,6 +404,10 @@ disk_read_lba:
   stc
   mov ax, DISK_ERR_WRONG_LETTER
   jmp .return
+.return_fail_reset_error:
+  stc
+  mov ax, DISK_ERR_RESET_ERROR
+  jmp .return
 .return_fail_int13h_error:
   stc
   mov ax, DISK_ERR_INT13H_FAIL
@@ -430,6 +436,11 @@ disk_read_lba:
   mov al, [bx + disk_param.number]
   and al, 80h
   jnz .return_fail_int13h_error
+  ; Do a reset for floppy
+  mov dl, [bx + disk_param.number]
+  xor ax, ax
+  int 13h
+  jc .return_fail_reset_error
   jmp .retry
 
   ; This function returns a pointer to the disk param block
