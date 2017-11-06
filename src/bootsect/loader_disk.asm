@@ -270,6 +270,7 @@ disk_get_size:
   ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
   ; Return:
   ;   DH = head
+  ;   DL = device number (i.e. the hardward number)
   ;   CH = low 8 bits of cylinder
   ;   CL[6:7] = high 2 bits of cylinder
   ;   CL[0:5] = sector
@@ -325,6 +326,7 @@ disk_get_chs:
   mov dh, al
   ; Make the low 6 bits of CL the sector ID starting from 1
   or cl, ah
+  mov dl, [bx + disk_param.number]
   jmp .return
 .return_fail:
   xor ax, ax

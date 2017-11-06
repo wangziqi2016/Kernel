@@ -58,6 +58,8 @@ section .text
   push word 'A'
   call disk_get_chs
   add sp, 6
+  movzx ax, dl
+  push ax
   movzx ax, dh
   push ax
   movzx ax, cl
@@ -67,9 +69,9 @@ section .text
   push ds
   push .chs_test_str
   call video_printf
-  add sp, 10
+  add sp, 12
   jmp .after_chs_test
-  .chs_test_str: db "CH = %y CL = %y DH = %y", 0ah, 00h
+  .chs_test_str: db "CH = %y CL = %y DH = %y DL = %y", 0ah, 00h
 .after_chs_test:
   push ds
   push .printf_far_str
