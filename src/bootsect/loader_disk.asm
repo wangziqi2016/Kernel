@@ -350,19 +350,39 @@ disk_get_chs:
   retn
 
   ; This function writes LBA of a given disk
-  ; This one has almost the same structure as the read except that
-  ; it returns 
+  ; For arguments and return values please refer to disk_op_lba
 disk_write_lba:
-
+  ; Move the return address down by 2 bytes
+  ; and add 2 bytes for the argument
+  push bp
+  mov bp, sp
+  ; Reserve space for 2 bytes, to avoid interrupts coming
+  ; during this interval
+  push ax
+  ; Old BP value
+  mov ax, [bp]
+  mov [bp - 2], ax
+  ; Return address
+  mov ax, [bp + 2]
+  mov [bp], ax
+  mov [bp + 2], word 0301h
+  ; Restore old BP value, and make the return
+  ; address to be the top of the stack
+  ; and then jump to the routine as if we have 
+  ; called it with the extra argument
+  pop bp
+  jmp disk_op_lba
+  hlt
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
   ; for three times. If all are not successful we just return fail
   ;   int disk_read_lba(char letter, uint32_t lba, void far *buffer);
-  ;   [BP + 4] - Disk letter
-  ;   [BP + 6][BP + 8] - low and high word of the LBA
-  ;   [BP + 10][BP + 12] - Far pointer to the buffer
-  ;   [BP + 14] - 8 bit opcode on lower byte; 0x02 for read; 0x03 for write 
+  ;   [BP + 4] - 8 bit opcode on lower byte (0x02 for read, 0x03 for write); 
+  ;              8 bit # of sectors to operate on higher byte (should be 1)
+  ;   [BP + 6] - Disk letter
+  ;   [BP + 8][BP + 10] - low and high word of the LBA
+  ;   [BP + 12][BP + 14] - Far pointer to the buffer
   ; Return value:
   ;   CF cleared if success
   ;   CF set if error
@@ -380,19 +400,21 @@ disk_op_lba:
   push bx
 .retry:
   ; Push the same parameter into the stack
+  mov ax, [bp + 10]
+  push ax
   mov ax, [bp + 8]
   push ax
   mov ax, [bp + 6]
   push ax
-  mov ax, [bp + 4]
-  push ax
   call disk_get_chs
   add sp, 6
   jc .return_fail_wrong_letter
-  ; Load ES:BX to point to the buffer. first protect AX
-  mov bx, [bp + 12]
+  ; Load ES:BX to point to the buffer
+  mov bx, [bp + 14]
   mov es, bx
-  mov bx, [bp + 10]
+  mov bx, [bp + 12]
+  ; Opcode + number of sectors to read/write
+  mov ax, [bp + 4]
   ; After this line, AX, DX and CX cannot be changed
   ; as they contain information for performing disk read
   int 13h
@@ -425,7 +447,7 @@ disk_op_lba:
   cmp ax, DISK_MAX_RETRY
   je .return_fail_int13h_error
   inc word [bp + .RETRY_COUNTER]
-  mov ax, [bp + 4]
+  mov ax, [bp + 6]
   push ax
   call disk_get_param
   mov bx, ax
