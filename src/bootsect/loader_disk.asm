@@ -41,7 +41,6 @@ disk_init:
   ; This function computes some frequently used parameters for all disks
   ; and store them in the corresponding entries of the disk parameter mapping
 disk_compute_param:
-  cli
   push bx
   push si
   push di
@@ -87,7 +86,6 @@ disk_compute_param:
   pop di
   pop si
   pop bx
-  sti
   retn
 .invalid_letter:
   ; We know DI saves the copy of disk letter
