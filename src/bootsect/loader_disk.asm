@@ -5,6 +5,12 @@ _loader_disk_start:
 
 ; The maximum numbre of hardware devices we could support
 DISK_MAX_DEVICE equ 8
+; The max number of times we retry for read/write failure
+DISK_MAX_RETRY  equ 3
+
+; Error code for disk_read_lba
+DISK_ERR_WRONG_LETTER   equ 1
+DISK_ERR_INT13H_FAIL    equ 2
 
 ; This defines the structure of the disk parameter table
 struc disk_param
@@ -230,8 +236,9 @@ disk_probe:
   ; Size is returned in DX:AX as 512 byte sectors since it may exceeds 
   ; the 16 bit limit
   ; Under the CHS addressing scheme, the maximum possible sector is 24 bit
-  ; Set CF if the letter is invalid
   ;   [BP + 4] - Letter
+  ; Return: Set CF if the letter is invalid
+  ;         Clear CF is success
 disk_get_size:
   push bp
   mov bp, sp
@@ -341,16 +348,35 @@ disk_get_chs:
   pop bp
   retn
 
+  ; This function writes LBA of a given disk
+  ; This one has almost the same structure as the read except that
+  ; it returns 
+disk_write_lba:
+
+
   ; This function reads LBA of a given disk
-  ; Note that we use 32 bit LBA
+  ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
+  ; for three times. If all are not successful we just return fail
+  ;   int disk_read_lba(char letter, uint32_t lba, void far *buffer);
   ;   [BP + 4] - Disk letter
   ;   [BP + 6][BP + 8] - low and high word of the LBA
   ;   [BP + 10][BP + 12] - Far pointer to the buffer
+  ; Return value:
+  ;   CF cleared if success
+  ;   CF set if error
+  ; AX = 0 if success
+  ; AX = DISK_ERR_WRONG_LETTER   if the letter is wrong
+  ; AX = DISK_ERR_INT13H_FAIL    if INT 13h fails after 0 or more retries
 disk_read_lba:
   push bp
   mov bp, sp
+.RETRY_COUNTER equ -2
+  xor ax, ax
+  ; This is temp var retry counter
+  push ax
   push es
   push bx
+.retry:
   ; Push the same parameter into the stack
   mov ax, [bp + 8]
   push ax
@@ -358,15 +384,53 @@ disk_read_lba:
   push ax
   mov ax, [bp + 4]
   push ax
-  call disk_get_param
+  call disk_get_chs
   add sp, 6
-  ; After this line, DH and CX cannot be changed
-  
+  jc .return_fail_wrong_letter
+  ; Load ES:BX to point to the buffer. first protect AX
+  mov bx, [bp + 12]
+  mov es, bx
+  mov bx, [bp + 10]
+  ; After this line, AX, DX and CX cannot be changed
+  ; as they contain information for performing disk read
+  int 13h
+  jc .retry_or_fail
+  clc
+  xor ax, ax
+  jmp .return
+.return_fail_wrong_letter:
+  stc
+  mov ax, DISK_ERR_WRONG_LETTER
+  jmp .return
+.return_fail_int13h_error:
+  stc
+  mov ax, DISK_ERR_INT13H_FAIL
+.return:
   pop bx
   pop es
   mov sp, bp
   pop bp
   retn
+  ; In this block we check whether the device is floppy and whether 
+  ; we still can retry. If both are true, then we simply retry. Otherwise
+  ; return read failure
+.retry_or_fail:
+  mov ax, [bp + .RETRY_COUNTER]
+  cmp ax, DISK_MAX_RETRY
+  je .return_fail_int13h_error
+  inc word [bp + .RETRY_COUNTER]
+  mov ax, [bp + 4]
+  push ax
+  call disk_get_param
+  mov bx, ax
+  pop ax
+  jc .return_fail_wrong_letter
+  ; If the number has 7-th bit set then it is a harddisk
+  ; and we do not retry, just fail directly
+  mov al, [bx + disk_param.number]
+  and al, 80h
+  jnz .return_fail_int13h_error
+  jmp .retry
 
   ; This function returns a pointer to the disk param block
   ; of the given disk letter
