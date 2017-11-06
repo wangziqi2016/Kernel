@@ -335,6 +335,33 @@ disk_get_chs:
   pop bp
   retn
 
+  ; This function reads LBA of a given disk
+  ; Note that we use 32 bit LBA
+  ;   [BP + 4] - Disk letter
+  ;   [BP + 6][BP + 8] - low and high word of the LBA
+  ;   [BP + 10][BP + 12] - Far pointer to the buffer
+disk_read_lba:
+  push bp
+  mov bp, sp
+  push es
+  push bx
+  ; Push the same parameter into the stack
+  mov ax, [bp + 8]
+  push ax
+  mov ax, [bp + 6]
+  push ax
+  mov ax, [bp + 4]
+  push ax
+  call disk_get_param
+  add sp, 6
+  ; After this line, DH and CX cannot be changed
+  
+  pop bx
+  pop es
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function returns a pointer to the disk param block
   ; of the given disk letter
   ;   [BP + 4] - The disk letter (low byte)
