@@ -374,6 +374,21 @@ disk_write_lba:
   jmp disk_op_lba
   hlt
 
+  ; This function reads LBA of a given disk
+  ; For arguments and return values please refer to disk_op_lba
+disk_read_lba:
+  push bp
+  mov bp, sp
+  push ax
+  mov ax, [bp]
+  mov [bp - 2], ax
+  mov ax, [bp + 2]
+  mov [bp], ax
+  mov [bp + 2], word 0201h
+  pop bp
+  jmp disk_op_lba
+  hlt
+
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
   ; for three times. If all are not successful we just return fail
