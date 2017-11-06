@@ -20,7 +20,9 @@ struc disk_param
   .unused: resb 1
   .track:  resw 1
   ; These two are derived from the above parameters
+  ; Capacity is in terms of sectors
   .capacity:            resd 1
+  ; This is used to compute CHS
   .sector_per_cylinder: resw 1
   .size:
 endstruc
