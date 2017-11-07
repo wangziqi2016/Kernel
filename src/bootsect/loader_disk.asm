@@ -485,6 +485,7 @@ disk_find_empty_buffer:
   jz .return
   add bx, disk_buffer_entry.size
   jmp .body
+  ; Before entering this, BX must contain the entry
 .return:
   ; Mark it as valid, not dirty and not pinned
   mov byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
@@ -509,6 +510,7 @@ disk_find_empty_buffer:
   retn
 %ifdef disk_find_empty_buffer_debug
 .debug_str: db "Index = %u", 0ah, 00h
+.debug_wb_str:  db "Write back %u", 0ah, 00h
 %endif
 .evict_fail:
   mov cx, [disk_buffer]
@@ -528,17 +530,35 @@ disk_find_empty_buffer:
   mov bx, [disk_buffer]
   ; DX:AX is the offset, we simply ignore DX and assume it will be 0
   mov ax, disk_buffer_entry.size
-  mul [disk_buffer_next_to_evict]
+  mul word [disk_buffer_next_to_evict]
   ; ES:BX should point to the buffer we want to evice
   add bx, ax
   ; If it is not dirty then we do not write back
-  test [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
   jz .no_write_back
+%ifdef disk_find_empty_buffer_debug
+  mov ax, [disk_buffer_next_to_evict]
+  push ax
+  push ds
+  push .debug_wb_str
+  call video_printf
+  add sp, 6
+%endif
   mov ax, bx
   call disk_buffer_write_lba
   jc .evict_fail
 .no_write_back:
-  jmp .not_found
+  ; Mask off the dirty bit
+  and byte [es:bx + disk_buffer_entry.status], ~DISK_BUFFER_STATUS_DIRTY
+  ; Update the counter and deal with potental wrap-backs
+  mov ax, [disk_buffer_next_to_evict]
+  inc ax
+  cmp ax, DISK_BUFFER_MAX_ENTRY
+  jne .evict_counter_no_wrap_back
+  xor ax, ax
+.evict_counter_no_wrap_back:
+  mov [disk_buffer_next_to_evict], ax
+  jmp .return
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
