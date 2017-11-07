@@ -315,10 +315,6 @@ video_printf:
   add bx, 4
   jmp .check_common_pattern_loop
 .not_common_pattern: 
-  cmp al, 's'
-  je .process_percent_s
-  cmp al, 'c'
-  je .process_percent_c
   ; If there is an unknown percent specifier, we just print these two out
   jmp .unknown_percent
   ; Should not enter this block
