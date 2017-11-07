@@ -114,7 +114,9 @@ disk_buffer_init:
   jz .after_init
   dec si
   ; Set status word to 0 (invalid)
-  mov [bx + disk_buffer.status], al
+  mov [bx + disk_buffer_entry.status], al
+  ; Advance the pointer
+  add bx, disk_buffer_entry.size
   jmp .body
 .after_init:  
 .return:
