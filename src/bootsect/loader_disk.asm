@@ -59,6 +59,10 @@ struc disk_buffer_entry
   .size:
 endstruc
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Disk Initialization
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
   ; This function probes all disks installed on the system
   ; and then computes disk parameters
 disk_init:
@@ -108,13 +112,13 @@ disk_buffer_init:
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
   ; AX value will be preserved
-  xor ax, ax
+  mov al, DISK_BUFFER_STATUS_VALID
 .body:
   test si, si
   jz .after_init
   dec si
-  ; Set status word to 0 (invalid)
-  mov [bx + disk_buffer_entry.status], al
+  ; Set status word to 0x01 (Valid) - must use ES:BX
+  mov [es:bx + disk_buffer_entry.status], al
   ; Advance the pointer
   add bx, disk_buffer_entry.size
   jmp .body
@@ -131,7 +135,7 @@ disk_buffer_init:
   push disk_buffer_too_large_str
   call video_printf
   add sp, 8
-.die
+.die:
   jmp .die
 
   ; This function computes some frequently used parameters for all disks
@@ -320,6 +324,10 @@ disk_probe:
 .die:
   jmp die
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Disk Param Computation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
   ; This function returns the raw byte size of a disk given its
   ; letter number
   ; Size is returned in DX:AX as 512 byte sectors since it may exceeds 
@@ -461,6 +469,63 @@ disk_write_lba:
   pop bp
   jmp disk_op_lba
   hlt
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Disk Buffer Management
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  ; This function returns an empty buffer from the buffer cache
+  ; Currently we ignore the pinned flag (it is always advisory)
+  ; If all entries are occupied, we evict a buffer and then
+  ; return it
+  ;   Return: AX = the pointer in 
+  ; Note that the returned buffer will have VALID bit set to 1
+  ; and modified set to 0
+disk_find_empty_buffer:
+  push es
+  push bx
+  push si
+  ; Load the segment register
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
+  ; Loop var
+  mov si, [disk_buffer_size]
+  ; BX must always hold the current disk buffer address
+  mov bx, [disk_buffer]
+.body:
+  test si, si
+  jz .not_found
+  dec si
+  ; It we found a valid one then just return
+  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
+  jnz .return
+  add bx, disk_buffer_entry.size
+  jmp .body
+.return:
+  ; Mark it as valid, not dirty and not pinned
+  mov byte [es:bx + disk_buffer_entry.status], 0
+  mov ax, bx
+
+  ; Debug - print the index
+  neg si
+  add si, [disk_buffer_size]
+  dec si
+  push si
+  push ds
+  push .debug_str
+  call video_printf
+  add sp, 6
+
+  pop si
+  pop bx
+  pop es
+  retn
+.debug_str: db "Index = %u", 0ah, 00h
+.not_found:
+  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Disk R/W
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   ; This function reads LBA of a given disk
   ; For arguments and return values please refer to disk_op_lba
@@ -619,3 +684,8 @@ disk_mapping_num: dw 0
 disk_buffer:      dw 0
 ; Number of entries in the buffer
 disk_buffer_size: dw 0
+; The next buffer to evict if all buffer entries are used
+; We increment this value everytime we evict a buffer entry
+; and next time we just start at this
+; Note that this value SHOULD wrap back
+disk_buffer_next_to_evict: dw 0
