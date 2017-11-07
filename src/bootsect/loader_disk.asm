@@ -73,7 +73,9 @@ disk_init:
   
   ; This function allocates buffer for disk sectors and initialize the buffer
 disk_buffer_init:
+  push es
   push bx
+  push si
   mov ax, disk_buffer_entry.size
   mov cx, DISK_BUFFER_MAX_ENTRY
   mov [disk_buffer_size], cx
@@ -98,8 +100,27 @@ disk_buffer_init:
   call video_printf
   add sp, 8
   ; Then iterate through the buffer to initialize its status
+  ; Use SI as loop index
+  mov si, [disk_buffer_size]
+  ; Use ES:BX as the buffer cache index
+  mov bx, [disk_buffer]
+  ; Load ES with the large BSS segment
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
+  ; AX value will be preserved
+  xor ax, ax
+.body:
+  test si, si
+  jz .after_init
+  dec si
+  ; Set status word to 0 (invalid)
+  mov [bx + disk_buffer.status], al
+  jmp .body
+.after_init:  
 .return:
+  pop si
   pop bx
+  pop es
   ret
 .buffer_too_large:
   push dx
