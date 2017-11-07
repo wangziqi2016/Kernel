@@ -513,6 +513,24 @@ disk_find_empty_buffer:
 ; Disk R/W
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+  ; Fast wrapper for reading LBA into a buffer
+  ; It has the same erorr condition and return value as disk_buffer_op_lba
+  ;    AX = Offset to the buffer entry
+disk_buffer_read_lba:
+  push word DISK_OP_READ
+  push ax
+  call disk_buffer_op_lba
+  add sp, 4
+  retn
+
+  ; Fast wrapper for writing LBA into a buffer
+disk_buffer_write_lba:
+  push word DISK_OP_WRITE
+  push ax
+  call disk_buffer_op_lba
+  add sp, 4
+  retn
+
   ; This function reads or writes LBA of a given disk
   ;   [BP + 4] - The pointer to the buffer object for writing
   ;              The buffer must have its driver letter and LBA set

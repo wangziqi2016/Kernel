@@ -28,10 +28,8 @@ disk_buffer_test:
   mov [es:bx + disk_buffer_entry.lba], si
   mov byte [es:bx + disk_buffer_entry.letter], 'A'
   mov byte [es:bx + disk_buffer_entry.device], 00h
-  push DISK_OP_READ
-  push bx
-  call disk_buffer_op_lba
-  add sp, 4
+  mov ax, bx
+  call disk_buffer_read_lba
   jmp .body
 .return:
   ; Here the last sector is sector 1 (LBA 0)
