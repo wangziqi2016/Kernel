@@ -44,6 +44,11 @@ DISK_BUFFER_STATUS_VALID  equ 01h
 DISK_BUFFER_STATUS_DIRTY  equ 02h
 DISK_BUFFER_STATUS_PINNED equ 04h
 
+; These two are used as arguments for performing disk r/w
+; via the common interface
+DISK_OP_READ  equ 0201h
+DISK_OP_WRITE equ 0301h
+
 ; This is the structure of buffer entry in the disk buffer cache
 struc disk_buffer_entry
   ; PINNED DIRTY VALID
@@ -445,31 +450,6 @@ disk_get_chs:
   pop bp
   retn
 
-  ; This function writes LBA of a given disk
-  ; For arguments and return values please refer to disk_op_lba
-disk_write_lba:
-  ; Move the return address down by 2 bytes
-  ; and add 2 bytes for the argument
-  push bp
-  mov bp, sp
-  ; Reserve space for 2 bytes, to avoid interrupts coming
-  ; during this interval
-  push ax
-  ; Old BP value
-  mov ax, [bp]
-  mov [bp - 2], ax
-  ; Return address
-  mov ax, [bp + 2]
-  mov [bp], ax
-  mov [bp + 2], word 0301h
-  ; Restore old BP value, and make the return
-  ; address to be the top of the stack
-  ; and then jump to the routine as if we have 
-  ; called it with the extra argument
-  pop bp
-  jmp disk_op_lba
-  hlt
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk Buffer Management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -480,7 +460,9 @@ disk_write_lba:
   ; return it
   ;   Return: AX = the pointer in 
   ; Note that the returned buffer will have VALID bit set to 1
-  ; and modified set to 0
+  ; and modified set to 0. The LBA, disk letter and disk number must
+  ; be set by the caller.
+  ; This function cannot fail.
 disk_find_empty_buffer:
   push es
   push bx
@@ -507,6 +489,8 @@ disk_find_empty_buffer:
   mov ax, bx
 
   ; Debug - print the index
+  ; Save return value first
+  push ax
   neg si
   add si, [disk_buffer_size]
   dec si
@@ -515,6 +499,7 @@ disk_find_empty_buffer:
   push .debug_str
   call video_printf
   add sp, 6
+  pop ax
 
   pop si
   pop bx
@@ -522,10 +507,52 @@ disk_find_empty_buffer:
   retn
 .debug_str: db "Index = %u", 0ah, 00h
 .not_found:
-  
+  jmp .not_found
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  ; This function reads or writes LBA of a given disk
+  ;   [BP + 6] - The opcode (0x0201 for read; 0x0301 for write)
+  ;   [BP + 4] - The pointer to the buffer object for writing
+  ;              The buffer must have its driver letter and LBA set
+  ; Sets CF is fails; Clears CF if succeeds
+  ; Return value in AX. Please refer to disk_op_lba
+  ; If valid is
+disk_op_lba_on_buffer:
+  ; Move the return address down by 2 bytes
+  ; and add 2 bytes for the argument
+  push bp
+  mov bp, sp
+  push bx
+  mov bx, [bp + 4]
+
+  ; Push LARGE_BSS:base + data offset as the buffer pointer
+  push MEM_LARGE_BSS_SEG
+  lea ax, [bx + disk_buffer_entry.data]  
+  push ax
+  mov ax, [bx + disk_buffer_entry.lba + 2]
+  ; Push high and low word of LBA
+  push ax
+  mov ax, [bx + disk_buffer_entry.lba]
+  push ax
+  ; Push the letter
+  mov al, [bx + disk_buffer_entry.letter]
+  push ax
+  ; Push the opcode (0x0301)
+  push word 0301
+  call disk_op_lba
+  add sp, 12
+  jc .return_fail
+  clc
+  jmp .return
+.return_fail:
+  stc
+.return:
+  pop bx
+  mov sp, bp
+  pop bp
+  retn
 
   ; This function reads LBA of a given disk
   ; For arguments and return values please refer to disk_op_lba

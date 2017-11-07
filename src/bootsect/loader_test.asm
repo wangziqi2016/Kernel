@@ -36,7 +36,7 @@ disk_buffer_test:
   push word 0
   push si
   push word 'A'
-  ;call disk_read_lba
+  call disk_read_lba
   add sp, 10
   jmp .body
 .return:
