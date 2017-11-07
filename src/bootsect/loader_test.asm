@@ -3,8 +3,39 @@ _loader_test_start:
 ; loader_test.asm - This file contains test cases for modules
 ;
 
-  ; This function tests disk
 disk_test:
+  call disk_chs_test
+  call disk_param_test
+  retn
+
+disk_param_test:
+  push word 'A'
+  call disk_get_size
+  pop cx
+  jc .disk_size_error
+  push dx
+  push ax
+  call video_putuint32
+  add sp, 4
+  push word 'A'
+  call disk_get_param
+  mov bx, ax
+  pop ax
+  mov ax, [bx + disk_param.capacity]
+  mov dx, [bx + disk_param.capacity + 2]
+  push dx
+  push ax
+  call video_putuint32
+  add sp, 4
+  jmp .return
+.disk_size_error:
+  mov ax, disk_get_size_error_str
+  call video_putstr_near
+.return:
+  retn
+
+  ; This function tests disk
+disk_chs_test:
   push word 0
   push word 2879
   push word 'A'
@@ -45,3 +76,7 @@ printf_near_str: db "NEAR", 00h
 printf_far_str: db "FAR", 00h
 
 disk_chs_test_str: db "CH = %y CL = %y DH = %y DL = %y AX = %x", 0ah, 00h
+disk_get_size_error_str: db "Disk size error", 0ah, 00h
+
+
+

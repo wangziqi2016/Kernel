@@ -56,31 +56,6 @@ section .text
   call disk_test
   call printf_test
   
-test_disk_param:
-  push word 'A'
-  call disk_get_size
-  pop cx
-  jc disk_size_error
-  push dx
-  push ax
-  call video_putuint32
-  add sp, 4
-  push word 'A'
-  call disk_get_param
-  mov bx, ax
-  pop ax
-  mov ax, [bx + disk_param.capacity]
-  mov dx, [bx + disk_param.capacity + 2]
-  push dx
-  push ax
-  call video_putuint32
-  add sp, 4
-  jmp getline_loop
-disk_size_error:
-  mov ax, .get_disk_size_error_str
-  call video_putstr_near
-  jmp getline_loop
-  .get_disk_size_error_str: db "Disk size error", 0ah, 00h
 getline_loop:
   push ds
   push test_buffer
