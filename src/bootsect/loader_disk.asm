@@ -45,7 +45,7 @@ DISK_BUFFER_STATUS_DIRTY  equ 02h
 DISK_BUFFER_STATUS_PINNED equ 04h
 
 ; This is the structure of buffer entry in the disk buffer cache
-struc disk_buffer
+struc disk_buffer_entry
   ; PINNED DIRTY VALID
   .status: resb 1
   ; The device ID
@@ -65,20 +65,50 @@ disk_init:
   ; Must disable all interrupts to avoid having non-consecutive disk 
   ; param table in the BSS segment
   cli
-  push bx
   call disk_probe
   call disk_compute_param
-  ; TODO: implement buffer cache
-  ; Then prepare the system BSS
-  ;mov ax, DISK_SECTOR_SIZE
-  ;call mem_get_sys_bss
-  ;cmp ax, 0ffffh
-  ;je .allocate_buffer_fail
-  ;mov bx, ax
-  pop bx
+  call disk_buffer_init
   sti
   retn
   
+  ; This function allocates buffer for disk sectors and initialize the buffer
+disk_buffer_init:
+  push bx
+  mov ax, disk_buffer_entry.size
+  mov cx, DISK_BUFFER_MAX_ENTRY
+  mov [disk_buffer_size], cx
+  ; DX:AX is the total number of bytes required for the buffer 
+  mul cx
+  ; If overflows to DX then it is too large
+  test dx, dx
+  jnz .buffer_too_large
+  ; Save the size to BX
+  mov bx, ax
+  ; Otherwise AX contains requested size
+  call mem_get_large_bss
+  ; If this fails then we know allocation fails
+  jc .buffer_too_large
+  ; Otherwise AX is the beginning of the buffer
+  mov [disk_buffer], ax
+  push bx
+  push ax
+  push ds
+  push disk_buffer_size_str
+  call video_printf
+  add sp, 8
+.return:
+  pop bx
+  ret
+.buffer_too_large:
+  push dx
+  push ax
+  push ds
+  push disk_buffer_too_large_str
+  call video_printf
+  add sp, 8
+.die
+  jmp .die
+
   ; This function computes some frequently used parameters for all disks
   ; and store them in the corresponding entries of the disk parameter mapping
 disk_compute_param:
@@ -133,7 +163,7 @@ disk_compute_param:
   push di
   push di
   push ds
-  push disk_invalid_letter
+  push disk_invalid_letter_str
   call video_printf
   add sp, 8
 .die:
@@ -182,10 +212,9 @@ disk_probe:
   push dx
   mov ax, disk_param.size
   ; Allocate a system static data chunk
-  ; if fail just print error message
+  ; if fail (CF = 1) just print error message
   call mem_get_sys_bss
-  cmp ax, 0FFFFh
-  je .error_unrecoverable
+  jc .error_unrecoverable
   ; Save this everytime
   mov [disk_mapping], ax
   ; AL = device type; BX = starting offset
@@ -239,7 +268,7 @@ disk_probe:
   mov al, [bp + .CURRENT_DISK_LETTER]
   push ax
   push ds
-  push disk_init_found
+  push disk_init_found_str
   call video_printf
   add sp, 14
   retn
@@ -550,8 +579,10 @@ disk_get_param:
   retn
 
 disk_init_error_str: db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
-disk_init_found:     db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
-disk_invalid_letter: db "Invalid disk letter: %c (%y)", 0ah, 00h
+disk_init_found_str:     db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
+disk_invalid_letter_str: db "Invalid disk letter: %c (%y)", 0ah, 00h
+disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
+disk_buffer_size_str: db "Sector buffer begins at %x; size %u bytes", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
@@ -559,5 +590,7 @@ disk_invalid_letter: db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_mapping:     dw 0
 ; Number of elements in the disk mapping table
 disk_mapping_num: dw 0
-; Contains segment:offset for the disk buffer (one sector)
-disk_buffer:      dd 0
+; This is the starting offset of the disk buffer
+disk_buffer:      dw 0
+; Number of entries in the buffer
+disk_buffer_size: dw 0

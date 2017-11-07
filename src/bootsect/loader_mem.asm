@@ -3,6 +3,11 @@ _loader_mem_start:
 ; loader_mem.asm - This file contains memory functions
 ;
 
+; This is the large BSS's segment address. We could start using this
+; address range from offset 0x10 (note that 0x0 - 0xf are still within 1MB
+; and is potentially used )
+MEM_LARGE_BSS_SEG equ 0ffffh
+
   ; This function initializes memory management
 mem_init:
   ; If A20 is enabled, then we continue with other jobs
@@ -313,9 +318,31 @@ mem_get_sys_bss:
   ; mem_get_sys_bss.
   ;   AX = number of bytes to allocate. We check for wrap-back
   ; Return:
-  ;   AX = 0xFFFF if fails, AX = offset address
-
+  ;   AX = 0x0000 if fails, AX = offset address
+  ;   CF is cleared if fails. CF is set if success
 mem_get_large_bss:
+  cli
+  ; CX = 0x10000 - top, i.e. remaining bytes
+  ; AX is the requested size
+  mov cx, [mem_large_bss]
+  neg cx
+  ; If requested bytes > remaining bytes then we fail
+  cmp ax, cx
+  ja .return_fail
+  neg cx
+  ; AX is the pointer after allocation and we write it back
+  add ax, cx
+  mov [mem_large_bss], ax
+  ; This is the value we return
+  sub ax, cx
+  clc
+  jmp .return
+.return_fail:
+  xor ax, ax
+  stc
+.return:
+  sti
+  retn
 
 mem_a20_closed_str: db "A20 gate is by default closed.", 0ah, 00h
 mem_a20_opened_str: db "A20 gate is now activated.", 0ah, 00h
@@ -334,6 +361,6 @@ mem_high_end:   dw 0280h
 mem_sys_bss:    dw 0fffeh
 ; This is the same as system BSS except that it uses the last segment 
 ; (A20 enabled).
-; Note that here we define it as a far pointer, i.e. segment:offset
-; Also, we always allocate from low addresses
-mem_large_bss:  dw 0h, 0ffffh
+; Note that we need to start allocating from 0x10, which is the first byte 
+; after 1MB
+mem_large_bss:  dw 0010h
