@@ -90,12 +90,14 @@ disk_buffer_init:
   jc .buffer_too_large
   ; Otherwise AX is the beginning of the buffer
   mov [disk_buffer], ax
+  ; Print
   push bx
   push ax
   push ds
   push disk_buffer_size_str
   call video_printf
   add sp, 8
+  ; Then iterate through the buffer to initialize its status
 .return:
   pop bx
   ret
@@ -582,7 +584,7 @@ disk_init_error_str: db "Error initializing disk parameters (AX = 0x%x)", 0ah, 0
 disk_init_found_str:     db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
 disk_invalid_letter_str: db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
-disk_buffer_size_str: db "Sector buffer begins at %x; size %u bytes", 0ah, 00h
+disk_buffer_size_str: db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space

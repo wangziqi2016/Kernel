@@ -334,7 +334,7 @@ mem_get_large_bss:
   add ax, cx
   mov [mem_large_bss], ax
   ; This is the value we return
-  sub ax, cx
+  mov ax, cx
   clc
   jmp .return
 .return_fail:
