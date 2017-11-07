@@ -88,46 +88,44 @@ video_putint16:
   ; This function prints 32 bit unsigned dec numbers
   ; Note that since we use 32 bit code here, the stack operand 
   ; size changes also
-  ;   [BP + 6][BP + 8] - The 32 bit integer
+  ;   [BP + 4][BP + 6] - The 32 bit integer
   ; Note that since we push EBP, the offset should be 6
 video_putuint32:
-  push ebp
-  mov ebp, esp
-  push esi
-  push edi
-  ; 4 byte EBP and 2 byte return address since we are now using
-  ; mixed 32 bit and 16 bit mode
-  mov eax, [ebp + 6]
+  push bp
+  mov bp, sp
+  push si
+  push di
+  mov eax, [bp + 4]
   ; Number of digits we have printed
-  xor edi, edi
+  xor di, di
 .div_body:
-  ; DX:AX / 10
+  ; EDX:EAX / 10
   xor edx, edx
   mov ecx, 10d
   div ecx
-  ; Remainder is in DX
-  mov esi, edx
-  mov esi, [video_digit_map + esi]
+  ; Remainder is in EDX (i.e. DX since it is less than 10)
+  mov si, dx
+  mov si, [video_digit_map + si]
   ; 16 bit push
-  push esi
+  push si
   ; One more digit
-  inc edi
+  inc di
   test eax, eax
   jnz .div_body
 .print_body:
-  test edi, edi
+  test di, di
   jz .return
-  dec edi
+  dec di
   ; 16 bit pop
-  pop eax
+  pop ax
   mov ah, [video_print_attr]
   call putchar
   jmp .print_body
 .return:
-  pop edi
-  pop esi
-  mov esp, ebp
-  pop ebp
+  pop di
+  pop si
+  mov sp, bp
+  pop bp
   retn
 
   ; This function prints 16 bit unsigned dec numbers
@@ -339,7 +337,7 @@ video_printf:
   db 'S', 0
   dw .process_percent_S
   db 'U', 0
-  db .process_percent_U
+  dw .process_percent_U
   db '%', 0
   dw .process_percent_percent
   db 00h

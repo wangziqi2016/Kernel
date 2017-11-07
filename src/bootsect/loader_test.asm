@@ -57,7 +57,7 @@ disk_chs_test:
   retn
 
 printf_test:
-  push dword 675973885d
+  push dword 675973885
   push ds
   push printf_far_str
   push printf_near_str
