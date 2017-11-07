@@ -57,6 +57,7 @@ disk_chs_test:
   retn
 
 printf_test:
+  push dword 675973885d
   push ds
   push printf_far_str
   push printf_near_str
@@ -68,10 +69,10 @@ printf_test:
   push ds
   push printf_test_str
   call video_printf
-  add sp, 20
+  add sp, 24
   retn
 
-printf_test_str: db "This is a test to printf %u %d %x %y %q %c %s %S %% %", 0ah, 00h
+printf_test_str: db "This is a test to printf %u %d %x %y %q %c %s %S %U %% %", 0ah, 00h
 printf_near_str: db "NEAR", 00h
 printf_far_str: db "FAR", 00h
 

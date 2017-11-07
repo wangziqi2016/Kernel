@@ -86,8 +86,10 @@ video_putint16:
   retn
 
   ; This function prints 32 bit unsigned dec numbers
-  ; Note that since we use 32 bit code here, the stack opand 
+  ; Note that since we use 32 bit code here, the stack operand 
   ; size changes also
+  ;   [BP + 6][BP + 8] - The 32 bit integer
+  ; Note that since we push EBP, the offset should be 6
 video_putuint32:
   push ebp
   mov ebp, esp
@@ -107,7 +109,7 @@ video_putuint32:
   mov esi, edx
   mov esi, [video_digit_map + esi]
   ; 16 bit push
-  push si
+  push esi
   ; One more digit
   inc edi
   test eax, eax
@@ -117,7 +119,7 @@ video_putuint32:
   jz .return
   dec edi
   ; 16 bit pop
-  pop ax
+  pop eax
   mov ah, [video_print_attr]
   call putchar
   jmp .print_body
@@ -336,6 +338,8 @@ video_printf:
   dw .process_percent_c
   db 'S', 0
   dw .process_percent_S
+  db 'U', 0
+  db .process_percent_U
   db '%', 0
   dw .process_percent_percent
   db 00h
@@ -343,6 +347,16 @@ video_printf:
   mov al, '%'
   mov ah, [video_print_attr]
   call putchar
+  jmp .body
+.process_percent_U:
+  mov ax, [bp + si + 2]
+  push ax
+  mov ax, [bp + si]
+  push ax
+  add si, 4
+  call video_putuint32
+  pop ax
+  pop ax
   jmp .body
 .process_percent_S:
   mov ax, [bp + si + 2]
