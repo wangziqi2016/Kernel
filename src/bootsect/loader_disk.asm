@@ -3,7 +3,7 @@ _loader_disk_start:
 ; loader_disk.asm - This file contains disk driver and I/O routine
 ;
 
-; The maximum numbre of hardware devices we could support
+; The maximum number of hardware devices we could support
 DISK_MAX_DEVICE  equ 8
 ; The max number of times we retry for read/write failure
 DISK_MAX_RETRY   equ 3
@@ -33,6 +33,29 @@ struc disk_param
   .capacity:            resd 1
   ; This is used to compute CHS
   .sector_per_cylinder: resw 1
+  .size:
+endstruc
+
+; 16 sectors are cached in memory
+DISK_BUFFER_MAX_ENTRY     equ 16d
+
+; Constants defined for disk sector buffer
+DISK_BUFFER_STATUS_VALID  equ 01h
+DISK_BUFFER_STATUS_DIRTY  equ 02h
+DISK_BUFFER_STATUS_PINNED equ 04h
+
+; This is the structure of buffer entry in the disk buffer cache
+struc disk_buffer
+  ; PINNED DIRTY VALID
+  .status: resb 1
+  ; The device ID
+  .device: resb 1
+  ; The device letter
+  .letter: resb 1
+  .unused: resb 1
+  ; The LBA that this sector is read from
+  .lba:    resd 1
+  .data:   resb DISK_SECTOR_SIZE
   .size:
 endstruc
 

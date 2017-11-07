@@ -307,6 +307,16 @@ mem_get_sys_bss:
   sti
   retn
 
+  ; This function allocates a requested chunk from the large BSS section
+  ; Large BSS is at the high end of memory with A20 opened, i.e. FFFF:0000
+  ; to FFFF:FFFF. The semantics of this function is very similar to 
+  ; mem_get_sys_bss.
+  ;   AX = number of bytes to allocate. We check for wrap-back
+  ; Return:
+  ;   AX = 0xFFFF if fails, AX = offset address
+
+mem_get_large_bss:
+
 mem_a20_closed_str: db "A20 gate is by default closed.", 0ah, 00h
 mem_a20_opened_str: db "A20 gate is now activated.", 0ah, 00h
 mem_a20_failed_str: db "Cannot activate A20 gate. Die.", 0ah, 00h
@@ -321,4 +331,9 @@ mem_high_end:   dw 0280h
 ; for this routine, we decrement this counter
 ; Note that this area is located at the end of the system data segment
 ; and never frees (holds static system data)
-mem_sys_bss:    dw 0FFFEh
+mem_sys_bss:    dw 0fffeh
+; This is the same as system BSS except that it uses the last segment 
+; (A20 enabled).
+; Note that here we define it as a far pointer, i.e. segment:offset
+; Also, we always allocate from low addresses
+mem_large_bss:  dw 0h, 0ffffh
