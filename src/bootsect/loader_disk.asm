@@ -14,6 +14,7 @@ DISK_SECTOR_SIZE equ 512d
 DISK_ERR_WRONG_LETTER   equ 1
 DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
+DISK_ERR_INVALID_BUFFER equ 4
 
 ; This defines the structure of the disk parameter table
 struc disk_param
@@ -117,12 +118,12 @@ disk_buffer_init:
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
   ; AX value will be preserved
-  mov al, DISK_BUFFER_STATUS_VALID
+  xor ax, ax
 .body:
   test si, si
   jz .after_init
   dec si
-  ; Set status word to 0x01 (Valid) - must use ES:BX
+  ; Set status word to 0x00 (Valid) - must use ES:BX
   mov [es:bx + disk_buffer_entry.status], al
   ; Advance the pointer
   add bx, disk_buffer_entry.size
@@ -478,14 +479,14 @@ disk_find_empty_buffer:
   test si, si
   jz .not_found
   dec si
-  ; It we found a valid one then just return
+  ; It we found an invalid one then just return
   test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
-  jnz .return
+  jz .return
   add bx, disk_buffer_entry.size
   jmp .body
 .return:
   ; Mark it as valid, not dirty and not pinned
-  mov byte [es:bx + disk_buffer_entry.status], 0
+  mov byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   mov ax, bx
 
   ; Debug - print the index
@@ -513,20 +514,22 @@ disk_find_empty_buffer:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   ; This function reads or writes LBA of a given disk
-  ;   [BP + 6] - The opcode (0x0201 for read; 0x0301 for write)
   ;   [BP + 4] - The pointer to the buffer object for writing
   ;              The buffer must have its driver letter and LBA set
+  ;   [BP + 6] - The opcode (0x0201 for read; 0x0301 for write)
   ; Sets CF is fails; Clears CF if succeeds
   ; Return value in AX. Please refer to disk_op_lba
-  ; If valid is
-disk_op_lba_on_buffer:
+disk_buffer_op_lba:
   ; Move the return address down by 2 bytes
   ; and add 2 bytes for the argument
   push bp
   mov bp, sp
   push bx
+  push es
+  ; Load the segment
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
   mov bx, [bp + 4]
-
   ; Push LARGE_BSS:base + data offset as the buffer pointer
   push MEM_LARGE_BSS_SEG
   lea ax, [bx + disk_buffer_entry.data]  
@@ -540,34 +543,16 @@ disk_op_lba_on_buffer:
   mov al, [bx + disk_buffer_entry.letter]
   push ax
   ; Push the opcode (0x0301)
-  push word 0301
+  mov ax, [bp + 6]
+  push ax
   call disk_op_lba
   add sp, 12
-  jc .return_fail
-  clc
-  jmp .return
-.return_fail:
-  stc
 .return:
+  pop es
   pop bx
   mov sp, bp
   pop bp
   retn
-
-  ; This function reads LBA of a given disk
-  ; For arguments and return values please refer to disk_op_lba
-disk_read_lba:
-  push bp
-  mov bp, sp
-  push ax
-  mov ax, [bp]
-  mov [bp - 2], ax
-  mov ax, [bp + 2]
-  mov [bp], ax
-  mov [bp + 2], word 0201h
-  pop bp
-  jmp disk_op_lba
-  hlt
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
