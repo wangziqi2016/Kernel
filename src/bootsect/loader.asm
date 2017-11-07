@@ -53,43 +53,9 @@ section .text
   call kbd_init
   call disk_init
 
-  push word 0
-  push word 2879
-  push word 'A'
-  call disk_get_chs
-  add sp, 6
-  push ax
-  movzx ax, dl
-  push ax
-  movzx ax, dh
-  push ax
-  movzx ax, cl
-  push ax
-  movzx ax, ch
-  push ax
-  push ds
-  push .chs_test_str
-  call video_printf
-  add sp, 12
-  jmp .after_chs_test
-  .chs_test_str: db "CH = %y CL = %y DH = %y DL = %y AX = %x", 0ah, 00h
-.after_chs_test:
-  push ds
-  push .printf_far_str
-  push .printf_near_str
-  push word '@'
-  push word 0abh
-  push word 0cdefh
-  push word -2468
-  push word 12345
-  push ds
-  push .printf_test_str
-  call video_printf
-  add sp, 16
-  jmp test_disk_param
-  .printf_test_str: db "This is a test to printf %u %d %x %y %q %c %s %S %% %", 0ah, 00h
-  .printf_near_str: db "NEAR", 00h
-  .printf_far_str: db "FAR", 00h
+  call disk_test
+  call printf_test
+  
 test_disk_param:
   push word 'A'
   call disk_get_size
