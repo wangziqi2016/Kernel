@@ -53,8 +53,9 @@ section .text
   call kbd_init
   call disk_init
 
-  call disk_test
   call printf_test
+  call disk_test
+  
   
 getline_loop:
   push ds

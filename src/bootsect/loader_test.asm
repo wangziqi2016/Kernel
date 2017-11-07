@@ -6,6 +6,20 @@ _loader_test_start:
 disk_test:
   call disk_chs_test
   call disk_param_test
+  call disk_buffer_test
+  retn
+
+disk_buffer_test:
+  push si
+  mov si, 16
+.body:
+  test si, si
+  jz .return
+  dec si
+  call disk_find_empty_buffer
+  jmp .body
+.return:
+  pop si
   retn
 
 disk_param_test:
