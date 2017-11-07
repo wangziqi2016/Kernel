@@ -285,6 +285,7 @@ memset:
   ;   AX = number of bytes to allocate
   ; Return：
   ;   AX = 0FFFFh if fails, AX = offset of start if succeeds
+  ;   CF is set if fails also
 mem_get_sys_bss:
   cli
   ; If the number of bytes exceeds whet was left then print error
@@ -296,10 +297,12 @@ mem_get_sys_bss:
   mov ax, [mem_sys_bss]
   sub ax, cx
   mov [mem_sys_bss], ax
+  clc
   jmp .return
 .bss_overflow:
   xor ax, ax
   dec ax
+  stc
 .return:
   sti
   retn
