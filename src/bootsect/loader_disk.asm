@@ -455,6 +455,7 @@ disk_get_chs:
 ; Disk Buffer Management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+%define disk_find_empty_buffer_debug
   ; This function returns an empty buffer from the buffer cache
   ; Currently we ignore the pinned flag (it is always advisory)
   ; If all entries are occupied, we evict a buffer and then
@@ -488,7 +489,7 @@ disk_find_empty_buffer:
   ; Mark it as valid, not dirty and not pinned
   mov byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   mov ax, bx
-
+%ifdef disk_find_empty_buffer_debug
   ; Debug - print the index
   ; Save return value first
   push ax
@@ -501,14 +502,44 @@ disk_find_empty_buffer:
   call video_printf
   add sp, 6
   pop ax
-
+%endif
   pop si
   pop bx
   pop es
   retn
+%ifdef disk_find_empty_buffer_debug
 .debug_str: db "Index = %u", 0ah, 00h
+%endif
+.evict_fail:
+  mov cx, [disk_buffer]
+  push cx
+  push bx
+  push ax
+  push ds
+  push disk_evict_fail_str
+  call video_printf
+  add sp, 10
+.die:
+  jmp .die
+  ; If not found we just use "disk_buffer_next_to_evict" to determine
+  ; which one to evict
 .not_found:
+  ; Load the base address
+  mov bx, [disk_buffer]
+  ; DX:AX is the offset, we simply ignore DX and assume it will be 0
+  mov ax, disk_buffer_entry.size
+  mul [disk_buffer_next_to_evict]
+  ; ES:BX should point to the buffer we want to evice
+  add bx, ax
+  ; If it is not dirty then we do not write back
+  test [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  jz .no_write_back
+  mov ax, bx
+  call disk_buffer_write_lba
+  jc .evict_fail
+.no_write_back:
   jmp .not_found
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -712,11 +743,12 @@ disk_get_param:
   pop bp
   retn
 
-disk_init_error_str: db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
-disk_init_found_str:     db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
-disk_invalid_letter_str: db "Invalid disk letter: %c (%y)", 0ah, 00h
+disk_init_error_str:       db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
+disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
+disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
-disk_buffer_size_str: db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
+disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
+disk_evict_fail_str:       db "Evict fail (AX = 0x%x, BX = 0x%x, base = 0x%x)", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
