@@ -10,17 +10,48 @@ disk_test:
   retn
 
 disk_buffer_test:
+  push es
   push si
-  mov si, 16
+  push bx
+  mov si, DISK_BUFFER_MAX_ENTRY
+  ; Load ES with the large BSS address
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
 .body:
   test si, si
   jz .return
   dec si
   call disk_find_empty_buffer
+  mov bx, ax
+  ; Set LBA - The first LBA is 15 and the last is 0
+  mov word [es:bx + disk_buffer_entry.lba + 2], 0
+  mov [es:bx + disk_buffer_entry.lba], si
+  mov byte [es:bx + disk_buffer_entry.letter], 'A'
+  mov byte [es:bx + disk_buffer_entry.device], 00h
+  ; Push far pointer to the buffer for holding the sector
+  push MEM_LARGE_BSS_SEG
+  lea ax, [es:bx + disk_buffer_entry.data]
+  push ax
+  ; Push LBA
+  push word 0
+  push si
+  push word 'A'
+  ;call disk_read_lba
+  add sp, 10
   jmp .body
 .return:
+  ; Here the last sector is sector 1 (LBA 0)
+  mov ax, [es:bx + disk_buffer_entry.data + DISK_SECTOR_SIZE - 2]
+  push ax
+  push ds
+  push .sector_end_str
+  call video_printf
+  add sp, 6
+  pop bx
   pop si
+  pop es
   retn
+.sector_end_str: db "Sector end: %x", 0ah, 00h
 
 disk_param_test:
   push word 'A'
