@@ -10,7 +10,7 @@ DISK_MAX_RETRY   equ 3
 ; The byte size of a sector of the disk
 DISK_SECTOR_SIZE equ 512d
 
-; Error code for disk_read_lba
+; Error code for disk operations
 DISK_ERR_WRONG_LETTER   equ 1
 DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
@@ -519,36 +519,49 @@ disk_find_empty_buffer:
   ;   [BP + 6] - The opcode (0x0201 for read; 0x0301 for write)
   ; Sets CF is fails; Clears CF if succeeds
   ; Return value in AX. Please refer to disk_op_lba
+  ;   In addition, AX = DISK_ERR_INVALID_BUFFER if the buffer is "invalid"
 disk_buffer_op_lba:
   ; Move the return address down by 2 bytes
   ; and add 2 bytes for the argument
   push bp
   mov bp, sp
   push bx
-  push es
   ; Load the segment
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
   mov bx, [bp + 4]
+  ; Check whether the buffer is valid, if not return error
+  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
+  jz .return_invalid_buffer
   ; Push LARGE_BSS:base + data offset as the buffer pointer
-  push MEM_LARGE_BSS_SEG
-  lea ax, [bx + disk_buffer_entry.data]  
   push ax
-  mov ax, [bx + disk_buffer_entry.lba + 2]
+  lea ax, [es:bx + disk_buffer_entry.data]  
+  push ax
+  mov ax, [es:bx + disk_buffer_entry.lba + 2]
   ; Push high and low word of LBA
   push ax
-  mov ax, [bx + disk_buffer_entry.lba]
+  mov ax, [es:bx + disk_buffer_entry.lba]
   push ax
   ; Push the letter
-  mov al, [bx + disk_buffer_entry.letter]
+  mov al, [es:bx + disk_buffer_entry.letter]
   push ax
-  ; Push the opcode (0x0301)
+  ; Push the opcode
   mov ax, [bp + 6]
   push ax
   call disk_op_lba
   add sp, 12
+  ; If there is an error then we do not set modified bit for read
+  jc .return
+  ; If it is write then we set modified flag
+  cmp word [bp + 6], DISK_OP_WRITE
+  jne .return
+  ; Set the dirty byte for a successful write operation
+  or byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  jmp .return
+.return_invalid_buffer:
+  mov ax, DISK_ERR_INVALID_BUFFER
+  stc
 .return:
-  pop es
   pop bx
   mov sp, bp
   pop bp
