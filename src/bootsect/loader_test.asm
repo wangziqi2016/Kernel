@@ -22,7 +22,7 @@ disk_test:
   push ds
   push disk_chs_test_str
   call video_printf
-  add sp, 12
+  add sp, 14
   retn
 
 printf_test:
