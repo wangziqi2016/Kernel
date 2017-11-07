@@ -4,9 +4,11 @@ _loader_disk_start:
 ;
 
 ; The maximum numbre of hardware devices we could support
-DISK_MAX_DEVICE equ 8
+DISK_MAX_DEVICE  equ 8
 ; The max number of times we retry for read/write failure
-DISK_MAX_RETRY  equ 3
+DISK_MAX_RETRY   equ 3
+; The byte size of a sector of the disk
+DISK_SECTOR_SIZE equ 512d
 
 ; Error code for disk_read_lba
 DISK_ERR_WRONG_LETTER   equ 1
@@ -40,8 +42,17 @@ disk_init:
   ; Must disable all interrupts to avoid having non-consecutive disk 
   ; param table in the BSS segment
   cli
+  push bx
   call disk_probe
   call disk_compute_param
+  ; TODO: implement buffer cache
+  ; Then prepare the system BSS
+  ;mov ax, DISK_SECTOR_SIZE
+  ;call mem_get_sys_bss
+  ;cmp ax, 0ffffh
+  ;je .allocate_buffer_fail
+  ;mov bx, ax
+  pop bx
   sti
   retn
   
@@ -522,6 +533,8 @@ disk_invalid_letter: db "Invalid disk letter: %c (%y)", 0ah, 00h
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
 ; in the compiled object
-disk_mapping: dw 0
+disk_mapping:     dw 0
 ; Number of elements in the disk mapping table
 disk_mapping_num: dw 0
+; Contains segment:offset for the disk buffer (one sector)
+disk_buffer:      dd 0
