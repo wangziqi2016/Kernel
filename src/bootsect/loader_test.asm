@@ -28,16 +28,10 @@ disk_buffer_test:
   mov [es:bx + disk_buffer_entry.lba], si
   mov byte [es:bx + disk_buffer_entry.letter], 'A'
   mov byte [es:bx + disk_buffer_entry.device], 00h
-  ; Push far pointer to the buffer for holding the sector
-  push MEM_LARGE_BSS_SEG
-  lea ax, [es:bx + disk_buffer_entry.data]
-  push ax
-  ; Push LBA
-  push word 0
-  push si
-  push word 'A'
-  call disk_read_lba
-  add sp, 10
+  push DISK_OP_READ
+  push bx
+  call disk_buffer_op_lba
+  add sp, 4
   jmp .body
 .return:
   ; Here the last sector is sector 1 (LBA 0)
