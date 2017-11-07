@@ -531,7 +531,8 @@ disk_buffer_write_lba:
   add sp, 4
   retn
 
-  ; This function reads or writes LBA of a given disk
+  ; This function reads or writes LBA of a given disk.
+  ;   1. If the operation is write, we also clear the dirty flag
   ;   [BP + 4] - The pointer to the buffer object for writing
   ;              The buffer must have its driver letter and LBA set
   ;   [BP + 6] - The opcode (0x0201 for read; 0x0301 for write)
@@ -574,7 +575,7 @@ disk_buffer_op_lba:
   cmp word [bp + 6], DISK_OP_WRITE
   jne .return
   ; Set the dirty byte for a successful write operation
-  or byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  and byte [es:bx + disk_buffer_entry.status], ~DISK_BUFFER_STATUS_DIRTY
   jmp .return
 .return_invalid_buffer:
   mov ax, DISK_ERR_INVALID_BUFFER

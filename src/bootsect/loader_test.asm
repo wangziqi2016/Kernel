@@ -30,8 +30,16 @@ disk_buffer_test:
   mov byte [es:bx + disk_buffer_entry.device], 00h
   mov ax, bx
   call disk_buffer_read_lba
+  jc .error_rw
   jmp .body
 .return:
+  ; Change it and write back
+  mov word [es:bx + disk_buffer_entry.data + DISK_SECTOR_SIZE - 2], 0aabbh
+  mov ax, bx
+  call disk_buffer_write_lba
+  jc .error_rw
+  mov al, [es:bx + disk_buffer_entry.status]
+  push ax
   ; Here the last sector is sector 1 (LBA 0)
   mov ax, [es:bx + disk_buffer_entry.data + DISK_SECTOR_SIZE - 2]
   push ax
@@ -43,7 +51,15 @@ disk_buffer_test:
   pop si
   pop es
   retn
-.sector_end_str: db "Sector end: %x", 0ah, 00h
+.error_rw:
+  push ax
+  push ds
+  push .error_rw_disk_str
+  call video_printf
+.die:
+  jmp .die
+.sector_end_str: db "Sector end: %x; status = %y", 0ah, 00h
+.error_rw_disk_str: db "Error r/w disk (AX = 0x%x)", 0ah, 00h
 
 disk_param_test:
   push word 'A'
