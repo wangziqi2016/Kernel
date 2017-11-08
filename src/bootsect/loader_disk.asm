@@ -374,6 +374,7 @@ disk_get_size:
   pop bp
   retn
 
+;%define disk_get_chs_debug
   ; This function returns the CHS representation given a linear sector ID
   ; and the drive letter
   ;   [BP + 4] - Device letter
@@ -413,20 +414,19 @@ disk_get_chs:
   ;     AL = head ID
   ;     DX = cylinder ID
   inc ah
-  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  ; Uncomment the following to print CHS values that we will return
-  ;movzx cx, ah
-  ;push cx
-  ;movzx cx, al
-  ;push cx
-  ;push dx
-  ;push ds
-  ;push .test_string
-  ;call video_printf
-  ;add sp, 10
-  ;jmp .after_debugging:
-  ;.test_string: db "CHS = %x %y %y", 0ah, 00h
-  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%ifdef disk_get_chs_debug
+  movzx cx, ah
+  push cx
+  movzx cx, al
+  push cx
+  push dx
+  push ds
+  push .test_string
+  call video_printf
+  add sp, 10
+  jmp .after_debugging
+.test_string: db "CHS = %x %y %y", 0ah, 00h
+%endif
 .after_debugging:
   ; Make the high 2 bits of CL the bit 8 and 9 of the cylinder number
   mov cl, dh
