@@ -494,14 +494,18 @@ disk_find_empty_buffer:
   ; Debug - print the index
   ; Save return value first
   push ax
-  neg si
-  add si, [disk_buffer_size]
-  dec si
-  push si
+  ; Use division to compute the index
+  mov ax, bx
+  sub ax, [disk_buffer]
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  div cx
+  push dx
+  push ax
   push ds
-  push .debug_str
+  push .debug_index_str
   call video_printf
-  add sp, 6
+  add sp, 8
   pop ax
 %endif
   pop si
@@ -509,7 +513,7 @@ disk_find_empty_buffer:
   pop es
   retn
 %ifdef disk_find_empty_buffer_debug
-.debug_str: db "Index = %u", 0ah, 00h
+.debug_index_str: db "Index = %u (rem %u)", 0ah, 00h
 .debug_wb_str:  db "Write back %u", 0ah, 00h
 %endif
 .evict_fail:

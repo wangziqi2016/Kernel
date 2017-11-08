@@ -13,7 +13,7 @@ disk_buffer_test:
   push es
   push si
   push bx
-  mov si, DISK_BUFFER_MAX_ENTRY
+  mov si, DISK_BUFFER_MAX_ENTRY + 10
   ; Load ES with the large BSS address
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
