@@ -519,6 +519,7 @@ disk_find_empty_buffer:
 %ifdef disk_find_empty_buffer_debug
 .debug_index_str: db "Index = %u (rem %u)", 0ah, 00h
 .debug_wb_str:  db "Write back %u", 0ah, 00h
+.debug_evict_str: db "Evicting %u", 0ah, 00h
 %endif
 .evict_fail:
   mov cx, [disk_buffer]
@@ -556,6 +557,14 @@ disk_find_empty_buffer:
   call disk_buffer_write_lba
   jc .evict_fail
 .no_write_back:
+%ifdef disk_find_empty_buffer_debug
+  mov ax, [disk_buffer_next_to_evict]
+  push ax
+  push ds
+  push .debug_evict_str
+  call video_printf
+  add sp, 6
+%endif
   ; Mask off the dirty bit
   and byte [es:bx + disk_buffer_entry.status], ~DISK_BUFFER_STATUS_DIRTY
   ; Update the counter and deal with potental wrap-backs
