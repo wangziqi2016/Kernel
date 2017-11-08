@@ -375,6 +375,7 @@ disk_get_size:
   retn
 
 ;%define disk_get_chs_debug
+
   ; This function returns the CHS representation given a linear sector ID
   ; and the drive letter
   ;   [BP + 4] - Device letter
@@ -385,7 +386,6 @@ disk_get_size:
   ;   CH = low 8 bits of cylinder
   ;   CL[6:7] = high 2 bits of cylinder
   ;   CL[0:5] = sector
-  ;   AX = 0x0201 which is the param for reading 1 sector using INT 13h
   ; CF is clear when success
   ; CF is set when error
 disk_get_chs:
@@ -415,6 +415,9 @@ disk_get_chs:
   ;     DX = cylinder ID
   inc ah
 %ifdef disk_get_chs_debug
+  ; Protect AX and CX
+  push ax
+  push dx
   movzx cx, ah
   push cx
   movzx cx, al
@@ -424,6 +427,8 @@ disk_get_chs:
   push .test_string
   call video_printf
   add sp, 10
+  pop dx
+  pop ax
   jmp .after_debugging
 .test_string: db "CHS = %x %y %y", 0ah, 00h
 %endif
@@ -440,7 +445,6 @@ disk_get_chs:
   ; DL is the device number. For floppy it is from 
   ; 0x00 and for HDD it is from 0x80
   mov dl, [bx + disk_param.number]
-  mov ax, 0201h
   clc
   jmp .return
 .return_fail:

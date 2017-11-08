@@ -38,6 +38,7 @@ disk_buffer_test:
   mov ax, bx
   call disk_buffer_write_lba
   jc .error_rw
+  ; Print the status
   mov al, [es:bx + disk_buffer_entry.status]
   push ax
   ; Here the last sector is sector 1 (LBA 0)
@@ -46,7 +47,7 @@ disk_buffer_test:
   push ds
   push .sector_end_str
   call video_printf
-  add sp, 6
+  add sp, 8
   pop bx
   pop si
   pop es
