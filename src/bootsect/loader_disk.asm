@@ -4,7 +4,7 @@ _loader_disk_start:
 ;
 
 ; The maximum number of hardware devices we could support
-DISK_MAX_DEVICE  equ 8
+DISK_MAX_DEVICE  equ 4
 ; The max number of times we retry for read/write failure
 DISK_MAX_RETRY   equ 3
 ; The byte size of a sector of the disk
@@ -236,9 +236,6 @@ disk_probe:
   and al, 7fh
   cmp dl, al
   jle .error_13h
-  ; We have added too many disks, which we could not support
-  cmp al, DISK_MAX_DEVICE
-  je .error_too_many_disks
   ; Save these three to protect them
   push cx
   push dx
@@ -278,6 +275,10 @@ disk_probe:
   inc byte [bp + .CURRENT_DISK_LETTER]
   ; Also increament the number of mappings
   inc word [disk_mapping_num]
+  ; Compare whether we have exceeded the value. If we do
+  ; then report error
+  cmp word [disk_mapping_num], DISK_MAX_DEVICE
+  ja .error_too_many_disks
   jmp .body
 .return:
   mov sp, bp
@@ -324,6 +325,7 @@ disk_probe:
   push disk_init_error_str
   call bsod_fatal
 .error_too_many_disks:
+  ; Print the max # of disks and then return
   push word DISK_MAX_DEVICE
   push ds
   push disk_too_many_disk_str
