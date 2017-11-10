@@ -51,12 +51,16 @@ bsod_fatal:
   add sp, 6
   mov ax, bsod_press_key_to_reboot
   call video_putstr_near
+  ; Use a loop to wait a valid scan code of any key
+  ; on the keyboard, and then reboot
+.wait_scan_code:
   call kbd_getscancode
+  test al, al
+  jz .wait_scan_code
+  ; Soft reboot by jumping to FFFF:0000
   push 0ffffh
   push 0000h
   retf
-.die:
-  jmp .die
 
 bsod_fatal_error_str:     db "FATAL ERROR: ", 0ah, 00h
 bsod_press_key_to_reboot: db "PRESS ANY KEY TO REBOOT...", 00h
