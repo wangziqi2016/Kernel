@@ -139,10 +139,7 @@ disk_buffer_init:
   push ax
   push ds
   push disk_buffer_too_large_str
-  call video_printf
-  add sp, 8
-.die:
-  jmp .die
+  call bsod_fatal
 
   ; This function computes some frequently used parameters for all disks
   ; and store them in the corresponding entries of the disk parameter mapping
@@ -199,10 +196,7 @@ disk_compute_param:
   push di
   push ds
   push disk_invalid_letter_str
-  call video_printf
-  add sp, 8
-.die:
-  jmp .die
+  call bsod_fatal
 
   ; This function detects all floppy and hard disks using BIOS routine
 disk_probe:
@@ -224,7 +218,7 @@ disk_probe:
   ; We start from 0x00 (disk num) and 'A' (letter assignment)
   mov [bp + .CURRENT_DISK_NUMBER], ax
 .body:
-  ; ES:DI = 0:0
+  ; ES:DI = 0:0 as required by INT13H
   xor ax, ax
   mov es, ax
   mov di, ax
@@ -236,12 +230,15 @@ disk_probe:
   ; Can either because we finished enumarating floppy disks,
   ; harddisks, or a real error - jump to the routine to check
   jc .error_13h
-  ; If the current disk num & 0x7F >= DH
-  ; then we know we are also in trouble
+  ; If the (current disk num & 0x7F) >= DH
+  ; then we know the INT returned success but there is no disk actually
   mov al, [bp + .CURRENT_DISK_NUMBER]
   and al, 7fh
   cmp dl, al
   jle .error_13h
+  ; We have added too many disks, which we could not support
+  cmp al, DISK_MAX_DEVICE
+  je .too_many_disks
   ; Save these three to protect them
   push cx
   push dx
@@ -325,10 +322,7 @@ disk_probe:
   push ax
   push ds
   push disk_init_error_str
-  call video_printf
-  add sp, 6
-.die:
-  jmp die
+  call bsod_fatal
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk Param Computation
@@ -528,10 +522,9 @@ disk_find_empty_buffer:
   push ax
   push ds
   push disk_evict_fail_str
-  call video_printf
-  add sp, 10
-.die:
-  jmp .die
+  call bsod_fatal
+  ; NEVER RETURNS
+  ; -------------
   ; If not found we just use "disk_buffer_next_to_evict" to determine
   ; which one to evict
 .not_found:

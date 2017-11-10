@@ -20,11 +20,13 @@ mem_init:
   call mem_check_a20
   test ax, ax
   jnz .a20_ok
+  ; Otherwise just die
+  push ds
   mov ax, mem_a20_failed_str
-  call video_putstr_near
-  ; If A20 cannot be activalted just die here
-.die:
-  jmp die
+  push ax
+  call bsod_fatal
+  ; NEVER RETURNS
+  ;--------------
 .a20_ok:
   mov ax, mem_a20_opened_str
   call video_putstr_near
@@ -53,11 +55,10 @@ mem_detect_conventional:
   mov [mem_high_end], ax
   retn
 .error:
+  push ds
   mov ax, mem_int12h_err_str
-  call video_putstr_near
-.die:
-  jmp .die
-  
+  push ax
+  call bsod_fatal
 
   ; This function checks whether A20 is there
   ; The way we check it is to verify that the memory address

@@ -203,11 +203,12 @@ kbd_isr:
   ; Note that SP is ignored
   popa
   iret
-  
+
   ; This function is non-blocking
   ; It returns a scan code from the buffer in AL; If the buffer is empty it 
   ; returns 0 in AX. AH is the status bit when the key is pushed down
-  ; This function is non-blocking
+  ; This function is non-blocking. If you need a blocking version, just check
+  ; returned AL value and then loop until it is non-zero
 kbd_getscancode:
   ; Must ensure atomicity of this operation
   cli
