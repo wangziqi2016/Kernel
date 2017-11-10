@@ -11,6 +11,8 @@ BSOD_VIDEO_ATTR equ VIDEO_ATTR_FG_RED | VIDEO_ATTR_FG_HIGHLIGHT | VIDEO_ATTR_BG_
   ; jumped onto. It receives video_printf() like parameters, and prints 
   ; the error on the screen
 bsod_fatal:
+  push bp
+  mov bp, sp
   call video_clear_all
   ; AL is now number of rows, we compute the total number of characters
   ; by multiplying these two
@@ -38,9 +40,25 @@ bsod_fatal:
   mov byte [video_print_attr], BSOD_VIDEO_ATTR
   mov ax, bsod_fatal_error_str
   call video_putstr_near
+  ; Then call printf core to print them out
+  mov ax, [bp + 6]
+  push ax
+  mov ax, [bp + 4]
+  push ax
+  ; Offset to the vector of arguments
+  push word 18d
+  call video_printf_core
+  add sp, 6
+  mov ax, bsod_press_key_to_reboot
+  call video_putstr_near
+  call kbd_getscancode
+  push 0ffffh
+  push 0000h
+  retf
 .die:
   jmp .die
 
-bsod_fatal_error_str: db "FATAL ERROR: ", 0ah, 00h
+bsod_fatal_error_str:     db "FATAL ERROR: ", 0ah, 00h
+bsod_press_key_to_reboot: db "PRESS ANY KEY TO REBOOT...", 00h
   
   
