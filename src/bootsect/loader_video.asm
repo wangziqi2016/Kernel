@@ -259,6 +259,27 @@ _video_puthex:
   pop bp
   retn
 
+  ; This function is a core to video_printf_core. It does not require the user
+  ; to input an offset to the argument vector. 
+  ; For input and format specification, please refer to video_printf_core()
+  ;   [BP + 4] - The format string offset
+  ;   [BP + 6] - The format string segment
+  ;   [BP + 8 and upward] - Arguments
+video_printf:
+  push bp
+  mov bp, sp
+  mov ax, [bp + 6]
+  push ax
+  mov ax, [bp + 4]
+  push ax
+  ; This is the offset of the BP in printf_core to the actual list
+  push word 18
+  call video_printf_core
+  ; Do not clear stack here since we restore SP
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function is a modified/simplified version of printf
   ; Interface: void printf(const char *fmt, ...);
   ; Format string specification:
@@ -272,12 +293,15 @@ _video_puthex:
   ;   - %% The percent sign itself
   ; As the normal printf() implementation, the caller should clear the 
   ; stack, and parameters are pushed from right to left, all 16 bit aligned
-  ;   [BP + 4] - The format string offset
-  ;   [BP + 6] - The format string segment
+  ;   [BP + 4] - The initial offset for SI that points to the argument list
+  ;              This allows us to forward the argument list to printf()
+  ;              from other printf-like functions
+  ;   [BP + 6] - The format string offset
+  ;   [BP + 8] - The format string segment
   ; We keep the following invariant:
   ;   [ES:DI] always points to the next character to print before the main loop
   ;   [SS:BP + SI] always points to the 16 bit aligned next parameter
-video_printf:
+video_printf_core:
   push bp
   mov bp, sp
   push es
@@ -285,11 +309,11 @@ video_printf:
   push si
   push di
   ; Set ES:DI to point to the format string
-  mov ax, [bp + 6]
+  mov ax, [bp + 8]
   mov es, ax
-  mov di, [bp + 4]
+  mov di, [bp + 6]
   ; Set SI to be the relative distance from SS:BP to the next argument
-  mov si, 8
+  mov si, [bp + 4]
 .body:
   ; If the next char is NUL then just return
   mov al, [es:di]
