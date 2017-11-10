@@ -238,7 +238,7 @@ disk_probe:
   jle .error_13h
   ; We have added too many disks, which we could not support
   cmp al, DISK_MAX_DEVICE
-  je .too_many_disks
+  je .error_too_many_disks
   ; Save these three to protect them
   push cx
   push dx
@@ -322,6 +322,11 @@ disk_probe:
   push ax
   push ds
   push disk_init_error_str
+  call bsod_fatal
+.error_too_many_disks:
+  push word DISK_MAX_DEVICE
+  push ds
+  push disk_too_many_disk_str
   call bsod_fatal
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -779,6 +784,7 @@ disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
 disk_evict_fail_str:       db "Evict fail (AX = 0x%x, BX = 0x%x, base = 0x%x)", 0ah, 00h
+disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
