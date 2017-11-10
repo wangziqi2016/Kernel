@@ -52,6 +52,7 @@ section .text
   call mem_init
   call kbd_init
   call disk_init
+  call bsod_fatal
 
   call printf_test
   call disk_test

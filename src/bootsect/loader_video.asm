@@ -11,10 +11,26 @@ _loader_video_start:
 VIDEO_SEG equ 0b800h
 ; Number of bytes per row
 BUFFER_LEN_PER_LINE equ 80 * 2
+
+; Below are constants for video attrs
+VIDEO_ATTR_FG_HIGHLIGHT equ 08h
+VIDEO_ATTR_FG_RED       equ 04h
+VIDEO_ATTR_FG_GREEN     equ 02h
+VIDEO_ATTR_FG_BLUE      equ 01h
+VIDEO_ATTR_FG_WHITE     equ 07h
+
+VIDEO_ATTR_BG_BLINK equ 80h
+VIDEO_ATTR_BG_RED   equ 40h
+VIDEO_ATTR_BG_GREEN equ 20h
+VIDEO_ATTR_BG_BLUE  equ 10h
+VIDEO_ATTR_BG_WHITE equ 70h
+
 ; 0x70 is the attr byte - foreground gray; background none
 ; 0x20 is the space character which we use to represent the cursor
 ; as a square block 
-CURSOR_WORD equ 7020h
+VIDEO_CURSOR_ATTR equ VIDEO_ATTR_BG_WHITE
+VIDEO_CURSOR_CHAR equ 20h
+VIDEO_CURSOR_WORD equ VIDEO_CURSOR_ATTR << 8 | VIDEO_CURSOR_CHAR
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Printing functions
@@ -657,9 +673,11 @@ video_putcursor:
   ; Save the content underneath first
   mov ax, [es:bx]
   mov [video_cursor_saved], ax
-  ; Then write the actual cursor character
+  ; Then write the actual cursor character - note that we do not overwrite
+  ; the character. We just set its bg color which allows the cursor 
+  ; to be on existing characters
   ;mov [es:bx], word CURSOR_WORD
-  mov [es:bx + 1], byte 70h
+  mov byte [es:bx + 1], VIDEO_CURSOR_ATTR
   pop bx
   pop es
   retn
