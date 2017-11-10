@@ -227,7 +227,7 @@ head_per_disk:
   db 02h
   ; Maximum is 2879 (2880 - 1)
 num_sector_to_read:
-  dw 10d
+  dw 20d
   
   ; CL + CH = sector + track
 current_sector:
