@@ -50,6 +50,10 @@ DISK_BUFFER_STATUS_PINNED equ 04h
 DISK_OP_READ  equ 0201h
 DISK_OP_WRITE equ 0301h
 
+; This is the pointer value for denoting invalid pointer
+; (used for maintaining the queue)
+DISK_BUFFER_PTR_INV equ 0ffffh
+
 ; This is the structure of buffer entry in the disk buffer cache
 struc disk_buffer_entry
   ; PINNED DIRTY VALID
@@ -583,6 +587,11 @@ disk_find_empty_buffer:
   mov [disk_buffer_next_to_evict], ax
   jmp .return
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Queue Management
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+%define disk_buffer_add_debug
   ; This function adds a buffer into the current queue
   ; This function implements the buffer replacement poloicy
   ;   1. If we choose to add to the end of the queue, and evict 
@@ -590,7 +599,45 @@ disk_find_empty_buffer:
   ;   2. If we choose to add to the beginning of the queue, and 
   ;      we always move buffers to the beginning of the queue, and
   ;      always evict from the end, then we are implementing LRU
+  ; Currently we implement LRU
+  ;   AX = pointer to the buffer that we need to add
 disk_buffer_add:
+  ; We load ES with the large BSS segment
+  push es
+  push bx
+  push si
+  push MEM_LARGE_BSS_SEG
+  pop es
+  ; ES:BX = base of the current buffer
+  ; ES:SI = base of the current head
+  ; AX = constant for invalid pointer
+  mov bx, ax
+  mov ax, DISK_BUFFER_PTR_INV
+  mov si, [disk_buffer_head]
+  ; Check whether the head is 0xffff and if it is we will
+  ; just link both head and tail onto the current buffer and return
+  cmp si, ax
+  je .empty_queue
+  ; If the queue is not empty, we do the following:
+  ;   1. Set the next of the current buffer to the current head
+  ;   2. Set the prev of the current buffer to INV
+  ;   3. Set the prev of the currenr head to the current buffer
+  ;   4. Set the head to the current buffer
+  mov  
+  mov [es:si + disk_buffer_entry.]
+.empty_queue:
+  ; Both head and tail point to the buffer
+  mov [disk_buffer_head], bx
+  mov [disk_buffer_tail], bx
+  ; The next and prev both point to invalid pointer
+  ; (AX is set before we jump here)
+  mov [es:bx + disk_buffer_entry.next], ax
+  mov [es:bx + disk_buffer_entry.prev], ax
+.return:
+  pop si
+  pop bx
+  pop es
+  retn
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
@@ -823,6 +870,6 @@ disk_buffer_next_to_evict: dw 0
 
 ; This is the head of the evict queue (i.e. linked list of sector objects)
 ; We use 0xffff to represent empty pointer.
-evict_queue_head: dw 0ffffh
+disk_buffer_head: dw DISK_BUFFER_PTR_INV
 ; This is the tail of the evict queue
-evict_quete_tail: dw 0ffffh
+disk_buffer_tail: dw DISK_BUFFER_PTR_INV
