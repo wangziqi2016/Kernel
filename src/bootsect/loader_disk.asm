@@ -4,7 +4,7 @@ _loader_disk_start:
 ;
 
 ; The maximum number of hardware devices we could support
-DISK_MAX_DEVICE  equ 4
+DISK_MAX_DEVICE  equ 8
 ; The max number of times we retry for read/write failure
 DISK_MAX_RETRY   equ 3
 ; The byte size of a sector of the disk
@@ -61,6 +61,12 @@ struc disk_buffer_entry
   .unused: resb 1
   ; The LBA that this sector is read from
   .lba:    resd 1
+  ; All valid entries form a linked list
+  ; This is the next pointer for maintaining the queue of active buffer entries
+  .next:   resw 1
+  ; The previous 
+  .prev:   resw 1
+  ; Sector data to be stored
   .data:   resb DISK_SECTOR_SIZE
   .size:
 endstruc
@@ -577,6 +583,15 @@ disk_find_empty_buffer:
   mov [disk_buffer_next_to_evict], ax
   jmp .return
 
+  ; This function adds a buffer into the current queue
+  ; This function implements the buffer replacement poloicy
+  ;   1. If we choose to add to the end of the queue, and evict 
+  ;      from the beginning, then we are implementing FIFO
+  ;   2. If we choose to add to the beginning of the queue, and 
+  ;      we always move buffers to the beginning of the queue, and
+  ;      always evict from the end, then we are implementing LRU
+disk_buffer_add:
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -600,6 +615,8 @@ disk_buffer_write_lba:
   retn
 
   ; This function reads or writes LBA of a given disk.
+  ; Note that we do not modify the queue in this function. The caller
+  ; is responsible for maintaining the queue
   ;   1. If the operation is write, we also clear the dirty flag
   ;   [BP + 4] - The pointer to the buffer object for writing
   ;              The buffer must have its driver letter and LBA set
@@ -803,3 +820,9 @@ disk_buffer_size: dw 0
 ; and next time we just start at this
 ; Note that this value SHOULD wrap back
 disk_buffer_next_to_evict: dw 0
+
+; This is the head of the evict queue (i.e. linked list of sector objects)
+; We use 0xffff to represent empty pointer.
+evict_queue_head: dw 0ffffh
+; This is the tail of the evict queue
+evict_quete_tail: dw 0ffffh
