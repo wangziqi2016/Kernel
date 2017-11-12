@@ -506,6 +506,11 @@ _disk_get_sector:
   jne .continue
   cmp [es:si + disk_buffer_entry.lba + 2], dx
   jne .continue
+  ; If there is a hit of the LBA and letter, we move it
+  ; to the beginning of the queue
+  ; If we use find_empty_buffer() then this has already been done
+  call disk_buffer_access
+  ; AX is not changed
   jmp .return
 .continue:
   mov si, [es:si + disk_buffer_entry.next]
@@ -573,7 +578,7 @@ disk_get_sector_for_write:
   push bp
   mov bp, sp
   ; Command
-  push word DISK-DISK_BUFFER_STATUS_DIRTY
+  push word DISK_BUFFER_STATUS_DIRTY
   mov ax, [bp + 8]
   push ax
   mov ax, [bp + 6]
