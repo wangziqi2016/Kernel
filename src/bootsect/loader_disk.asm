@@ -489,10 +489,11 @@ _disk_get_sector:
   ; Load ES
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
-  ; DX:AX is the lba
+  ; DX:AX is the lba, CL is the letter
+  ; Note that this three will not be changed in the loop,
+  ; but will be changed after the loop
   mov ax, [bp + 6]
   mov dx, [bp + 8]
-  ; CL is the letter. Ignore the high byte
   mov cl, [bp + 4]
   ; SI is the current buffer object
   mov si, [disk_buffer_head]
@@ -520,10 +521,16 @@ _disk_get_sector:
   call disk_find_empty_buffer
   ; AX = SI = new buffer allocated
   mov si, ax
+  ; Re-load LBA and letter, and write them into the buffer
+  mov ax, [bp + 6]
+  mov dx, [bp + 8]
+  mov cl, [bp + 4]
   ; Write letter and LBA
   mov [es:si + disk_buffer_entry.letter], cl
   mov [es:si + disk_buffer_entry.lba], ax
   mov [es:si + disk_buffer_entry.lba + 2], dx
+  ; Since we changed AX just now, so change it back
+  mov ax, si
   ; Call the read routine with AX being the pointer to the buffer object
   call disk_buffer_read_lba
   test ax, ax
