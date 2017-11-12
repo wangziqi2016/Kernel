@@ -23,6 +23,7 @@ disk_buffer_test:
   dec si
   call disk_find_empty_buffer
   mov bx, ax
+  call disk_buffer_print
   ; Set LBA - The first LBA is 15 and the last is 0
   mov word [es:bx + disk_buffer_entry.lba + 2], 0
   mov [es:bx + disk_buffer_entry.lba], si

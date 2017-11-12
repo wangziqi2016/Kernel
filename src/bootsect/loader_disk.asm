@@ -992,11 +992,6 @@ disk_mapping_num: dw 0
 disk_buffer:      dw 0
 ; Number of entries in the buffer
 disk_buffer_size: dw 0
-; The next buffer to evict if all buffer entries are used
-; We increment this value everytime we evict a buffer entry
-; and next time we just start at this
-; Note that this value SHOULD wrap back
-disk_buffer_next_to_evict: dw 0
 
 ; This is the head of the evict queue (i.e. linked list of sector objects)
 ; We use 0xffff to represent empty pointer.
