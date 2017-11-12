@@ -39,7 +39,6 @@ disk_buffer_test:
   mov word [es:bx + disk_buffer_entry.lba + 2], 0
   mov [es:bx + disk_buffer_entry.lba], si
   mov byte [es:bx + disk_buffer_entry.letter], 'A'
-  mov byte [es:bx + disk_buffer_entry.device], 00h
   mov ax, bx
   call disk_buffer_read_lba
   jc .error_rw

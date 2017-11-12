@@ -57,21 +57,21 @@ DISK_BUFFER_PTR_INV equ 0ffffh
 ; This is the structure of buffer entry in the disk buffer cache
 struc disk_buffer_entry
   ; PINNED DIRTY INUSE
-  .status: resb 1
+  .status:  resb 1
   ; The device ID
-  .device: resb 1
+  .unused1: resb 1
   ; The device letter
-  .letter: resb 1
-  .unused: resb 1
+  .letter:  resb 1
+  .unused2: resb 1
   ; The LBA that this sector is read from
-  .lba:    resd 1
+  .lba:     resd 1
   ; All valid entries form a linked list
   ; This is the next pointer for maintaining the queue of active buffer entries
-  .next:   resw 1
+  .next:    resw 1
   ; The previous 
-  .prev:   resw 1
+  .prev:    resw 1
   ; Sector data to be stored
-  .data:   resb DISK_SECTOR_SIZE
+  .data:    resb DISK_SECTOR_SIZE
   .size:
 endstruc
 
@@ -470,7 +470,29 @@ disk_get_chs:
 ; Disk Buffer Management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-%define disk_find_empty_buffer_debug
+  ; This function searches the buffer. If a sector of given LBA is found 
+  ; then we return its data. Otherwise, we read the sector from memory
+  ; and create a new buffer by eviction or using empty buffers.
+  ; If the LBA is found in the current buffer list, but it is dirty, this
+  ; function does not write back
+  ;   [BX + 4][BP + 6] - LBA
+  ;   [BP + 8] - lower byte is the letter
+disk_load_for_read:
+  push bp
+  mov bp, sp
+  push si
+  ; Load ES
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
+  ; EAX is the lba
+  mov eax, [bp + 4]
+
+  mov sp, bp
+  pop si
+  pop bp
+  retn
+
+;%define disk_find_empty_buffer_debug
   ; This function returns an empty buffer from the buffer cache
   ; Currently we ignore the pinned flag (it is always advisory)
   ; If all entries are occupied, we evict a buffer and then
@@ -892,12 +914,12 @@ disk_buffer_op_lba:
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
   ; for three times. If all are not successful we just return fail
-  ;   int disk_read_lba(char letter, uint32_t lba, void far *buffer);
+  ;   int disk_op_lba(char letter, uint32_t lba, void far *buffer_data);
   ;   [BP + 4] - 8 bit opcode on lower byte (0x02 for read, 0x03 for write); 
   ;              8 bit # of sectors to operate on higher byte (should be 1)
   ;   [BP + 6] - Disk letter
   ;   [BP + 8][BP + 10] - low and high word of the LBA
-  ;   [BP + 12][BP + 14] - Far pointer to the buffer
+  ;   [BP + 12][BP + 14] - Far pointer to the buffer data
   ; Return value:
   ;   CF cleared if success
   ;   CF set if error
