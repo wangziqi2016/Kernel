@@ -542,6 +542,7 @@ _disk_get_sector:
   pop bp
   retn
 .read_fail:
+  push ax
   push ds
   push disk_read_fail_str
   call bsod_fatal
@@ -944,8 +945,9 @@ disk_buffer_read_lba:
   push word DISK_OP_READ
   push ax
   call disk_buffer_op_lba
-  pop ax
-  pop ax
+  pushf
+  add sp, 4
+  popf
   retn
 
   ; Fast wrapper for writing LBA into a buffer
@@ -953,8 +955,9 @@ disk_buffer_write_lba:
   push word DISK_OP_WRITE
   push ax
   call disk_buffer_op_lba
-  pop ax
-  pop ax
+  pushf
+  add sp, 4
+  popf
   retn
 
   ; This function reads or writes LBA of a given disk.
@@ -996,20 +999,20 @@ disk_buffer_op_lba:
   mov ax, [bp + 6]
   push ax
   call disk_op_lba
-  ; ADD instruction will change the value of CF
-  ; Since we use CF to represent error, we must take care 
-  ; to save the FLAGS
+  ; Use CX to hold FLAGS
   pushf
+  pop cx
   add sp, 12
+  push cx
   popf
   ; If there is an error then we do not set modified bit for read
   jc .return
   ; If it is write then we set modified flag
   cmp word [bp + 6], DISK_OP_WRITE
-  jne .return
+  jne .return_success
   ; Clear the dirty byte for a successful write operation
   and byte [es:bx + disk_buffer_entry.status], ~DISK_BUFFER_STATUS_DIRTY
-  jmp .return
+  jmp .return_success
 .return_invalid_buffer:
   mov ax, DISK_ERR_INVALID_BUFFER
   stc
@@ -1018,6 +1021,9 @@ disk_buffer_op_lba:
   mov sp, bp
   pop bp
   retn
+.return_success:
+  clc
+  jmp .return
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
@@ -1064,8 +1070,8 @@ disk_op_lba:
   ; as they contain information for performing disk read
   int 13h
   jc .retry_or_fail
-  clc
   xor ax, ax
+  clc
   jmp .return
 .return_fail_wrong_letter:
   stc
@@ -1151,7 +1157,7 @@ disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
 disk_evict_fail_str:       db "Evict fail", 0ah, 00h
-disk_read_fail_str:        db "Read fail", 0ah, 00h
+disk_read_fail_str:        db "Read fail (%u)", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
 disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h

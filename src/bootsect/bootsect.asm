@@ -48,7 +48,6 @@ read_next_sector:
   ; the 1st sector
   call read_sector
   call next_sector
-
   ; This means we have seen an overflow as we always read 512 bytes
   cmp bx, 0000h
   jnz test_num_sector
