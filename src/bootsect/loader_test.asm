@@ -9,6 +9,15 @@ disk_test:
   call disk_buffer_test
   retn
 
+  ; AX = index
+  ; return: AX = offset
+disk_buffer_get_ptr:
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  mul cx
+  add ax, [disk_buffer]
+  retn
+
 disk_buffer_test:
   push es
   push si
@@ -53,30 +62,19 @@ disk_buffer_test:
   add sp, 8
 .test_buffer_access:
   mov ax, 0
-  xor dx, dx
-  mov cx, disk_buffer_entry.size
-  mul cx
-  add ax, [disk_buffer]
+  call disk_buffer_get_ptr
   call disk_buffer_access
   mov ax, 9
-  xor dx, dx
-  mov cx, disk_buffer_entry.size
-  mul cx
-  add ax, [disk_buffer]
+  call disk_buffer_get_ptr
   call disk_buffer_access
   mov ax, 12
-  xor dx, dx
-  mov cx, disk_buffer_entry.size
-  mul cx
-  add ax, [disk_buffer]
+  call disk_buffer_get_ptr
   call disk_buffer_access
   mov ax, 10
-  xor dx, dx
-  mov cx, disk_buffer_entry.size
-  mul cx
-  add ax, [disk_buffer]
+  call disk_buffer_get_ptr
   call disk_buffer_access
   call disk_buffer_print
+
 .test_disk_flush_all:
   call disk_buffer_flush_all
   call disk_buffer_print
