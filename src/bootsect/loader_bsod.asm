@@ -7,13 +7,18 @@ _loader_bsod_start:
 ; This is the character attr we use for printing in BSOD mode
 BSOD_VIDEO_ATTR equ VIDEO_ATTR_FG_RED | VIDEO_ATTR_FG_HIGHLIGHT | VIDEO_ATTR_BG_BLUE
 
+; If this flag is on we do not clear the screen
+%define debug_no_clear
+
   ; This function never returns - so it can be either called, or directly 
   ; jumped onto. It receives video_printf() like parameters, and prints 
   ; the error on the screen
 bsod_fatal:
   push bp
   mov bp, sp
+%ifndef debug_no_clear
   call video_clear_all
+%endif
   ; AL is now number of rows, we compute the total number of characters
   ; by multiplying these two
   mov al, byte [video_max_row]

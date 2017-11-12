@@ -526,7 +526,8 @@ _disk_get_sector:
   mov [es:si + disk_buffer_entry.lba + 2], dx
   ; Call the read routine with AX being the pointer to the buffer object
   call disk_buffer_read_lba
-  jc .read_fail
+  test ax, ax
+  jnz .read_fail
   ; When reaching this block, SI must be the data pointer
 .return:
   ; If the dirty bit is set in the command word, we 
@@ -548,7 +549,6 @@ _disk_get_sector:
   call bsod_fatal
   ; NEVER RETURNS
   ; -------------
-
   ; Loads the sector for read. Do not set dirty flag. 
   ;   [BP + 4] - lower byte is the letter
   ;   [BX + 6][BP + 8] - LBA
@@ -940,7 +940,9 @@ disk_buffer_remove:
 
   ; Fast wrapper for reading LBA into a buffer
   ; It has the same erorr condition and return value as disk_buffer_op_lba
-  ;    AX = Offset to the buffer entry
+  ;   AX = Offset to the buffer entry
+  ; Return:
+  ;   AX = 0 if success; Otherwise error
 disk_buffer_read_lba:
   push word DISK_OP_READ
   push ax
@@ -963,9 +965,9 @@ disk_buffer_write_lba:
   ;   [BP + 4] - The pointer to the buffer object for writing
   ;              The buffer must have its driver letter and LBA set
   ;   [BP + 6] - The opcode (0x0201 for read; 0x0301 for write)
-  ; Sets CF is fails; Clears CF if succeeds
   ; Return value in AX. Please refer to disk_op_lba
   ;   In addition, AX = DISK_ERR_INVALID_BUFFER if the buffer is "invalid"
+  ;   DO NOT SET CF!
 disk_buffer_op_lba:
   ; Move the return address down by 2 bytes
   ; and add 2 bytes for the argument
@@ -996,25 +998,24 @@ disk_buffer_op_lba:
   push ax
   call disk_op_lba
   add sp, 12
-  ; If there is an error then we do not set modified bit for read
-  jc .return
+  ; If there is an error then we can catch it
+  ; AX != 0 means error
+  test ax, ax
+  jnz .return
+  ; Keep AX == 0 below
   ; If it is write then we set modified flag
   cmp word [bp + 6], DISK_OP_WRITE
-  jne .return_success
+  jne .return
   ; Clear the dirty byte for a successful write operation
   and byte [es:bx + disk_buffer_entry.status], ~DISK_BUFFER_STATUS_DIRTY
-  jmp .return_success
+  jmp .return
 .return_invalid_buffer:
   mov ax, DISK_ERR_INVALID_BUFFER
-  stc
 .return:
   pop bx
   mov sp, bp
   pop bp
   retn
-.return_success:
-  clc
-  jmp .return
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
@@ -1058,7 +1059,7 @@ disk_op_lba:
   ; Opcode + number of sectors to read/write
   mov ax, [bp + 4]
   ; After this line, AX, DX and CX cannot be changed
-  ; as they contain information for performing disk read
+  ; as they contain information for performing disk I/O
   int 13h
   jc .retry_or_fail
   xor ax, ax

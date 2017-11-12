@@ -285,6 +285,7 @@ video_printf:
   ; Format string specification:
   ;   - %d 16 bit signed integer
   ;   - %u 16 bit unsigned integer
+  ;   - %U 32 bit unsigned integer
   ;   - %x 16 bit hex (always upper case, like traditional %X)
   ;   - %y 8  bit hex (always upper case); Need to push it as 16 bit
   ;   - %c a character; Need to push it as 16 bit
