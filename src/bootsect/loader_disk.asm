@@ -650,11 +650,13 @@ disk_buffer_access:
 
   ; This function flushes a buffer given the pointer
   ;   AX = Pointer to the buffer to be flushed
+  ; Return: AX is unchanged
 disk_buffer_flush:
   ; Remove it and then write back
   call disk_buffer_remove
   ; AX is not changed
   call disk_buffer_wb
+  ; AX is not changed
   retn
 
   ; This function flushs all buffer until the linked list is empty
@@ -710,14 +712,15 @@ disk_buffer_wb:
   ; If not then just move it to the head and return it
   ; 
   ; This function will NOT put the buffer at the beginning of the queue
+  ; This function will NOT clear the dirty flag even if it is written back
   ; Return:
   ;   AX = Buffer that we have evicted (must be in the linked list)
 disk_buffer_evict_lru:
   ; Remove it from the linked list
   mov ax, [disk_buffer_tail]
-  call disk_buffer_remove
-  ; AX = The buffer just removed
-  call disk_buffer_wb
+  ; This will first remove it from the linked list
+  ; and then check the dirty bit. If dirty is on then write it back
+  call disk_buffer_flush
   ; AX is unchanged
   retn
 
