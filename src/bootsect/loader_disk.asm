@@ -591,7 +591,6 @@ disk_find_empty_buffer:
 ; Queue Management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-%define disk_buffer_add_debug
   ; This function adds a buffer into the current queue
   ; This function implements the buffer replacement poloicy
   ;   1. If we choose to add to the end of the queue, and evict 
@@ -601,7 +600,7 @@ disk_find_empty_buffer:
   ;      always evict from the end, then we are implementing LRU
   ; Currently we implement LRU
   ;   AX = pointer to the buffer that we need to add
-disk_buffer_add:
+disk_buffer_add_head:
   ; We load ES with the large BSS segment
   push es
   push bx
@@ -623,8 +622,11 @@ disk_buffer_add:
   ;   2. Set the prev of the current buffer to INV
   ;   3. Set the prev of the currenr head to the current buffer
   ;   4. Set the head to the current buffer
-  mov  
-  mov [es:si + disk_buffer_entry.]
+  mov [es:bx + disk_buffer_entry.next], si
+  mov [es:bx + disk_buffer_entry.prev], ax 
+  mov [es:si + disk_buffer_entry.prev], bx
+  mov [disk_buffer_head], bx
+  jmp .return
 .empty_queue:
   ; Both head and tail point to the buffer
   mov [disk_buffer_head], bx
@@ -639,6 +641,7 @@ disk_buffer_add:
   pop es
   retn
 
+ 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -851,6 +854,8 @@ disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
 disk_evict_fail_str:       db "Evict fail (AX = 0x%x, BX = 0x%x, base = 0x%x)", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
+disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
+disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
