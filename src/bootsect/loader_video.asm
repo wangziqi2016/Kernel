@@ -280,6 +280,26 @@ video_printf:
   pop bp
   retn
 
+  ; This function wraps the printf core, and assumes to use the system segemnt
+  ; as the segment of the format string, saving a push DS instruction
+  ; All arguments are passed in the same way as in printf.
+  ;   [BP + 4] - Format string offset
+  ;   [BP + 6 and upward] 0 Arguments
+video_printf_near:
+  push bp
+  mov bp, sp 
+  ; Always use DS for format string
+  push ds
+  mov ax, [bp + 4]
+  push ax
+  ; Note that since there is one less arg for this function, this number
+  ; also shrinks by 2
+  push word 16
+  call video_printf_core
+  mov sp, bp
+  pop bp
+  retn
+
   ; This function is a modified/simplified version of printf
   ; Interface: void printf(const char *fmt, ...);
   ; Format string specification:
