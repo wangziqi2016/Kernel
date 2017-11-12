@@ -513,7 +513,7 @@ _disk_get_sector:
 .not_found:
   ; Allocate an empty buffer, and then read the data
   call disk_find_empty_buffer
-  ; SI = new buffer allocated
+  ; AX = SI = new buffer allocated
   mov si, ax
   ; Write letter and LBA
   mov [es:si + disk_buffer_entry.letter], cl
@@ -552,6 +552,28 @@ disk_get_sector:
   mov bp, sp
   ; Command
   push word 0
+  ; LBA
+  mov ax, [bp + 8]
+  push ax
+  mov ax, [bp + 6]
+  push ax
+  ; Letter
+  mov ax, [bp + 4]
+  push ax
+  call _disk_get_sector
+  add sp, 8
+  ; Adjust the pointer to the data area
+  add ax, disk_buffer_entry.data
+  mov sp, bp
+  pop bp
+  retn
+
+  ; Same as disk_get_sector, except that we set the dirty bit
+disk_get_sector_for_write:
+  push bp
+  mov bp, sp
+  ; Command
+  push word DISK-DISK_BUFFER_STATUS_DIRTY
   mov ax, [bp + 8]
   push ax
   mov ax, [bp + 6]
@@ -559,6 +581,7 @@ disk_get_sector:
   mov ax, [bp + 4]
   push ax
   call _disk_get_sector
+  add sp, 8
   ; Adjust the pointer to the data area
   add ax, disk_buffer_entry.data
   mov sp, bp
