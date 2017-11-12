@@ -34,7 +34,7 @@ disk_buffer_test:
   push 0
   push si
   push word 'A'
-  call disk_get_sector
+  call disk_get_sector_for_write
   add sp, 6
   ; Call to print the cirlular buffer
   call disk_buffer_print

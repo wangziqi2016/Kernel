@@ -674,6 +674,26 @@ disk_find_empty_buffer:
 ; Queue Management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+  ; This function returns the index of a buffer in the buffer pool
+  ; given its pointer.
+  ; If the pointer is invalid we jump to BSOD
+  ; AX = pointer
+  ; Return: AX = index; DX = remainder (should be 0)
+disk_buffer_get_index:
+  xor dx, dx
+  sub ax, [disk_buffer]
+  mov cx, disk_buffer_entry.size
+  div cx
+  test dx, dx
+  jnz .invalid_ptr
+  retn
+.invalid_ptr:
+  push ds
+  push disk_invalid_ptr_to_index
+  call bsod_fatal
+  ; NEVER RETURNS
+  ; -------------
+
   ; Prints current active buffers using their indices
 disk_buffer_print:
   push es
@@ -684,12 +704,10 @@ disk_buffer_print:
 .body:
   cmp si, DISK_BUFFER_PTR_INV
   je .return
+  ; AX holds the current pointer to the buffer object
   mov ax, si
-  sub ax, [disk_buffer]
-  xor dx, dx
-  mov cx, disk_buffer_entry.size
-  div cx
-  ; After the divition, DX:AX is remainder:result
+  ; After this call, AX holds the index and DX is 0
+  call disk_buffer_get_index
   push ax
   push ds
   push disk_buffer_print_format
@@ -1177,6 +1195,7 @@ disk_read_fail_str:        db "Read fail (%u)", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
 disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
+disk_invalid_ptr_to_index: db "Invalid buffer pointer", 0ah, 00h
 disk_buffer_print_format:  db "%u ", 00h
 
 ; This is an offset in the system segment to the start of the disk param table
