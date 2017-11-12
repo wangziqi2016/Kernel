@@ -74,7 +74,20 @@ disk_buffer_test:
   call disk_buffer_get_ptr
   call disk_buffer_access
   call disk_buffer_print
-
+.test_disk_flush:
+  mov ax, 10
+  call disk_buffer_get_ptr
+  call disk_buffer_flush
+  mov ax, 0
+  call disk_buffer_get_ptr
+  call disk_buffer_flush
+  mov ax, 5
+  call disk_buffer_get_ptr
+  call disk_buffer_flush
+  mov ax, 11
+  call disk_buffer_get_ptr
+  call disk_buffer_flush
+  call disk_buffer_print
 .test_disk_flush_all:
   call disk_buffer_flush_all
   call disk_buffer_print
