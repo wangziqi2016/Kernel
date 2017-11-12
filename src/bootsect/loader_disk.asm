@@ -708,20 +708,15 @@ disk_buffer_print:
   mov ax, si
   ; After this call, AX holds the index and DX is 0
   call disk_buffer_get_index
+  ; Status byte
+  mov dl, [es:si + disk_buffer_entry.status]
+  push dx
+  ; Index
   push ax
   push ds
   push disk_buffer_print_format
   call video_printf
-  add sp, 6
-  ;push si
-  ;call video_putuint16
-  ;pop ax
-  test byte [es:si + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
-  jz .not_dirty
-  ;mov al, 'd'
-  ;mov ah, [video_print_attr]
-  ;call putchar
-.not_dirty:
+  add sp, 8
   ; Go to the next object
   mov si, [es:si + disk_buffer_entry.next]
   jmp .body
@@ -1196,7 +1191,8 @@ disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
 disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
 disk_invalid_ptr_to_index: db "Invalid buffer pointer", 0ah, 00h
-disk_buffer_print_format:  db "%u ", 00h
+; Index (status)
+disk_buffer_print_format:  db "%u,%y ", 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
