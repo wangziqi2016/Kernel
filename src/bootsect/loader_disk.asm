@@ -475,8 +475,9 @@ disk_get_chs:
   ; and create a new buffer by eviction or using empty buffers.
   ; If the LBA is found in the current buffer list, but it is dirty, this
   ; function does not write back
-  ;   [BX + 4][BP + 6] - LBA
-  ;   [BP + 8] - lower byte is the letter
+  ; disk_buffer_entry *_disk_get_sector(char letter, uint32_t lba, uint16_t command);
+  ;   [BP + 4] - lower byte is the letter
+  ;   [BX + 6][BP + 8] - LBA
   ;   [BP + 10] - a status word as special commands for the operation
   ;      If DISK_BUFFER_STATUS_DIRTY is set we set the dirty flag for write
   ; Return
@@ -489,10 +490,10 @@ _disk_get_sector:
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
   ; DX:AX is the lba
-  mov ax, [bp + 4]
-  mov dx, [bp + 6]
+  mov ax, [bp + 6]
+  mov dx, [bp + 8]
   ; CL is the letter. Ignore the high byte
-  mov cl, [bp + 8]
+  mov cl, [bp + 4]
   ; SI is the current buffer object
   mov si, [disk_buffer_head]
 .body:
@@ -541,6 +542,28 @@ _disk_get_sector:
   call bsod_fatal
   ; NEVER RETURNS
   ; -------------
+
+  ; Loads the sector for read. Do not set dirty flag. 
+  ;   [BP + 4] - lower byte is the letter
+  ;   [BX + 6][BP + 8] - LBA
+  ;   Return: Pointer to the sector data
+disk_get_sector:
+  push bp
+  mov bp, sp
+  ; Command
+  push word 0
+  mov ax, [bp + 8]
+  push ax
+  mov ax, [bp + 6]
+  push ax
+  mov ax, [bp + 4]
+  push ax
+  call _disk_get_sector
+  ; Adjust the pointer to the data area
+  add ax, disk_buffer_entry.data
+  mov sp, bp
+  pop bp
+  retn
 
 ;%define disk_find_empty_buffer_debug
   ; This function returns an empty buffer from the buffer cache
