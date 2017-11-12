@@ -522,8 +522,8 @@ _disk_get_sector:
   mov si, ax
   ; Write letter and LBA
   mov [es:si + disk_buffer_entry.letter], cl
-  mov [es:si + disk_buffer_entry.lba + 2], ax
-  mov [es:si + disk_buffer_entry.lba], dx
+  mov [es:si + disk_buffer_entry.lba], ax
+  mov [es:si + disk_buffer_entry.lba + 2], dx
   ; Call the read routine with AX being the pointer to the buffer object
   call disk_buffer_read_lba
   jc .read_fail
@@ -566,7 +566,7 @@ disk_get_sector:
   mov ax, [bp + 4]
   push ax
   call _disk_get_sector
-  add sp, 8
+  ; DO NOT CLEAR STACK - WE HAVE THE FRAME
   ; Adjust the pointer to the data area
   add ax, disk_buffer_entry.data
   mov sp, bp
@@ -586,7 +586,7 @@ disk_get_sector_for_write:
   mov ax, [bp + 4]
   push ax
   call _disk_get_sector
-  add sp, 8
+  ; DO NOT CLEAR STACK - WE HAVE THE FRAME
   ; Adjust the pointer to the data area
   add ax, disk_buffer_entry.data
   mov sp, bp
@@ -944,7 +944,8 @@ disk_buffer_read_lba:
   push word DISK_OP_READ
   push ax
   call disk_buffer_op_lba
-  add sp, 4
+  pop ax
+  pop ax
   retn
 
   ; Fast wrapper for writing LBA into a buffer
@@ -952,7 +953,8 @@ disk_buffer_write_lba:
   push word DISK_OP_WRITE
   push ax
   call disk_buffer_op_lba
-  add sp, 4
+  pop ax
+  pop ax
   retn
 
   ; This function reads or writes LBA of a given disk.
@@ -994,13 +996,18 @@ disk_buffer_op_lba:
   mov ax, [bp + 6]
   push ax
   call disk_op_lba
+  ; ADD instruction will change the value of CF
+  ; Since we use CF to represent error, we must take care 
+  ; to save the FLAGS
+  pushf
   add sp, 12
+  popf
   ; If there is an error then we do not set modified bit for read
   jc .return
   ; If it is write then we set modified flag
   cmp word [bp + 6], DISK_OP_WRITE
   jne .return
-  ; Set the dirty byte for a successful write operation
+  ; Clear the dirty byte for a successful write operation
   and byte [es:bx + disk_buffer_entry.status], ~DISK_BUFFER_STATUS_DIRTY
   jmp .return
 .return_invalid_buffer:
