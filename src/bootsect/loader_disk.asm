@@ -641,6 +641,16 @@ disk_buffer_add_head:
   pop es
   retn
 
+  ; This function removes the given buffer and moves it to the head
+  ; of the queue. It should be accessed for every hit in the buffer object
+  ; This is how we implement LRU
+  ;   AX = buffer to be accessed
+disk_buffer_access:
+  ; It returns the same thing in AX
+  call disk_buffer_remove
+  call disk_buffer_add_head
+  retn
+
   ; This function removes a buffer object from the linked list
   ; We support removing from any position, including head and tail and middle
   ; and removing the only element
