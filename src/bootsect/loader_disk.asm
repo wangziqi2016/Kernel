@@ -471,13 +471,17 @@ disk_get_chs:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   ; This function searches the buffer. If a sector of given LBA is found 
-  ; then we return its data. Otherwise, we read the sector from memory
+  ; then we return it. Otherwise, we read the sector from memory
   ; and create a new buffer by eviction or using empty buffers.
   ; If the LBA is found in the current buffer list, but it is dirty, this
   ; function does not write back
   ;   [BX + 4][BP + 6] - LBA
   ;   [BP + 8] - lower byte is the letter
-disk_load_for_read:
+  ;   [BP + 10] - a status word as special commands for the operation
+  ;      If DISK_BUFFER_STATUS_DIRTY is set we set the dirty flag for write
+  ; Return
+  ;   The offset of the buffer object
+_disk_get_sector:
   push bp
   mov bp, sp
   push si
@@ -501,20 +505,42 @@ disk_load_for_read:
   jne .continue
   cmp [es:si + disk_buffer_entry.lba + 2], dx
   jne .continue
-  ; Found one with the same LBA and disk letter as specified
-  ; So just load AX using the offset of the data
-  lea ax, [es:si + disk_buffer_entry.data]
   jmp .return
 .continue:
   mov si, [es:si + disk_buffer_entry.next]
   jmp .body
 .not_found:
-  ; AX must be the data pointer
+  ; Allocate an empty buffer, and then read the data
+  call disk_find_empty_buffer
+  ; SI = new buffer allocated
+  mov si, ax
+  ; Write letter and LBA
+  mov [es:si + disk_buffer_entry.letter], cl
+  mov [es:si + disk_buffer_entry.lba + 2], ax
+  mov [es:si + disk_buffer_entry.lba], dx
+  ; Call the read routine with AX being the pointer to the buffer object
+  call disk_buffer_read_lba
+  jc .read_fail
+  ; When reaching this block, SI must be the data pointer
 .return:
+  ; If the dirty bit is set in the command word, we 
+  ; also set the dirty bit for the buffer
+  test word [bp + 10], DISK_BUFFER_STATUS_DIRTY
+  jz .no_set_dirty
+  or byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+.no_set_dirty:
+  ; Return result in AX
+  mov ax, si
   pop si
   mov sp, bp
   pop bp
   retn
+.read_fail:
+  push ds
+  push disk_read_fail_str
+  call bsod_fatal
+  ; NEVER RETURNS
+  ; -------------
 
 ;%define disk_find_empty_buffer_debug
   ; This function returns an empty buffer from the buffer cache
@@ -1067,6 +1093,7 @@ disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
 disk_evict_fail_str:       db "Evict fail", 0ah, 00h
+disk_read_fail_str:        db "Read fail", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
 disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
