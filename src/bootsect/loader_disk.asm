@@ -648,6 +648,24 @@ disk_buffer_access:
   call disk_buffer_add_head
   retn
 
+  ; This function flushs all buffer until the linked list is empty
+disk_buffer_flush_all:
+  push si
+.body:
+  ; Re-load the var and check whether it is invalid pointer
+  mov si, [disk_buffer_head]
+  cmp si, DISK_BUFFER_PTR_INV
+  je .return
+  ; Evict the buffer, and return it to the empty buffer pool
+  call disk_buffer_evict_lru
+  jmp .body
+.return:
+  mov ax, DISK_BUFFER_PTR_INV
+  mov [disk_buffer_head], ax
+  mov [disk_buffer_tail], ax
+  pop si
+  retn
+
   ; We evict the buffer from the tail of the linked list
   ; First check whether it is dirty, if it is then we write back
   ; If not then just move it to the head and return it
@@ -666,10 +684,10 @@ disk_buffer_evict_lru:
   ; AX = BX = The buffer just removed
   mov bx, ax
   test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
-  jz .return
+  jnz .return
   ; AX is still be buffer address, so we write it back
   call disk_buffer_write_lba
-  jc .evict_fail
+  jnc .evict_fail
   ; Before enter this BX is always the return value
 .return:
   mov ax, bx
@@ -678,11 +696,11 @@ disk_buffer_evict_lru:
   retn
 .evict_fail:
   ; Print it first
-  call disk_buffer_print
+  ;call disk_buffer_print
   push ds
   push disk_evict_fail_str
   ; Call the no clear version to keep the printed buffer
-  call bsod_fatal_noclear
+  call bsod_fatal
   ; NEVER RETURNS
   ;--------------
 
@@ -982,7 +1000,7 @@ disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
 disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
-disk_evict_fail_str:       db "Evict fail. Buffer: ", 00h
+disk_evict_fail_str:       db "Evict fail", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
 disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h

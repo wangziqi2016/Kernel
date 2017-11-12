@@ -53,15 +53,30 @@ disk_buffer_test:
   add sp, 8
 .test_buffer_access:
   mov ax, 0
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  mul cx
+  add ax, [disk_buffer]
   call disk_buffer_access
-  call disk_buffer_print
   mov ax, 9
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  mul cx
+  add ax, [disk_buffer]
   call disk_buffer_access
   mov ax, 12
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  mul cx
+  add ax, [disk_buffer]
   call disk_buffer_access
   mov ax, 10
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  mul cx
+  add ax, [disk_buffer]
   call disk_buffer_access
-  ;call disk_buffer_print
+  call disk_buffer_print
   pop bx
   pop si
   pop es

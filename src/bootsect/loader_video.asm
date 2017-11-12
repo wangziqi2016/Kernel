@@ -479,6 +479,8 @@ video_get_offset:
   ; This function scrolls up by a given number of lines
   ; Note that we just modify the video buffer. Current row and col is not 
   ; changed
+  ; NOTE: This function does not write attr byte. All lines scrolled in are
+  ; 0x00. Ths caller should take care of attrs
   ;   [SP + 0] num of lines
 video_scroll_up:
   push bp
@@ -628,7 +630,7 @@ video_move_to_next_char:
   ; Note that current row in the memory stay unchanged
   push word 1
   call video_scroll_up
-  add sp, 2
+  pop ax
   jmp .return
 .inc_col:
   mov [video_current_col], ax
@@ -655,7 +657,7 @@ video_move_to_next_line:
   jnz .inc_row
   push word 1
   call video_scroll_up
-  add sp, 2
+  pop ax
   jmp .return
 .inc_row:
   mov [video_current_row], ax
@@ -677,7 +679,7 @@ video_clear_all:
   mov ax, [video_max_row]
   push ax
   call video_scroll_up
-  add sp, 2
+  pop ax
   mov word [video_current_col], 0
   mov word [video_current_row], 0
   mov word [video_cursor_offset], 0
