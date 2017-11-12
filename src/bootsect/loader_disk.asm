@@ -808,6 +808,8 @@ disk_buffer_flush_all:
   pop si
   retn
 
+%define debug_disk_buffer_wb
+
   ; Write back a buffer if it is dirty
   ;   AX = The buffer to be tested and written back
   ; Return: Same AX
@@ -822,6 +824,18 @@ disk_buffer_wb:
   ; AX is still be buffer address, so we write it back
   call disk_buffer_write_lba
   jc .evict_fail
+%ifdef debug_disk_buffer_wb
+  mov ax, bx
+  xor dx, dx
+  sub ax, [disk_buffer]
+  mov cx, disk_buffer_entry.size
+  div cx
+  push ax
+  push ds
+  push .debug_str
+  call video_printf
+  add sp, 6
+%endif
   ; Before enter this BX is always the return value
 .return:
   mov ax, bx
@@ -837,6 +851,9 @@ disk_buffer_wb:
   call bsod_fatal
   ; NEVER RETURNS
   ;--------------
+%ifdef debug_disk_buffer_wb
+.debug_str: db "WriteBack %u", 0ah, 00h
+%endif
   
   ; We evict the buffer from the tail of the linked list
   ; First check whether it is dirty, if it is then we write back
