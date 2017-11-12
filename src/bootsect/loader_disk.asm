@@ -591,6 +591,42 @@ disk_find_empty_buffer:
 ; Queue Management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+  ; Prints current active buffers using their indices
+disk_buffer_print:
+  push es
+  push si
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
+  mov si, [disk_buffer_head]
+.body:
+  test si, DISK_BUFFER_PTR_INV
+  je .return
+  mov ax, si
+  sub ax, [disk_buffer]
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  div cx
+  push ax
+  push ds
+  push disk_buffer_print_format
+  call video_printf
+  add sp, 6
+  test byte [es:si + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  jz .not_dirty
+  mov al, 'd'
+  mov ah, [video_print_attr]
+  call putchar
+.not_dirty:
+  ; Go to the next object
+  mov si, [es:si + disk_buffer_entry.next]
+.return:
+  ; New line
+  mov al, 10h
+  call putchar
+  pop si
+  pop es
+  retn
+
   ; This function adds a buffer into the current queue
   ; This function implements the buffer replacement poloicy
   ;   1. If we choose to add to the end of the queue, and evict 
@@ -650,6 +686,42 @@ disk_buffer_access:
   call disk_buffer_remove
   call disk_buffer_add_head
   retn
+
+  ; We evict the buffer from the tail of the linked list
+  ; First check whether it is dirty, if it is then we write back
+  ; If not then just move it to the head and return it
+  ; Return:
+  ;   AX = Buffer that we have evicted
+disk_buffer_evict_lru:
+  push es
+  push bx
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
+  ; Remove it from the linked list
+  mov ax, [disk_buffer_tail]
+  call disk_buffer_remove
+  ; AX = BX = The buffer just removed
+  mov bx, ax
+  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  jz .return
+  ; AX is still be buffer address, so we write it back
+  call disk_buffer_write_lba
+  jc .evict_fail
+  ; Before enter this BX is always the return value
+.return:
+  mov ax, bx
+  pop bx
+  pop es
+  retn
+.evict_fail:
+  ; Print it first
+  call disk_buffer_print
+  push ds
+  push disk_evict_fail_str
+  ; Call the no clear version to keep the printed buffer
+  call bsod_fatal_noclear
+  ; NEVER RETURNS
+  ;--------------
 
   ; This function removes a buffer object from the linked list
   ; We support removing from any position, including head and tail and middle
@@ -947,10 +1019,11 @@ disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
 disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
-disk_evict_fail_str:       db "Evict fail (AX = 0x%x, BX = 0x%x, base = 0x%x)", 0ah, 00h
+disk_evict_fail_str:       db "Evict fail. Buffer: ", 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
 disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
+disk_buffer_print_format:  db "%u "
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
