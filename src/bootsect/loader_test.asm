@@ -30,18 +30,14 @@ disk_buffer_test:
   test si, si
   jz .return
   dec si
-  call disk_find_empty_buffer
-  ; Save return value to BX
-  mov bx, ax
+  ; Arguments
+  push 0
+  push si
+  push 'A'
+  call disk_get_sector
+  add sp, 6
   ; Call to print the cirlular buffer
   call disk_buffer_print
-  ; Set LBA - The first LBA is 15 and the last is 0
-  mov word [es:bx + disk_buffer_entry.lba + 2], 0
-  mov [es:bx + disk_buffer_entry.lba], si
-  mov byte [es:bx + disk_buffer_entry.letter], 'A'
-  mov ax, bx
-  call disk_buffer_read_lba
-  jc .error_rw
   jmp .body
 .return:
   ; Change it and write back
