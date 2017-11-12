@@ -676,6 +676,16 @@ disk_buffer_remove:
   je .remove_head
   cmp di, bx
   je .remove_tail
+.remove_middle:
+  ; Do not move head and tail, but change the prev and next
+  mov si, [es:bx + disk_buffer_entry.prev]
+  mov di, [es:bx + disk_buffer_entry.next]
+  ; Both SI and DI should be valid pointers, because we know 
+  ; it is neither head nor tail
+  ; SI->next = DI
+  ; DI->prev = SI
+  mov [es:si + disk_buffer_entry.next], di
+  mov [es:di + disk_buffer_entry.prev], si
 .return:
   ; Restore AX
   mov ax, bx
