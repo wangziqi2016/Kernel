@@ -648,6 +648,24 @@ disk_buffer_access:
   call disk_buffer_add_head
   retn
 
+  ; This function flushes a buffer given the pointer
+  ;   AX = Pointer to the buffer to be flushed
+disk_buffer_flush:
+  push es
+  push bx
+  push MEM_LARGE_BSS_SEG
+  pop es
+  mov bx, ax
+  test byte [es:bx + disk_buffer_entry + status], DISK_BUFFER_STATUS_DIRTY
+  jz .no_write_back
+
+.no_write_back:
+  
+.return:
+  pop bx
+  pop es
+  retn
+
   ; This function flushs all buffer until the linked list is empty
 disk_buffer_flush_all:
   push si
@@ -666,22 +684,14 @@ disk_buffer_flush_all:
   pop si
   retn
 
-  ; We evict the buffer from the tail of the linked list
-  ; First check whether it is dirty, if it is then we write back
-  ; If not then just move it to the head and return it
-  ; 
-  ; This function will NOT put the buffer at the beginning of the queue
-  ; Return:
-  ;   AX = Buffer that we have evicted (must be in the linked list)
-disk_buffer_evict_lru:
+  ; Write back a buffer if it is dirty
+  ;   AX = The buffer to be tested and written back
+  ; Return: Same AX
+disk_buffer_wb:
   push es
   push bx
-  mov ax, MEM_LARGE_BSS_SEG
-  mov es, ax
-  ; Remove it from the linked list
-  mov ax, [disk_buffer_tail]
-  call disk_buffer_remove
-  ; AX = BX = The buffer just removed
+  push MEM_LARGE_BSS_SEG
+  pop es
   mov bx, ax
   test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
   jz .return
@@ -703,6 +713,22 @@ disk_buffer_evict_lru:
   call bsod_fatal
   ; NEVER RETURNS
   ;--------------
+  
+  ; We evict the buffer from the tail of the linked list
+  ; First check whether it is dirty, if it is then we write back
+  ; If not then just move it to the head and return it
+  ; 
+  ; This function will NOT put the buffer at the beginning of the queue
+  ; Return:
+  ;   AX = Buffer that we have evicted (must be in the linked list)
+disk_buffer_evict_lru:
+  ; Remove it from the linked list
+  mov ax, [disk_buffer_tail]
+  call disk_buffer_remove
+  ; AX = The buffer just removed
+  call disk_buffer_wb
+  ; AX is unchanged
+  retn
 
   ; This function removes a buffer object from the linked list
   ; We support removing from any position, including head and tail and middle
