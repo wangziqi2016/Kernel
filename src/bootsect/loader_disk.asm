@@ -945,9 +945,7 @@ disk_buffer_read_lba:
   push word DISK_OP_READ
   push ax
   call disk_buffer_op_lba
-  pushf
   add sp, 4
-  popf
   retn
 
   ; Fast wrapper for writing LBA into a buffer
@@ -955,9 +953,7 @@ disk_buffer_write_lba:
   push word DISK_OP_WRITE
   push ax
   call disk_buffer_op_lba
-  pushf
   add sp, 4
-  popf
   retn
 
   ; This function reads or writes LBA of a given disk.
@@ -999,12 +995,7 @@ disk_buffer_op_lba:
   mov ax, [bp + 6]
   push ax
   call disk_op_lba
-  ; Use CX to hold FLAGS
-  pushf
-  pop cx
   add sp, 12
-  push cx
-  popf
   ; If there is an error then we do not set modified bit for read
   jc .return
   ; If it is write then we set modified flag
