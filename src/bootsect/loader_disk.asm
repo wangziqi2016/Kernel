@@ -115,10 +115,9 @@ disk_buffer_init:
   ; Print
   push bx
   push ax
-  push ds
   push disk_buffer_size_str
-  call video_printf
-  add sp, 8
+  call video_printf_near
+  add sp, 6
   ; Then iterate through the buffer to initialize its status
   ; Use SI as loop index
   mov si, [disk_buffer_size]
@@ -310,10 +309,9 @@ disk_probe:
   push ax
   mov al, [bp + .CURRENT_DISK_LETTER]
   push ax
-  push ds
   push disk_init_found_str
-  call video_printf
-  add sp, 14
+  call video_printf_near
+  add sp, 12
   retn
   ; Just change the disk number and then try again
 .finish_checking_floppy:
@@ -434,10 +432,9 @@ disk_get_chs:
   movzx cx, al
   push cx
   push dx
-  push ds
   push .test_string
-  call video_printf
-  add sp, 10
+  call video_printf_near
+  add sp, 8
   pop dx
   pop ax
   jmp .after_debugging
@@ -652,10 +649,9 @@ disk_find_empty_buffer:
   div cx
   push dx
   push ax
-  push ds
   push .debug_index_str
-  call video_printf
-  add sp, 8
+  call video_printf_near
+  add sp, 6
   pop ax
 %endif
   pop si
@@ -718,10 +714,9 @@ disk_buffer_print:
   push dx
   ; Index
   push ax
-  push ds
   push disk_buffer_print_format
-  call video_printf
-  add sp, 8
+  call video_printf_near
+  add sp, 6
   ; Go to the next object
   mov si, [es:si + disk_buffer_entry.next]
   jmp .body
@@ -852,10 +847,9 @@ disk_buffer_wb:
   mov cx, disk_buffer_entry.size
   div cx
   push ax
-  push ds
   push .debug_str
-  call video_printf
-  add sp, 6
+  call video_printf_near
+  add sp, 4
 %endif
   ; Before enter this BX is always the return value
 .return:
