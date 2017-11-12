@@ -9,6 +9,37 @@ disk_test:
   call disk_buffer_test
   retn
 
+  ; Prints all buffers
+disk_buffer_print:
+  push es
+  push si
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
+  mov si, [disk_buffer_head]
+.body:
+  test si, DISK_BUFFER_PTR_INV
+  je .return
+  mov ax, si
+  sub ax, [disk_buffer]
+  xor dx, dx
+  mov cx, disk_buffer_entry.size
+  div cx
+  push ax
+  push ds
+  push .debug_index
+  call video_printf
+  add sp, 6
+  ; Go to the next object
+  mov si, [es:si + disk_buffer_entry.next]
+.return:
+  ; New line
+  mov al, 10h
+  call putchar
+  pop si
+  pop es
+  retn
+.debug_index: db "%u "
+
 disk_buffer_test:
   push es
   push si
