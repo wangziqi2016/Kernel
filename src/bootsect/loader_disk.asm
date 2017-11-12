@@ -651,19 +651,10 @@ disk_buffer_access:
   ; This function flushes a buffer given the pointer
   ;   AX = Pointer to the buffer to be flushed
 disk_buffer_flush:
-  push es
-  push bx
-  push MEM_LARGE_BSS_SEG
-  pop es
-  mov bx, ax
-  test byte [es:bx + disk_buffer_entry + status], DISK_BUFFER_STATUS_DIRTY
-  jz .no_write_back
-
-.no_write_back:
-  
-.return:
-  pop bx
-  pop es
+  ; Remove it and then write back
+  call disk_buffer_remove
+  ; AX is not changed
+  call disk_buffer_wb
   retn
 
   ; This function flushs all buffer until the linked list is empty
