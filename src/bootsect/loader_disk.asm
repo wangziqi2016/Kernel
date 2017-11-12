@@ -684,10 +684,10 @@ disk_buffer_evict_lru:
   ; AX = BX = The buffer just removed
   mov bx, ax
   test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
-  jnz .return
+  jz .return
   ; AX is still be buffer address, so we write it back
   call disk_buffer_write_lba
-  jnc .evict_fail
+  jc .evict_fail
   ; Before enter this BX is always the return value
 .return:
   mov ax, bx

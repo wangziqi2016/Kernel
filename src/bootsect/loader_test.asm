@@ -77,6 +77,9 @@ disk_buffer_test:
   add ax, [disk_buffer]
   call disk_buffer_access
   call disk_buffer_print
+.test_disk_flush_all:
+  call disk_buffer_flush_all
+  call disk_buffer_print
   pop bx
   pop si
   pop es
