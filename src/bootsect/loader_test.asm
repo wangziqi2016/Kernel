@@ -22,7 +22,9 @@ disk_buffer_test:
   jz .return
   dec si
   call disk_find_empty_buffer
+  ; Save return value to BX
   mov bx, ax
+  ; Call to print the cirlular buffer
   call disk_buffer_print
   ; Set LBA - The first LBA is 15 and the last is 0
   mov word [es:bx + disk_buffer_entry.lba + 2], 0

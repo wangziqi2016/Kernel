@@ -506,9 +506,8 @@ disk_find_empty_buffer:
   mov byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   mov ax, bx
   ; Add to the head of the buffer
+  ; AX is not changed by this function
   call disk_buffer_add_head
-  ; This is the return value
-  mov ax, bx
 %ifdef disk_find_empty_buffer_debug
   ; Debug - print the index
   ; Save return value first
@@ -552,29 +551,34 @@ disk_buffer_print:
   mov es, ax
   mov si, [disk_buffer_head]
 .body:
-  test si, DISK_BUFFER_PTR_INV
+  cmp si, DISK_BUFFER_PTR_INV
   je .return
   mov ax, si
   sub ax, [disk_buffer]
   xor dx, dx
   mov cx, disk_buffer_entry.size
   div cx
+  ; After the divition, DX:AX is remainder:result
   push ax
   push ds
   push disk_buffer_print_format
   call video_printf
   add sp, 6
+  ;push si
+  ;call video_putuint16
+  ;pop ax
   test byte [es:si + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
   jz .not_dirty
-  mov al, 'd'
-  mov ah, [video_print_attr]
-  call putchar
+  ;mov al, 'd'
+  ;mov ah, [video_print_attr]
+  ;call putchar
 .not_dirty:
   ; Go to the next object
   mov si, [es:si + disk_buffer_entry.next]
+  jmp .body
 .return:
   ; New line
-  mov al, 10h
+  mov al, 0ah
   call putchar
   pop si
   pop es
@@ -589,6 +593,8 @@ disk_buffer_print:
   ;      always evict from the end, then we are implementing LRU
   ; Currently we implement LRU
   ;   AX = pointer to the buffer that we need to add
+  ; Return: 
+  ;   Same AX
 disk_buffer_add_head:
   ; We load ES with the large BSS segment
   push es
@@ -625,6 +631,7 @@ disk_buffer_add_head:
   mov [es:bx + disk_buffer_entry.next], ax
   mov [es:bx + disk_buffer_entry.prev], ax
 .return:
+  mov ax, bx
   pop si
   pop bx
   pop es
@@ -634,6 +641,7 @@ disk_buffer_add_head:
   ; of the queue. It should be accessed for every hit in the buffer object
   ; This is how we implement LRU
   ;   AX = buffer to be accessed
+  ; Return: AX is not changed
 disk_buffer_access:
   ; It returns the same thing in AX
   call disk_buffer_remove
@@ -644,9 +652,9 @@ disk_buffer_access:
   ; First check whether it is dirty, if it is then we write back
   ; If not then just move it to the head and return it
   ; 
-  ; This function will put the buffer at the beginning of the queue
+  ; This function will NOT put the buffer at the beginning of the queue
   ; Return:
-  ;   AX = Buffer that we have evicted
+  ;   AX = Buffer that we have evicted (must be in the linked list)
 disk_buffer_evict_lru:
   push es
   push bx
@@ -664,8 +672,6 @@ disk_buffer_evict_lru:
   jc .evict_fail
   ; Before enter this BX is always the return value
 .return:
-  mov ax, bx
-  call disk_buffer_add_head
   mov ax, bx
   pop bx
   pop es
@@ -980,7 +986,7 @@ disk_evict_fail_str:       db "Evict fail. Buffer: ", 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
 disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
-disk_buffer_print_format:  db "%u "
+disk_buffer_print_format:  db "%u ", 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
