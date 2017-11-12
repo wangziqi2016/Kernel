@@ -51,6 +51,17 @@ disk_buffer_test:
   push .sector_end_str
   call video_printf
   add sp, 8
+.test_buffer_access:
+  mov ax, 0
+  call disk_buffer_access
+  call disk_buffer_print
+  mov ax, 9
+  call disk_buffer_access
+  mov ax, 12
+  call disk_buffer_access
+  mov ax, 10
+  call disk_buffer_access
+  ;call disk_buffer_print
   pop bx
   pop si
   pop es

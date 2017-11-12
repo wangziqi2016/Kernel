@@ -41,7 +41,7 @@ endstruc
 DISK_BUFFER_MAX_ENTRY     equ 16d
 
 ; Constants defined for disk sector buffer
-DISK_BUFFER_STATUS_VALID  equ 01h
+DISK_BUFFER_STATUS_INUSE  equ 01h
 DISK_BUFFER_STATUS_DIRTY  equ 02h
 DISK_BUFFER_STATUS_PINNED equ 04h
 
@@ -56,7 +56,7 @@ DISK_BUFFER_PTR_INV equ 0ffffh
 
 ; This is the structure of buffer entry in the disk buffer cache
 struc disk_buffer_entry
-  ; PINNED DIRTY VALID
+  ; PINNED DIRTY INUSE
   .status: resb 1
   ; The device ID
   .device: resb 1
@@ -496,14 +496,14 @@ disk_find_empty_buffer:
   jz .not_found
   dec si
   ; It we found an invalid (empty) one then just return
-  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
+  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_INUSE
   jz .return
   add bx, disk_buffer_entry.size
   jmp .body
   ; Before entering this, BX must contain the entry
 .return:
   ; Mark it as valid, not dirty and not pinned
-  mov byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
+  mov byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_INUSE
   mov ax, bx
   ; Add to the head of the buffer
   ; AX is not changed by this function
@@ -815,7 +815,7 @@ disk_buffer_op_lba:
   mov es, ax
   mov bx, [bp + 4]
   ; Check whether the buffer is valid, if not return error
-  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
+  test byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_INUSE
   jz .return_invalid_buffer
   ; Push LARGE_BSS:base + data offset as the buffer pointer
   push ax
