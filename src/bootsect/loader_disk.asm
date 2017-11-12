@@ -484,11 +484,35 @@ disk_load_for_read:
   ; Load ES
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
-  ; EAX is the lba
-  mov eax, [bp + 4]
-
-  mov sp, bp
+  ; DX:AX is the lba
+  mov ax, [bp + 4]
+  mov dx, [bp + 6]
+  ; CL is the letter. Ignore the high byte
+  mov cl, [bp + 8]
+  ; SI is the current buffer object
+  mov si, [disk_buffer_head]
+.body:
+  cmp si, DISK_BUFFER_PTR_INV
+  je .not_found
+  ; First check letter
+  cmp [es:si + disk_buffer_entry.letter], cl
+  jne .continue
+  cmp [es:si + disk_buffer_entry.lba], ax
+  jne .continue
+  cmp [es:si + disk_buffer_entry.lba + 2], dx
+  jne .continue
+  ; Found one with the same LBA and disk letter as specified
+  ; So just load AX using the offset of the data
+  lea ax, [es:si + disk_buffer_entry.data]
+  jmp .return
+.continue:
+  mov si, [es:si + disk_buffer_entry.next]
+  jmp .body
+.not_found:
+  ; AX must be the data pointer
+.return:
   pop si
+  mov sp, bp
   pop bp
   retn
 
