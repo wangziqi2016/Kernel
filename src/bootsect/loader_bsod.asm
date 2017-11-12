@@ -10,10 +10,14 @@ BSOD_VIDEO_ATTR equ VIDEO_ATTR_FG_RED | VIDEO_ATTR_FG_HIGHLIGHT | VIDEO_ATTR_BG_
   ; This function never returns - so it can be either called, or directly 
   ; jumped onto. It receives video_printf() like parameters, and prints 
   ; the error on the screen
+  ; 
+  ; Note that this function has multiple entrances: we can choose to either
+  ; clear the screen or not to clear
 bsod_fatal:
   push bp
   mov bp, sp
   call video_clear_all
+bsod_fatal_noclear:
   ; AL is now number of rows, we compute the total number of characters
   ; by multiplying these two
   mov al, byte [video_max_row]
