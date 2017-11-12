@@ -541,7 +541,7 @@ _disk_get_sector:
   ; also set the dirty bit for the buffer
   test word [bp + 10], DISK_BUFFER_STATUS_DIRTY
   jz .no_set_dirty
-  or byte [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  or byte [es:si + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
 .no_set_dirty:
   ; Return result in AX
   mov ax, si
@@ -556,6 +556,7 @@ _disk_get_sector:
   call bsod_fatal
   ; NEVER RETURNS
   ; -------------
+
   ; Loads the sector for read. Do not set dirty flag. 
   ;   [BP + 4] - lower byte is the letter
   ;   [BX + 6][BP + 8] - LBA
@@ -701,6 +702,10 @@ disk_buffer_print:
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax
   mov si, [disk_buffer_head]
+  ; If the head is an inv ptr, then we just print
+  ; a single word indicating that this is empty
+  cmp si, DISK_BUFFER_PTR_INV
+  je .print_empty
 .body:
   cmp si, DISK_BUFFER_PTR_INV
   je .return
@@ -720,6 +725,9 @@ disk_buffer_print:
   ; Go to the next object
   mov si, [es:si + disk_buffer_entry.next]
   jmp .body
+.print_empty:
+  mov ax, disk_buffer_print_empty
+  call video_putstr_near
 .return:
   ; New line
   mov al, 0ah
@@ -1193,6 +1201,8 @@ disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
 disk_invalid_ptr_to_index: db "Invalid buffer pointer", 0ah, 00h
 ; Index (status)
 disk_buffer_print_format:  db "%u,%y ", 00h
+; Note that we deliberately do not put new line here
+disk_buffer_print_empty:   db "(Empty)", 00h
 
 ; This is an offset in the system segment to the start of the disk param table
 ; We allocate the table inside the system static data area to save space
