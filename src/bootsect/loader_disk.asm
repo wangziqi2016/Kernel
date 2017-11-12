@@ -669,15 +669,32 @@ disk_buffer_remove:
   ; empty queue
   cmp si, ax
   je .error_empty_queue
+  ; If head == tail, we are removing the only element
   cmp si, di
   je .remove_last_one
-  ; Before entering this, AX must be set to the argument AX
+  cmp si, bx
+  je .remove_head
+  cmp di, bx
+  je .remove_tail
 .return:
+  ; Restore AX
+  mov ax, bx
   pop di
   pop si
   pop bx
   pop es
   retn
+.remove_head:
+  ; Change head to its next, and then change the current head's prev to INV
+  mov si, [es:si + disk_buffer_entry.next]
+  mov [disk_buffer_head], si
+  mov [es:si + disk_buffer_entry.prev], ax
+  jmp .return
+.remove_tail:
+  mov di, [es:di + disk_buffer_entry.prev]
+  mov [disk_buffer_tail], di
+  mov [es:di + disk_buffer_entry.next], ax
+  jmp .return
 .remove_last_one:
   ; If the only element in the queue is the not the one we are removing
   ; then we jump to error
@@ -686,8 +703,6 @@ disk_buffer_remove:
   ; The queue is now empty, so just set it
   mov [disk_buffer_head], ax
   mov [disk_buffer_tail], ax
-  ; Restore AX for return
-  mov ax, bx
   jmp .return
 .error_remove_invalid:
   push ds
@@ -701,6 +716,7 @@ disk_buffer_remove:
   call bsod_fatal
   ; NEVER RETURNS
   ;--------------
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
