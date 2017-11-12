@@ -641,7 +641,66 @@ disk_buffer_add_head:
   pop es
   retn
 
- 
+  ; This function removes a buffer object from the linked list
+  ; We support removing from any position, including head and tail and middle
+  ; and removing the only element
+  ;   1. If there is only one element, we just reset the head and tail to INV
+  ;   2. If we remove from the head, we need to move the head
+  ;   3. If we remove from the tail, we need to move the tail
+  ;   4. If we remove from the middle, we just remove it
+  ;   AX = The pointer to the buffer to be removed
+  ; Return:
+  ;   AX = The pointer to the buffer we removed (i.e. the same as input)
+disk_buffer_remove:
+  ; ES:SI = head
+  ; ES:DI = tail
+  ; ES:BX = to be removed
+  push es
+  push bx
+  push si
+  push di
+  push MEM_LARGE_BSS_SEG
+  pop es
+  mov bx, ax
+  mov si, [disk_buffer_head]
+  mov di, [disk_buffer_tail]
+  mov ax, DISK_BUFFER_PTR_INV
+  ; If the head is INV then we are trying to remove from 
+  ; empty queue
+  cmp si, ax
+  je .error_empty_queue
+  cmp si, di
+  je .remove_last_one
+  ; Before entering this, AX must be set to the argument AX
+.return:
+  pop di
+  pop si
+  pop bx
+  pop es
+  retn
+.remove_last_one:
+  ; If the only element in the queue is the not the one we are removing
+  ; then we jump to error
+  mov si, bx
+  jne .error_remove_invalid
+  ; The queue is now empty, so just set it
+  mov [disk_buffer_head], ax
+  mov [disk_buffer_tail], ax
+  ; Restore AX for return
+  mov ax, bx
+  jmp .return
+.error_remove_invalid:
+  push ds
+  push disk_rm_invalid_buffer_str
+  call bsod_fatal
+  ; NEVER RETURNS
+  ;--------------
+.error_empty_queue:
+  push ds
+  push disk_rm_from_empty_queue_str
+  call bsod_fatal
+  ; NEVER RETURNS
+  ;--------------
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Disk R/W
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
