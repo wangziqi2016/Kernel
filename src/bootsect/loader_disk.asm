@@ -690,6 +690,8 @@ disk_buffer_access:
   ; We evict the buffer from the tail of the linked list
   ; First check whether it is dirty, if it is then we write back
   ; If not then just move it to the head and return it
+  ; 
+  ; This function will put the buffer at the beginning of the queue
   ; Return:
   ;   AX = Buffer that we have evicted
 disk_buffer_evict_lru:
@@ -709,6 +711,8 @@ disk_buffer_evict_lru:
   jc .evict_fail
   ; Before enter this BX is always the return value
 .return:
+  mov ax, bx
+  call disk_buffer_add_head
   mov ax, bx
   pop bx
   pop es
