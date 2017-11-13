@@ -159,8 +159,8 @@ typedef struct Buffer_t {
   // These two are status bit for the buffer
   uint64_t in_use : 1;
   uint64_t dirty  : 1;
-  Buffer_t *next_p;
-  Buffer_t *prev_p;
+  struct Buffer_t *next_p;
+  struct Buffer_t *prev_p;
   // This holds the buffer data
   uint8_t data[DEFAULT_SECTOR_SIZE];
 } Buffer;
@@ -201,9 +201,30 @@ void buffer_add_to_head(Buffer *buffer_p) {
   return;
 }
 
-/**/
+/*
+ * buffer_remove() - This function removes a buffer from the linked list
+ */
 void buffer_remove(Buffer *buffer_p) {
+  // If there is only one element in the buffer, then we just
+  // set head and tail to NULL
+  if(buffer_head_p == buffer_tail_p) {
+    assert(buffer_p == buffer_head_p);
+    buffer_head_p = buffer_tail_p = NULL;
+  } else if(buffer_head_p == buffer_p) {
+    // If the buffer we remove is at the head
+    buffer_head_p = buffer_head_p->next_p;
+    buffer_head_p->prev_p = NULL;
+  } else if(buffer_tail_p == buffer_p) {
+    buffer_tail_p = buffer_tail_p->prev_p;
+    buffer_tail_p->next_p = NULL;
+  } else {
+    Buffer *next_p = buffer_p->next_p;
+    Buffer *prev_p = buffer_p->prev_p;
+    prev_p->next_p = next_p;
+    next_p->prev_p = prev_p;
+  }
 
+  return;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -237,6 +258,7 @@ void test_lba_rw(Storage *disk_p) {
 }
 
 int main() {
+  init_buffer();
   Storage *disk_p = get_mem_storage(2880);
   test_lba_rw(disk_p);
   free_mem_storage(disk_p);
