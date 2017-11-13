@@ -153,11 +153,21 @@ void test_lba_rw(Storage *disk_p) {
     disk_p->write(disk_p, i, buffer);
   }
 
+  for(size_t i = 0;i < disk_p->sector_count;i++) {
+    disk_p->read(disk_p, i, buffer);
+    for(int j = 0;j < DEFAULT_SECTOR_SIZE;j++) {
+      if(buffer[j] != (uint8_t)i) {
+        fatal_error("LBA read fail (i = %lu, j = %d)", i, j);
+      }
+    }
+  }
+
   return;
 }
 
 int main() {
   Storage *disk_p = get_mem_storage(2880);
+  test_lba_rw(disk_p);
   free_mem_storage(disk_p);
   return 0;
 }
