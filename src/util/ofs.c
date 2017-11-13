@@ -10,6 +10,32 @@
 
 #define DEFAULT_SECTOR_SIZE 512
 
+/*
+ * fatal_error() - Reports error and then exit
+ */
+void fatal_error(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  putchar('\n');
+  exit(1);
+}
+
+/*
+ * info() - Prints info message
+ */
+void info(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  putchar('\n');
+  return;
+}
+
+/////////////////////////////////////////////////////////////////////
+// Storage Layer
+/////////////////////////////////////////////////////////////////////
+
 // This enum defines the type of the storage
 enum STORAGE_TYPE {
   // We use a memory chunk to simulate storage
@@ -35,28 +61,6 @@ typedef struct Storage_t {
   void (*write)(struct Storage_t *disk_p, uint64_t lba, void *buffer);
   void (*free)(struct Storage_t *disk_p);
 } Storage;
-
-/*
- * fatal_error() - Reports error and then exit
- */
-void fatal_error(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  vfprintf(stderr, fmt, args);
-  putchar('\n');
-  exit(1);
-}
-
-/*
- * info() - Prints info message
- */
-void info(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  vfprintf(stderr, fmt, args);
-  putchar('\n');
-  return;
-}
 
 /*
  * mem_read() - Reads a sector into the given buffer
@@ -143,6 +147,58 @@ void free_mem_storage(Storage *disk_p) {
   return;
 }
 
+/////////////////////////////////////////////////////////////////////
+// Buffer Layer
+/////////////////////////////////////////////////////////////////////
+
+#define MAX_BUFFER 16
+
+typedef struct Buffer_t {
+  Storage *disk_p;
+  // These two are status bit for the buffer
+  uint64_t in_use : 1;
+  uint64_t dirty  : 1;
+  Buffer_t *next_p;
+  Buffer_t *prev_p;
+  // This holds the buffer data
+  uint8_t *data_p;
+} Buffer;
+
+// These two maintains a linked list of valid buffer objects
+Buffer *buffer_head_p = NULL;
+Buffer *buffer_tail_p = NULL;
+
+/*
+ * buffer_add_to_head() - Adds a buffer object to the head of the queue
+ */
+void buffer_add_to_head(Buffer *buffer_p) {
+  if(buffer_head_p == NULL) {
+    assert(buffer_tail_p == NULL);
+    buffer_head_p = buffer_tail_p = buffer_p;
+    buffer_p->next_p = buffer_p->prev_p = NULL;
+  } else {
+    buffer_head_p->prev_p = buffer_p;
+    buffer_p->next_p = buffer_head_p;
+    buffer_p->prev_p = NULL;
+    buffer_head_p = buffer_p;
+  }
+
+  return;
+}
+
+/**/
+void buffer_remove(Buffer *buffer_p) {
+
+}
+
+/////////////////////////////////////////////////////////////////////
+// FS Layer
+/////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////
+// Test Cases
+/////////////////////////////////////////////////////////////////////
+
 #define DEBUG
 #ifdef DEBUG
 
@@ -172,8 +228,14 @@ int main() {
   return 0;
 }
 #else 
+
+/////////////////////////////////////////////////////////////////////
+// Main Function
+/////////////////////////////////////////////////////////////////////
+
 int main() {
   return 0;
 }
+
 #endif
 
