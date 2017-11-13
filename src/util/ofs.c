@@ -43,7 +43,19 @@ void fatal_error(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   vfprintf(stderr, fmt, args);
+  putchar('\n');
   exit(1);
+}
+
+/*
+ * info() - Prints info message
+ */
+void info(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  putchar('\n');
+  return;
 }
 
 /*
@@ -82,6 +94,76 @@ void mem_free(Storage *disk_p) {
   return;
 }
 
+/*
+ * get_mem_storage() - This function returns a memory storage object from 
+ *                     the heap
+ * 
+ * The caller is responsible for freeing the object upon exit
+ */
+Storage *get_mem_storage(size_t sector_count) {
+  Storage *disk_p = malloc(sizeof(Storage));
+  if(disk_p == NULL) {
+    fatal_error("Failed to allocatoe a Storage object");
+  }
+
+  disk_p->type = STORAGE_TYPE_MEM;
+  disk_p->sector_count = sector_count;
+  disk_p->sector_size = DEFAULT_SECTOR_SIZE;
+  size_t alloc_size = disk_p->sector_count * disk_p->sector_size;
+  disk_p->data_p = malloc(alloc_size);
+  if(disk_p->data_p == NULL) {
+    fatal_error("Run our of memory when allocating storage of %lu bytes",
+                alloc_size);
+  } else {
+    info("  Allocating %lu bytes as storage", alloc_size);
+    info("  Default sector size = %lu byte", alloc_size);
+  }
+
+  disk_p->read = mem_read;
+  disk_p->write = mem_write;
+  disk_p->free = mem_free;
+
+  return disk_p;
+}
+
+/*
+ * free_mem_storage() - This function frees the memory storage
+ * 
+ * This pointer is to be invalidated after return
+ */
+void free_mem_storage(Storage *disk_p) {
+  if(disk_p->type != STORAGE_TYPE_MEM) {
+    fatal_error("Invalid type to free as mem: %d", disk_p->type);
+  }
+
+  // Free both the data storage and the object itself
+  free(disk_p->data_p);
+  free(disk_p);
+
+  return;
+}
+
+#define DEBUG
+#ifdef DEBUG
+
+void test_lba_rw(Storage *disk_p) {
+  uint8_t buffer[DEFAULT_SECTOR_SIZE];
+  for(size_t i = 0;i < disk_p->sector_count;i++) {
+    memset(buffer, (char)i, DEFAULT_SECTOR_SIZE);
+    disk_p->write(disk_p, i, buffer);
+  }
+
+  return;
+}
+
+int main() {
+  Storage *disk_p = get_mem_storage(2880);
+  free_mem_storage(disk_p);
+  return 0;
+}
+#else 
 int main() {
   return 0;
 }
+#endif
+
