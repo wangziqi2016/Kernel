@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
+#include <assert.h>
 
 #define DEFAULT_SECTOR_SIZE 512
 
@@ -161,12 +162,26 @@ typedef struct Buffer_t {
   Buffer_t *next_p;
   Buffer_t *prev_p;
   // This holds the buffer data
-  uint8_t *data_p;
+  uint8_t data[DEFAULT_SECTOR_SIZE];
 } Buffer;
 
-// These two maintains a linked list of valid buffer objects
+// Static object
+Buffer buffers[MAX_BUFFER];
+
+// These two maintain a linked list of valid buffer objects
 Buffer *buffer_head_p = NULL;
 Buffer *buffer_tail_p = NULL;
+
+/*
+ * init_buffer() - This function initializes the environment for buffers
+ */
+void init_buffer() {
+  for(int i = 0;i < MAX_BUFFER;i++) {
+    memset(buffers + i, 0x00, sizeof(Buffer));
+  }
+
+  return;
+}
 
 /*
  * buffer_add_to_head() - Adds a buffer object to the head of the queue
