@@ -636,6 +636,10 @@ disk_find_empty_buffer:
   mov ax, bx
   ; Add to the head of the buffer
   ; AX is not changed by this function
+  ; Note that there are two possibilities:
+  ;   (1) We found an empty buffer. The buffer is not in the linked list yet
+  ;   (2) We evicted a buffer. The buffer has been removed from the linked list
+  ;       within function disk_buffer_flush
   call disk_buffer_add_head
 %ifdef disk_find_empty_buffer_debug
   ; Debug - print the index
@@ -663,6 +667,7 @@ disk_find_empty_buffer:
 %endif
 .not_found:
   ; AX = evivted buffer (dirty flag may not be cleared)
+  ; The buffer returned has been removed from the linked list
   call disk_buffer_evict_lru
   mov bx, ax
   jmp .return
@@ -796,6 +801,7 @@ disk_buffer_access:
   retn
 
   ; This function flushes a buffer given the pointer
+  ; Note that we also remove the buffer object from the linked list
   ;   AX = Pointer to the buffer to be flushed
   ; Return: AX is unchanged
 disk_buffer_flush:
