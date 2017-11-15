@@ -182,6 +182,8 @@ void init_buffer() {
     memset(buffers + i, 0x00, sizeof(Buffer));
   }
 
+  buffer_head_p = buffer_tail_p = NULL;
+
   return;
 }
 
@@ -189,6 +191,7 @@ void init_buffer() {
  * buffer_add_to_head() - Adds a buffer object to the head of the queue
  */
 void buffer_add_to_head(Buffer *buffer_p) {
+  assert(buffer_p != NULL);
   if(buffer_head_p == NULL) {
     assert(buffer_tail_p == NULL);
     buffer_head_p = buffer_tail_p = buffer_p;
@@ -207,6 +210,7 @@ void buffer_add_to_head(Buffer *buffer_p) {
  * buffer_remove() - This function removes a buffer from the linked list
  */
 void buffer_remove(Buffer *buffer_p) {
+  assert(buffer_p != NULL);
   assert(buffer_p->in_use == 1);
   // If there is only one element in the buffer, then we just
   // set head and tail to NULL
@@ -258,12 +262,38 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
 /*
  * buffer_flush() - This function removes the buffer from the linked list
  *                  and then writes back if it is dirty
+ * 
+ * We also clear the in_use and dirty flag for the buffer
  */
 void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
+  assert(buffer_p->in_use == 1);
   buffer_remove(buffer_p);
   buffer_wb(buffer_p, disk_p);
+  buffer_p->in_use = 0;
+  buffer_p->dirty = 0;
 
   return;
+}
+
+/*
+ * buffer_evict_lru() - Evicts a buffer using LRU
+ * 
+ * Since we move the buffer object to the head of the linked list for 
+ * every reference, in order to implement LRU we simply remove and write back
+ * the last buffer in the linked list
+ * 
+ * Note that the buffer will also be removed from the linked list
+ * 
+ * We return the evicted buffer from this function for the caller to make
+ * use of it. The returned buffer has its in_use and dirty flag cleared
+ */
+Buffer *buffer_evict_lru(Storage *disk_p) {
+  assert(buffer_head_p != NULL && buffer_tail_p != NULL);
+  // We just take the tail and remove it and then write back
+  Buffer *buffer_p = buffer_tail_p;
+  buffer_flush(buffer_p, disk_p);
+
+  return buffer_p;
 }
 
 /////////////////////////////////////////////////////////////////////
