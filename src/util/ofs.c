@@ -324,6 +324,27 @@ Buffer *get_empty_buffer(Storage *disk_p) {
   return buffer_p;
 }
 
+/*
+ * buffer_print() - This function prints the buffers in-use from the head to
+ *                  the tail of the linked list
+ */
+void buffer_print() {
+  Buffer *buffer_p = buffer_head_p;
+  // For empty buffers, just print a line and exit
+  if(buffer_p == NULL) {
+    info("(Empty buffer)");
+  } else {
+    while(buffer_p != NULL) {
+      fprintf(stderr, "%lu(%X)", buffer_p->lba, 
+              (uint32_t)((buffer_p->dirty << 1) | (buffer_p->in_use)));
+      buffer_p = buffer_p->next_p;
+    }
+  }
+
+  return;
+}
+
+
 /////////////////////////////////////////////////////////////////////
 // FS Layer
 /////////////////////////////////////////////////////////////////////
