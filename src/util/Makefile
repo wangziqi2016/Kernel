@@ -12,10 +12,14 @@ LDFLAGS =
 
 $(info = Compiling utility...)
 
-all: binpad ofs
+BIN = binpad ofs
+all: $(BIN)
 
 binpad: binpad.c Makefile
 	$(CXX) binpad.c -o binpad $(CXXFLAGS) $(LDFLAGS)
 
 ofs: ofs.c Makefile
-	$(CXX) ofs.c -o ofs $(CXXFLAGS) $(LDFLAGS)	
+	$(CXX) ofs.c -o ofs $(CXXFLAGS) $(LDFLAGS)
+
+clean:
+	rm -f $(BIN)
