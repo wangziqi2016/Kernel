@@ -345,19 +345,23 @@ void buffer_print() {
 }
 
 /*
+ * _read_lba()
  * read_lba() - This function reads the sector of the given LBA
  * 
  * We return a pointer to the read data. If the data is already in the 
  * buffer, then no read happens, and we just return the buffer's data area.
  * Otherwise we allocate a new buffer, and read data, and return the pointer.
+ * 
+ * This function is a wrapper to the read read_lba() where it returns the 
+ * buffer, and the read_lba() returns a pointer
  */
-uint8_t *read_lba(Storage *disk_p, uint64_t lba) {
+Buffer *_read_lba(Storage *disk_p, uint64_t lba) {
   Buffer *buffer_p = buffer_head_p;
   while(buffer_p != NULL) {
     // If the LBA is in the buffer, then we just return its data
     if(buffer_p->lba == lba) {
       assert(buffer_p->in_use == 1);
-      return buffer_p->data;
+      return buffer_p;
     }
   }
 
@@ -367,6 +371,24 @@ uint8_t *read_lba(Storage *disk_p, uint64_t lba) {
   
   // Perform read here and return the pointer
   disk_p->read(disk_p, lba, buffer_p->data);
+  return buffer_p;
+}
+
+uint8_t *read_lba(Storage *disk_p, uint64_t lba) {
+  return _read_lba(disk_p, lba)->data;
+}
+
+/*
+ * read_lba_for_write() - This function reads an LBA for performing 
+ *                        write operations
+ * 
+ * If the LBA is already in the buffer, we simply set its dirty flag. Otherwise
+ * the buffer will first be loaded into the buffer, and then be marked as dirty
+ */
+uint8_t *read_lba_for_write(Storage *disk_p, uint64_t lba) {
+  Buffer *buffer_p = _read_lba(disk_p, lba);
+  buffer_p->dirty = 1;
+
   return buffer_p->data;
 }
 
