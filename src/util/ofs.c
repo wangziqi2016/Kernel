@@ -186,18 +186,6 @@ void init_buffer() {
 }
 
 /*
- * buffer_wb() - This function writes back the buffer if it is dirty, or 
- *               simply clear it
- * 
- * Note that we do not remove the buffer from the linked list
- */
-void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
-  assert(buffer_p->in_use == 1);
-  disk_p->write(disk_p, buffer_p->lba, buffer_p->data);
-  return;
-}
-
-/*
  * buffer_add_to_head() - Adds a buffer object to the head of the queue
  */
 void buffer_add_to_head(Buffer *buffer_p) {
@@ -219,6 +207,7 @@ void buffer_add_to_head(Buffer *buffer_p) {
  * buffer_remove() - This function removes a buffer from the linked list
  */
 void buffer_remove(Buffer *buffer_p) {
+  assert(buffer_p->in_use == 1);
   // If there is only one element in the buffer, then we just
   // set head and tail to NULL
   if(buffer_head_p == buffer_tail_p) {
@@ -247,6 +236,32 @@ void buffer_remove(Buffer *buffer_p) {
 void buffer_access(Buffer *buffer_p) {
   buffer_remove(buffer_p);
   buffer_add_to_head(buffer_p);
+
+  return;
+}
+
+/*
+ * buffer_wb() - This function writes back the buffer if it is dirty, or 
+ *               simply clear it
+ * 
+ * Note that we do not remove the buffer from the linked list
+ */
+void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
+  assert(buffer_p->in_use == 1);
+  if(buffer_p->dirty == 1) {
+    disk_p->write(disk_p, buffer_p->lba, buffer_p->data);
+  }
+
+  return;
+}
+
+/*
+ * buffer_flush() - This function removes the buffer from the linked list
+ *                  and then writes back if it is dirty
+ */
+void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
+  buffer_remove(buffer_p);
+  buffer_wb(buffer_p, disk_p);
 
   return;
 }
