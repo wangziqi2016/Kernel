@@ -159,6 +159,8 @@ typedef struct Buffer_t {
   // These two are status bit for the buffer
   uint64_t in_use : 1;
   uint64_t dirty  : 1;
+  // This is the LBA of the buffer object
+  uint64_t lba;
   struct Buffer_t *next_p;
   struct Buffer_t *prev_p;
   // This holds the buffer data
@@ -180,6 +182,18 @@ void init_buffer() {
     memset(buffers + i, 0x00, sizeof(Buffer));
   }
 
+  return;
+}
+
+/*
+ * buffer_wb() - This function writes back the buffer if it is dirty, or 
+ *               simply clear it
+ * 
+ * Note that we do not remove the buffer from the linked list
+ */
+void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
+  assert(buffer_p->in_use == 1);
+  disk_p->write(disk_p, buffer_p->lba, buffer_p->data);
   return;
 }
 
@@ -223,6 +237,16 @@ void buffer_remove(Buffer *buffer_p) {
     prev_p->next_p = next_p;
     next_p->prev_p = prev_p;
   }
+
+  return;
+}
+
+/*
+ * buffer_access() - Move a buffer object to the head of the linked list
+ */
+void buffer_access(Buffer *buffer_p) {
+  buffer_remove(buffer_p);
+  buffer_add_to_head(buffer_p);
 
   return;
 }
