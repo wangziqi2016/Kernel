@@ -296,6 +296,34 @@ Buffer *buffer_evict_lru(Storage *disk_p) {
   return buffer_p;
 }
 
+/*
+ * get_empty_buffer() - Returns an empty buffer that we could use to hold data
+ * 
+ * This function searches the buffer slots, and tries to find an empty buffer.
+ * If none is found, then we evict a buffer that is in-use, and return it
+ * 
+ * The returned buffer always have in_use set to 1 and dirty set to 0
+ */
+Buffer *get_empty_buffer(Storage *disk_p) {
+  // First find in the buffer array
+  for(int i = 0;i < MAX_BUFFER;i++) {
+    if(buffers[i].in_use == 0) {
+      // Make it in use and clean
+      buffers[i].in_use = 1;
+      buffers[i].dirty = 0;
+      return buffers + i;
+    }
+  }
+
+  // If did not find any buffer in the array then all buffers are
+  // in use, in which case we just search the linked list
+  Buffer *buffer_p = buffer_evict_lru(disk_p);
+  assert(buffer_p->in_use == 0 && buffer_p->dirty == 0);
+  buffer_p->in_use = 1;
+
+  return buffer_p;
+}
+
 /////////////////////////////////////////////////////////////////////
 // FS Layer
 /////////////////////////////////////////////////////////////////////
