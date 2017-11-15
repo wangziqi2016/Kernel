@@ -344,6 +344,32 @@ void buffer_print() {
   return;
 }
 
+/*
+ * read_lba() - This function reads the sector of the given LBA
+ * 
+ * We return a pointer to the read data. If the data is already in the 
+ * buffer, then no read happens, and we just return the buffer's data area.
+ * Otherwise we allocate a new buffer, and read data, and return the pointer.
+ */
+uint8_t *read_lba(Storage *disk_p, uint64_t lba) {
+  Buffer *buffer_p = buffer_head_p;
+  while(buffer_p != NULL) {
+    // If the LBA is in the buffer, then we just return its data
+    if(buffer_p->lba == lba) {
+      assert(buffer_p->in_use == 1);
+      return buffer_p->data;
+    }
+  }
+
+  // If there is no buffered content we have to allocate one
+  buffer_p = get_empty_buffer(disk_p);
+  assert(buffer_p->in_use == 1);
+  
+  // Perform read here and return the pointer
+  disk_p->read(disk_p, lba, buffer_p->data);
+  return buffer_p->data;
+}
+
 
 /////////////////////////////////////////////////////////////////////
 // FS Layer
