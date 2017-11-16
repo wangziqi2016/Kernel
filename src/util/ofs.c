@@ -560,7 +560,7 @@ size_t fs_init_inode(Storage *disk_p,
   }
 
   // Flush all inode sectors
-  buffer_flush_all();
+  buffer_flush_all(disk_p);
 
   // Number of inodes
   return current_inode - inode_start;
@@ -604,6 +604,8 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
     current_free++;
   }
 
+  buffer_flush_all(disk_p);
+
   return current_free - free_start;
 }
 
@@ -621,11 +623,12 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   size_t free_sector_count = usable_sector_count - inode_sector_count;
   info("  # of inode sectors: %lu; free sectors: %lu",
        inode_sector_count,
-       file_sector_count);
+       free_sector_count);
   // This is the absolute sector ID of the free start sector
   size_t free_start_sector = inode_start_sector + inode_sector_count;
   size_t free_list_size = \
     fs_init_free_list(disk_p, free_start_sector, total_sector);
+  info("  Free list size: %lu", free_list_size);
   
   return;
 }
@@ -677,12 +680,25 @@ void test_buffer(Storage *disk_p) {
   return;
 }
 
+void test_fs_init(Storage disk_p) {
+  fs_init(disk_p, disk_p->sector_count, 0);
+  return;
+}
+
+void (*tests[])(Storage *) = {
+  test_lba_rw,
+  test_buffer,
+  test_fs_init,
+  free_mem_storage,
+}
+
 int main() {
   buffer_init();
   Storage *disk_p = get_mem_storage(2880);
-  test_lba_rw(disk_p);
-  test_buffer(disk_p);
-  free_mem_storage(disk_p);
+  for(int i = 0;i < sizeof(tests) / sizeof(tests[0]);i++) {
+    tests[i](disk_p);
+  }
+  
   return 0;
 }
 #else 
