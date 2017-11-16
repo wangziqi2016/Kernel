@@ -244,6 +244,8 @@ void buffer_access(Buffer *buffer_p) {
   return;
 }
 
+#define BUFFER_WB_DEBUG
+
 /*
  * buffer_wb() - This function writes back the buffer if it is dirty, or 
  *               simply clear it
@@ -255,6 +257,12 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
   if(buffer_p->dirty == 1) {
     disk_p->write(disk_p, buffer_p->lba, buffer_p->data);
   }
+
+#ifdef BUFFER_WB_DEBUG
+  info("Writing back buffer %lu (LBA %lu)", 
+       (size_t)(buffer_p - buffers) / sizeof(Buffer),
+       buffer_p->lba);
+#endif
 
   return;
 }
@@ -313,21 +321,30 @@ Buffer *buffer_evict_lru(Storage *disk_p) {
  * The returned buffer always have in_use set to 1 and dirty set to 0
  */
 Buffer *get_empty_buffer(Storage *disk_p) {
+  // We set this if we have found one
+  Buffer *buffer_p = NULL;
   // First find in the buffer array
   for(int i = 0;i < MAX_BUFFER;i++) {
     if(buffers[i].in_use == 0) {
       // Make it in use and clean
       buffers[i].in_use = 1;
       buffers[i].dirty = 0;
-      return buffers + i;
+      buffer_p = buffers + i;
+      break;
     }
   }
 
   // If did not find any buffer in the array then all buffers are
   // in use, in which case we just search the linked list
-  Buffer *buffer_p = buffer_evict_lru(disk_p);
-  assert(buffer_p->in_use == 0 && buffer_p->dirty == 0);
-  buffer_p->in_use = 1;
+  if(buffer_p == NULL) {
+    // The buffer has been removed from the linked list
+    buffer_p = buffer_evict_lru(disk_p);
+    assert(buffer_p->in_use == 0 && buffer_p->dirty == 0);
+    buffer_p->in_use = 1;
+  }
+
+  // Then put the buffer back into the linked list
+  buffer_add_to_head(buffer_p);
 
   return buffer_p;
 }
@@ -369,16 +386,22 @@ Buffer *_read_lba(Storage *disk_p, uint64_t lba) {
     // If the LBA is in the buffer, then we just return its data
     if(buffer_p->lba == lba) {
       assert(buffer_p->in_use == 1);
-      return buffer_p;
+      buffer_access(buffer_p);
+      break;
     }
+
+    buffer_p = buffer_p->next_p;
   }
 
-  // If there is no buffered content we have to allocate one
-  buffer_p = get_empty_buffer(disk_p);
-  assert(buffer_p->in_use == 1);
+  if(buffer_p == NULL) {
+    // If there is no buffered content we have to allocate one
+    buffer_p = get_empty_buffer(disk_p);
+    assert(buffer_p->in_use == 1);
   
-  // Perform read here and return the pointer
-  disk_p->read(disk_p, lba, buffer_p->data);
+    // Perform read here and return the pointer
+    disk_p->read(disk_p, lba, buffer_p->data);
+  }
+
   return buffer_p;
 }
 
