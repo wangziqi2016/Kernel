@@ -463,8 +463,16 @@ void test_lba_rw(Storage *disk_p) {
 
 void test_buffer(Storage *disk_p) {
   info("Testing buffer...");
-  for(int i = 0;i < MAX_BUFFER * 2;i++) {
+  for(int i = 0;i < MAX_BUFFER;i++) {
     void *p = read_lba(disk_p, (uint64_t)i);
+    memset(p, (char)i, disk_p->sector_size);
+
+    buffer_print();
+  }
+  
+  info("Testing buffer and dirty flag...");
+  for(int i = 0;i < MAX_BUFFER * 2;i++) {
+    void *p = read_lba_for_write(disk_p, (uint64_t)i);
     memset(p, (char)i, disk_p->sector_size);
 
     buffer_print();
