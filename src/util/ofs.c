@@ -177,9 +177,9 @@ Buffer *buffer_head_p = NULL;
 Buffer *buffer_tail_p = NULL;
 
 /*
- * init_buffer() - This function initializes the environment for buffers
+ * buffer_init() - This function initializes the environment for buffers
  */
-void init_buffer() {
+void buffer_init() {
   for(int i = 0;i < MAX_BUFFER;i++) {
     memset(buffers + i, 0x00, sizeof(Buffer));
   }
@@ -444,6 +444,8 @@ uint8_t *read_lba_for_write(Storage *disk_p, uint64_t lba) {
 
 // This is the length of the free array
 #define FREE_ARRAY_MAX 100
+#define FS_SIG_SIZE 4
+#define FS_SIG "WZQ"
 
 typedef struct {
   // Number of elements in the local array
@@ -456,9 +458,15 @@ typedef struct {
 
 // This defines the first block of the file system
 typedef struct {
+  // We use this to identify a valid super block
+  char signature[FS_SIG_SIZE];
   // Number of sectors for i-node
   uint16_t isize;
   // Number of sectors for file storage
+  // NOTE: We modified the semantics of this field.
+  // In the original OFS design this is the absolute number of blocks
+  // used by the FS and the bootsect. We make it relative to the inode
+  // blocks
   uint16_t fsize;
   // Linked list of free blocks and the free array
   FreeArray free_array;
@@ -471,6 +479,19 @@ typedef struct {
   char fmod;
   uint16_t time[2];
 } __attribute__((packed)) SuperBlock;
+
+/*
+ * fs_init() - This function initializes an empty FS on a raw storage
+ */
+void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
+  assert(start_sector < total_sector - 1);
+  size_t inode_start_sector = start_sector + 1;
+  // This is the number of total usable blocks for inode and file
+  size_t usable_sector_count = total_sector - start_sector - 1;
+  // This is the number of sectors we allocate to inodes
+  size_t inode_sector_count = (usable_sector_count - 1) / 17;
+  size_t file_sector_count = usable_sector_count - inode_sector;
+}
 
 /////////////////////////////////////////////////////////////////////
 // Test Cases
@@ -520,7 +541,7 @@ void test_buffer(Storage *disk_p) {
 }
 
 int main() {
-  init_buffer();
+  buffer_init();
   Storage *disk_p = get_mem_storage(2880);
   test_lba_rw(disk_p);
   test_buffer(disk_p);
