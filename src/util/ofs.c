@@ -438,10 +438,36 @@ uint8_t *read_lba_for_write(Storage *disk_p, uint64_t lba) {
   return buffer_p->data;
 }
 
-
 /////////////////////////////////////////////////////////////////////
 // FS Layer
 /////////////////////////////////////////////////////////////////////
+
+// This is the length of the free array
+#define FREE_ARRAY_MAX 100
+
+typedef struct {
+  // Number of elements in the local array
+  uint16_t nfree;
+  // The first word of this structure is the block number
+  // to the next block that holds this list
+  // All elements after the first one is the free blocks
+  uint16_t free[FREE_ARRAY_MAX];
+} __attribute__((packed)) FreeArray;
+
+// This defines the first block of the file system
+typedef struct {
+  // Number of sectors for i-node
+  uint16_t isize;
+  // Number of sectors for file storage
+  uint16_t fsize;
+  // Linked list of free blocks and the free array
+  FreeArray free_array;
+  // Number of free inodes as a fast cache in the following
+  // array
+  uint16_t ninode;
+  uint16_t inode[FREE_ARRAY_MAX];
+
+} __attribute__((packed)) SuperBlock;
 
 /////////////////////////////////////////////////////////////////////
 // Test Cases
