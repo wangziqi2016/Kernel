@@ -169,6 +169,8 @@ typedef struct Buffer_t {
 
 // Static object
 Buffer buffers[MAX_BUFFER];
+// Number of buffers that is still in-use
+size_t buffer_in_use = 0;
 
 // These two maintain a linked list of valid buffer objects
 Buffer *buffer_head_p = NULL;
@@ -183,6 +185,7 @@ void init_buffer() {
   }
 
   buffer_head_p = buffer_tail_p = NULL;
+  buffer_in_use = 0;
 
   return;
 }
@@ -202,6 +205,8 @@ void buffer_add_to_head(Buffer *buffer_p) {
     buffer_p->prev_p = NULL;
     buffer_head_p = buffer_p;
   }
+
+  buffer_in_use++;
 
   return;
 }
@@ -230,6 +235,8 @@ void buffer_remove(Buffer *buffer_p) {
     prev_p->next_p = next_p;
     next_p->prev_p = prev_p;
   }
+
+  buffer_in_use--;
 
   return;
 }
@@ -321,14 +328,18 @@ Buffer *buffer_evict_lru(Storage *disk_p) {
 Buffer *get_empty_buffer(Storage *disk_p) {
   // We set this if we have found one
   Buffer *buffer_p = NULL;
-  // First find in the buffer array
-  for(int i = 0;i < MAX_BUFFER;i++) {
-    if(buffers[i].in_use == 0) {
-      // Make it in use and clean
-      buffers[i].in_use = 1;
-      buffers[i].dirty = 0;
-      buffer_p = buffers + i;
-      break;
+
+  // If the buffer pool still has at least one buffer
+  if(buffer_in_use != MAX_BUFFER) {
+    // First find in the buffer array
+    for(int i = 0;i < MAX_BUFFER;i++) {
+      if(buffers[i].in_use == 0) {
+        // Make it in use and clean
+        buffers[i].in_use = 1;
+        buffers[i].dirty = 0;
+        buffer_p = buffers + i;
+        break;
+      }
     }
   }
 
