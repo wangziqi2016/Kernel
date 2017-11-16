@@ -499,7 +499,37 @@ typedef struct {
   uint16_t actime[2];
   // Modification time
   uint16_t modtime[2];
-} Inode;
+} __attribute__((packed)) Inode;
+
+/*
+ * fs_init_inode() - This function initializes the inode from a given sector
+ *                   of the storage
+ *
+ * The function also returns the number of sectors the inode array occupies
+ * to initialize data sectors.
+ */
+size_t fs_init_inode(Storage *disk_p, 
+                     size_t inode_start, 
+                     size_t total_count) {
+  size_t current_inode = inode_start;
+  // Number of inodes in each sector
+  // This should be an integer
+  const size_t inode_per_sector = disk_p->sector_size / sizeof(Inode);
+  info("  # of inodes per sector: %lu", inode_per_sector);  
+  // We stop initializing inode when we could allocate one inode for
+  // each sector
+  while(total_count > current_inode) {
+    void *data = read_lba_for_write(disk_p, current_inode);
+    memset(data, 0x00, disk_p->sector_size);
+    // Go to the next inode sector
+    current_inode++;
+    // We have allocated inode for each of the blocks in this range
+    total_count -= inode_per_sector;
+  }
+
+  // Number of inodes
+  return current_inode - inode_start;
+}
 
 /*
  * fs_init() - This function initializes an empty FS on a raw storage
