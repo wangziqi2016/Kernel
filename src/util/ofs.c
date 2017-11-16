@@ -542,7 +542,7 @@ typedef struct {
  */
 size_t fs_init_inode(Storage *disk_p, 
                      size_t inode_start, 
-                     size_t total_count) {
+                     size_t total_end) {
   size_t current_inode = inode_start;
   // Number of inodes in each sector
   // This should be an integer
@@ -550,13 +550,13 @@ size_t fs_init_inode(Storage *disk_p,
   info("  # of inodes per sector: %lu", inode_per_sector);  
   // We stop initializing inode when we could allocate one inode for
   // each sector
-  while(total_count > current_inode) {
-    void *data = read_lba_for_write(disk_p, current_inode);
+  while(total_end > current_inode) {
+    void *data = write_lba(disk_p, current_inode);
     memset(data, 0x00, disk_p->sector_size);
     // Go to the next inode sector
     current_inode++;
     // We have allocated inode for each of the blocks in this range
-    total_count -= inode_per_sector;
+    total_end -= inode_per_sector;
   }
 
   // Flush all inode sectors
@@ -575,9 +575,36 @@ size_t fs_init_inode(Storage *disk_p,
  * we begin allocating sectors from the last sector of the entire fs
  */
 size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
-  while(free_end > free_start) {
-    void *data = read_lba_for_write();
+  size_t current_free = free_start;
+  while(free_end > current_free) {
+    uint16_t *data = (uint16_t *)write_lba(disk_p, current_free);
+    // There must be at least one free sector
+    assert(free_end > (current_free + 1));
+    size_t delta = free_end - current_free - 1;
+    // These two are default values
+    uint16_t next_free_list = current_free + 1;
+    uint16_t free_sector_count = FS_FREE_ARRAY_MAX - 1;
+    // We do not need more free blocks, the current one is the 
+    // last one
+    if(delta <= free_sector_count) {
+      next_free_list = 0;
+      free_sector_count = delta;
+    }
+
+    // Number of entries in the list
+    data[0] = next_free_list;
+    data[1] = free_sector_count;
+    for(int i = 0;i < delta;i++) {
+      free_end--;
+      // This is the current last free sector
+      data[i + 2] = free_end;
+    }
+
+    // Go to next free block
+    current_free++;
   }
+
+  return current_free - free_start;
 }
 
 /*
@@ -585,16 +612,22 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
  */
 void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   assert(start_sector < total_sector - 1);
+  assert(total_sector <= disk_p->sector_count);
   size_t inode_start_sector = start_sector + 1;
   // This is the number of total usable blocks for inode and file
   size_t usable_sector_count = total_sector - start_sector - 1;
-  size_t inode_sector_count = fs_init_inode(disk_p);
+  size_t inode_sector_count = \
+    fs_init_inode(disk_p, inode_start_sector, total_sector);
   size_t free_sector_count = usable_sector_count - inode_sector_count;
   info("  # of inode sectors: %lu; free sectors: %lu",
        inode_sector_count,
        file_sector_count);
   // This is the absolute sector ID of the free start sector
   size_t free_start_sector = inode_start_sector + inode_sector_count;
+  size_t free_list_size = \
+    fs_init_free_list(disk_p, free_start_sector, total_sector);
+  
+  return;
 }
 
 /////////////////////////////////////////////////////////////////////
