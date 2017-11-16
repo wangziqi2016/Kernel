@@ -256,14 +256,13 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
   assert(buffer_p->in_use == 1);
   if(buffer_p->dirty == 1) {
     disk_p->write(disk_p, buffer_p->lba, buffer_p->data);
-  }
-
 #ifdef BUFFER_WB_DEBUG
-  info("Writing back buffer %lu (LBA %lu)", 
-       (size_t)(buffer_p - buffers),
-       buffer_p->lba);
+    info("Writing back buffer %lu (LBA %lu)", 
+        (size_t)(buffer_p - buffers),
+        buffer_p->lba);
 #endif
-
+  }
+  
   return;
 }
 
@@ -277,16 +276,15 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
  */
 void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
   assert(buffer_p->in_use == 1);
-  buffer_remove(buffer_p);
-  buffer_wb(buffer_p, disk_p);
-  buffer_p->in_use = 0;
-  buffer_p->dirty = 0;
-
-#ifdef BUGGER_FLUSH_DEBUG
+#ifdef BUFFER_FLUSH_DEBUG
   info("Flushing buffer %lu (LBA %lu)", 
        (size_t)(buffer_p - buffers),
        buffer_p->lba);
 #endif
+  buffer_remove(buffer_p);
+  buffer_wb(buffer_p, disk_p);
+  buffer_p->in_use = 0;
+  buffer_p->dirty = 0;
 
   return;
 }
@@ -463,7 +461,7 @@ void test_lba_rw(Storage *disk_p) {
 
 void test_buffer(Storage *disk_p) {
   info("Testing buffer...");
-  for(int i = 0;i < MAX_BUFFER;i++) {
+  for(int i = 0;i < MAX_BUFFER * 2;i++) {
     void *p = read_lba(disk_p, (uint64_t)i);
     memset(p, (char)i, disk_p->sector_size);
 
