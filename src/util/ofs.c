@@ -257,12 +257,14 @@ void buffer_access(Buffer *buffer_p) {
  * buffer_wb() - This function writes back the buffer if it is dirty, or 
  *               simply clear it
  * 
- * Note that we do not remove the buffer from the linked list
+ * Note that we do not remove the buffer from the linked list. But this function
+ * clears the dirty bit of the buffer object
  */
 void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
   assert(buffer_p->in_use == 1);
   if(buffer_p->dirty == 1) {
     disk_p->write(disk_p, buffer_p->lba, buffer_p->data);
+    buffer_p->dirty = 0;
 #ifdef BUFFER_WB_DEBUG
     info("Writing back buffer %lu (LBA %lu)", 
         (size_t)(buffer_p - buffers),
@@ -303,6 +305,21 @@ void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
 void buffer_flush_all(Storage *disk_p) {
   while(buffer_head_p != NULL) {
     buffer_flush(buffer_head_p, disk_p);
+  }
+
+  return;
+}
+
+/*
+ * buffer_flush_all_no_rm() - This function writes back all dirty buffers
+ *                            but does not remove them from the linked list
+ */
+void buffer_flush_all_no_rm(Storage *disk_p) {
+  Buffer *buffer_p = buffer_head_p;
+  while(buffer_p != NULL) {
+    // Write it back without removing it from the linked list
+    // Also this function will clear the dirty flag
+    buffer_wb(buffer_p, disk_p);
   }
 
   return;
@@ -651,8 +668,10 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   sb_p->flock = sb_p->ilock = 0;
   sb_p->fmod = 0;
   sb_p->time[0] = sb_p->time[1] = 0;
-
+  // Make sure the super block goes to disk
   buffer_flush_all(disk_p);
+
+  info("Finished writing the super block");
 
   return;
 }
