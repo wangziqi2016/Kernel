@@ -259,6 +259,8 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
   return;
 }
 
+#define BUFFER_FLUSH_DEBUG
+
 /*
  * buffer_flush() - This function removes the buffer from the linked list
  *                  and then writes back if it is dirty
@@ -271,6 +273,12 @@ void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
   buffer_wb(buffer_p, disk_p);
   buffer_p->in_use = 0;
   buffer_p->dirty = 0;
+
+#ifdef BUGGER_FLUSH_DEBUG
+  info("Flushing buffer %lu (LBA %lu)", 
+       (size_t)(buffer_p - buffers) / sizeof(Buffer),
+       buffer_p->lba);
+#endif
 
   return;
 }
@@ -405,6 +413,7 @@ uint8_t *read_lba_for_write(Storage *disk_p, uint64_t lba) {
 #ifdef DEBUG
 
 void test_lba_rw(Storage *disk_p) {
+  info("Testing LBA r/w...");
   uint8_t buffer[DEFAULT_SECTOR_SIZE];
   for(size_t i = 0;i < disk_p->sector_count;i++) {
     memset(buffer, (char)i, DEFAULT_SECTOR_SIZE);
@@ -423,10 +432,23 @@ void test_lba_rw(Storage *disk_p) {
   return;
 }
 
+void test_buffer(Storage *disk_p) {
+  info("Testing buffer...");
+  for(int i = 0;i < MAX_BUFFER * 2;i++) {
+    void *p = read_lba(disk_p, (uint64_t)i);
+    memset(p, (char)i, disk_p->sector_size);
+
+    buffer_print();
+  }
+
+  return;
+}
+
 int main() {
   init_buffer();
   Storage *disk_p = get_mem_storage(2880);
   test_lba_rw(disk_p);
+  test_buffer(disk_p);
   free_mem_storage(disk_p);
   return 0;
 }
