@@ -260,7 +260,7 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
 
 #ifdef BUFFER_WB_DEBUG
   info("Writing back buffer %lu (LBA %lu)", 
-       (size_t)(buffer_p - buffers) / sizeof(Buffer),
+       (size_t)(buffer_p - buffers),
        buffer_p->lba);
 #endif
 
@@ -284,7 +284,7 @@ void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
 
 #ifdef BUGGER_FLUSH_DEBUG
   info("Flushing buffer %lu (LBA %lu)", 
-       (size_t)(buffer_p - buffers) / sizeof(Buffer),
+       (size_t)(buffer_p - buffers),
        buffer_p->lba);
 #endif
 
@@ -360,11 +360,16 @@ void buffer_print() {
     info("(Empty buffer)");
   } else {
     while(buffer_p != NULL) {
-      fprintf(stderr, "%lu(%X)", buffer_p->lba, 
+      fprintf(stderr, "%lu,%lu(%X) ", 
+              buffer_p - buffers,
+              buffer_p->lba, 
               (uint32_t)((buffer_p->dirty << 1) | (buffer_p->in_use)));
       buffer_p = buffer_p->next_p;
     }
   }
+
+  // Print a new line
+  info("");
 
   return;
 }
@@ -397,6 +402,7 @@ Buffer *_read_lba(Storage *disk_p, uint64_t lba) {
     // If there is no buffered content we have to allocate one
     buffer_p = get_empty_buffer(disk_p);
     assert(buffer_p->in_use == 1);
+    buffer_p->lba = lba;
   
     // Perform read here and return the pointer
     disk_p->read(disk_p, lba, buffer_p->data);
