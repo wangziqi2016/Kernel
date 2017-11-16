@@ -539,8 +539,23 @@ size_t fs_init_inode(Storage *disk_p,
     total_count -= inode_per_sector;
   }
 
+  // Flush all inode sectors
+  buffer_flush_all();
+
   // Number of inodes
   return current_inode - inode_start;
+}
+
+/*
+ * fs_init_free_list() - This function builds the free list
+ *
+ * The free list consists of 99 elements, which are free block numbers,
+ * and 1 pointer to the next free block. Note that sectors that hold the 
+ * free list themselves could not occur in the free list, and therefore,
+ * we begin allocating sectors from the last sector of the entire fs
+ */
+size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
+
 }
 
 /*
@@ -551,9 +566,13 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   size_t inode_start_sector = start_sector + 1;
   // This is the number of total usable blocks for inode and file
   size_t usable_sector_count = total_sector - start_sector - 1;
-  // This is the number of sectors we allocate to inodes
-  size_t inode_sector_count = (usable_sector_count - 1) / 17;
-  size_t file_sector_count = usable_sector_count - inode_sector_count;
+  size_t inode_sector_count = fs_init_inode(disk_p);
+  size_t free_sector_count = usable_sector_count - inode_sector_count;
+  info("  # of inode sectors: %lu; free sectors: %lu",
+       inode_sector_count,
+       file_sector_count);
+  // This is the absolute sector ID of the free start sector
+  size_t free_start_sector = inode_start_sector + inode_sector_count;
 }
 
 /////////////////////////////////////////////////////////////////////
