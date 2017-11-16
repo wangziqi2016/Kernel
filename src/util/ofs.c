@@ -495,6 +495,10 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 #define FS_FREE_ARRAY_MAX 100
 #define FS_SIG_SIZE 4
 #define FS_SIG "WZQ"
+// This is the sector ID of the super block
+#define FS_SB_SECTOR 1
+// This indicates invalid sector numbers
+#define FS_INVALID_SECTOR 0
 
 typedef struct {
   // Number of elements in the local array
@@ -577,7 +581,7 @@ size_t fs_init_inode(Storage *disk_p,
   }
 
   // Flush all inode sectors
-  buffer_flush_all(disk_p);
+  buffer_flush_all_no_rm(disk_p);
 
   // Number of inodes
   return current_inode - inode_start;
@@ -604,7 +608,8 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
     // We do not need more free blocks, the current one is the 
     // last one
     if(delta <= free_sector_count) {
-      next_free_list = 0;
+      // There is no "next" block, set it to 0
+      next_free_list = FS_INVALID_SECTOR;
       free_sector_count = delta;
     } else {
       // Otherwise we write that many free blocks
@@ -624,7 +629,7 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
     current_free++;
   }
 
-  buffer_flush_all(disk_p);
+  buffer_flush_all_no_rm(disk_p);
 
   return current_free - free_start;
 }
@@ -669,11 +674,36 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   sb_p->fmod = 0;
   sb_p->time[0] = sb_p->time[1] = 0;
   // Make sure the super block goes to disk
-  buffer_flush_all(disk_p);
+  buffer_flush_all_no_rm(disk_p);
 
   info("Finished writing the super block");
 
   return;
+}
+
+/*
+ * fs_alloc_sector() - This function allocates a new sector using either the SB
+ *                     or the linked list
+ *
+ * Returns 0 if allocation failed (0 is not a valid block ID)
+ */
+uint16_t fs_alloc_sector(Storage *disk_p) {
+  // First read the super block, setting dirty flag
+  SuperBlock *sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+  uint16_t ret = 0;
+  // If there are cached free values, then just get one
+  if(sb_p->free_array.nfree != 0) {
+    ret = sb_p->free_array.free[sb_p->free_array.nfree];
+    sb_p->free_array.nfree--;
+  } else {
+    uint16_t free_list_head = free_array.free[0];
+    // If there is no next block, then we have exhausted free blocks
+    if(free_list_head == FS_INVALID_SECTOR) {
+      ret = 0;
+    } else {
+
+    }
+  }
 }
 
 /////////////////////////////////////////////////////////////////////
