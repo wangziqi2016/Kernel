@@ -251,7 +251,7 @@ void buffer_access(Buffer *buffer_p) {
   return;
 }
 
-#define BUFFER_WB_DEBUG
+//#define BUFFER_WB_DEBUG
 
 /*
  * buffer_wb() - This function writes back the buffer if it is dirty, or 
@@ -273,7 +273,7 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
   return;
 }
 
-#define BUFFER_FLUSH_DEBUG
+//#define BUFFER_FLUSH_DEBUG
 
 /*
  * buffer_flush() - This function removes the buffer from the linked list
@@ -632,7 +632,28 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   size_t free_list_size = \
     fs_init_free_list(disk_p, free_start_sector, total_sector);
   info("  Free list size: %lu", free_list_size);
-  
+
+  // At last, we init the super block
+  SuperBlock *sb_p = (SuperBlock *)write_lba(disk_p, start_sector);
+  // We use the signature to verify the fs type
+  memcpy(sb_p->signature, FS_SIG, FS_SIG_SIZE);
+  sb_p->isize = (uint16_t)inode_sector_count;
+  sb_p->fsize = (uint16_t)free_sector_count;
+  // There is no cached free block and free inodes. The first write operation
+  // into the file system will find one
+  sb_p->FreeArray.nfree = 0;
+  memset(sb_p->FreeArray.free, 0x0, sizeof(sb_p->FreeArray.free));
+  // The first element is the sector ID for the sector that stores 
+  // the free list
+  sb_p->FreeArray.free[0] = free_start_sector;
+  sb_p->ninode = 0;
+  memset(sb_p->inode, 0x0, sizeof(sp_p->inode));
+  sb_p->flock = sb_p->ilock = 0;
+  sb_p->fmod = 0;
+  sb_p->time[0] = sb_p->time[1] = 0;
+
+  buffer_flush_all();
+
   return;
 }
 
