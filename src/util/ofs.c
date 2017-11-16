@@ -405,8 +405,11 @@ void buffer_print() {
  * 
  * This function is a wrapper to the read read_lba() where it returns the 
  * buffer, and the read_lba() returns a pointer
+ *
+ * The read_flag determines whether we perform read operation if the LBA
+ * is not buffered. Because sometimes we just want to perform blind write.
  */
-Buffer *_read_lba(Storage *disk_p, uint64_t lba) {
+Buffer *_read_lba(Storage *disk_p, uint64_t lba, int read_flag) {
   Buffer *buffer_p = buffer_head_p;
   while(buffer_p != NULL) {
     // If the LBA is in the buffer, then we just return its data
@@ -426,14 +429,17 @@ Buffer *_read_lba(Storage *disk_p, uint64_t lba) {
     buffer_p->lba = lba;
   
     // Perform read here and return the pointer
-    disk_p->read(disk_p, lba, buffer_p->data);
+    // If we do not perform read then we will do blind write
+    if(read_flag == 1) {
+      disk_p->read(disk_p, lba, buffer_p->data);
+    }
   }
 
   return buffer_p;
 }
 
 uint8_t *read_lba(Storage *disk_p, uint64_t lba) {
-  return _read_lba(disk_p, lba)->data;
+  return _read_lba(disk_p, lba, 1)->data;
 }
 
 /*
@@ -444,7 +450,21 @@ uint8_t *read_lba(Storage *disk_p, uint64_t lba) {
  * the buffer will first be loaded into the buffer, and then be marked as dirty
  */
 uint8_t *read_lba_for_write(Storage *disk_p, uint64_t lba) {
-  Buffer *buffer_p = _read_lba(disk_p, lba);
+  Buffer *buffer_p = _read_lba(disk_p, lba, 1);
+  buffer_p->dirty = 1;
+
+  return buffer_p->data;
+}
+
+/*
+ * write_lba() - This function creases a buffer of the given LBA
+ *               and buffers user's writes into the sector
+ *
+ * The sector will eventually reach the disk when it is written back
+ */
+uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
+  // NOTE: Pass 0 here to avoid reading the sector
+  Buffer *buffer_p = _read_lba(disk_p, lba, 0);
   buffer_p->dirty = 1;
 
   return buffer_p->data;
@@ -555,7 +575,9 @@ size_t fs_init_inode(Storage *disk_p,
  * we begin allocating sectors from the last sector of the entire fs
  */
 size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
-
+  while(free_end > free_start) {
+    void *data = read_lba_for_write();
+  }
 }
 
 /*
