@@ -466,7 +466,10 @@ typedef struct {
   // array
   uint16_t ninode;
   uint16_t inode[FREE_ARRAY_MAX];
-
+  char flock;
+  char ilock;
+  char fmod;
+  uint16_t time[2];
 } __attribute__((packed)) SuperBlock;
 
 /////////////////////////////////////////////////////////////////////
