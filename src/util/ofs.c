@@ -589,6 +589,9 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
     if(delta <= free_sector_count) {
       next_free_list = 0;
       free_sector_count = delta;
+    } else {
+      // Otherwise we write that many free blocks
+      delta = FS_FREE_ARRAY_MAX - 1;
     }
 
     // Number of entries in the list
@@ -680,7 +683,7 @@ void test_buffer(Storage *disk_p) {
   return;
 }
 
-void test_fs_init(Storage disk_p) {
+void test_fs_init(Storage *disk_p) {
   fs_init(disk_p, disk_p->sector_count, 0);
   return;
 }
@@ -690,7 +693,7 @@ void (*tests[])(Storage *) = {
   test_buffer,
   test_fs_init,
   free_mem_storage,
-}
+};
 
 int main() {
   buffer_init();
@@ -698,7 +701,7 @@ int main() {
   for(int i = 0;i < sizeof(tests) / sizeof(tests[0]);i++) {
     tests[i](disk_p);
   }
-  
+
   return 0;
 }
 #else 
