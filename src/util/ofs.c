@@ -443,7 +443,7 @@ uint8_t *read_lba_for_write(Storage *disk_p, uint64_t lba) {
 /////////////////////////////////////////////////////////////////////
 
 // This is the length of the free array
-#define FREE_ARRAY_MAX 100
+#define FS_FREE_ARRAY_MAX 100
 #define FS_SIG_SIZE 4
 #define FS_SIG "WZQ"
 
@@ -453,7 +453,7 @@ typedef struct {
   // The first word of this structure is the block number
   // to the next block that holds this list
   // All elements after the first one is the free blocks
-  uint16_t free[FREE_ARRAY_MAX];
+  uint16_t free[FS_FREE_ARRAY_MAX];
 } __attribute__((packed)) FreeArray;
 
 // This defines the first block of the file system
@@ -473,12 +473,33 @@ typedef struct {
   // Number of free inodes as a fast cache in the following
   // array
   uint16_t ninode;
-  uint16_t inode[FREE_ARRAY_MAX];
+  uint16_t inode[FS_FREE_ARRAY_MAX];
   char flock;
   char ilock;
   char fmod;
   uint16_t time[2];
 } __attribute__((packed)) SuperBlock;
+
+#define FS_ADDR_ARRAY_SIZE 8
+
+// This defines the inode structure
+typedef struct {
+  uint16_t flags;
+  // Number of hardlinks to the file
+  uint8_t nlinks;
+  // User ID and group ID
+  uint8_t uid;
+  uint8_t gid;
+  // High byte of 24 bit size field
+  uint8_t size0;
+  // Low word of 24 bit size field
+  uint16_t size1;
+  uint16_t addr[FS_ADDR_ARRAY_SIZE];
+  // Access time
+  uint16_t actime[2];
+  // Modification time
+  uint16_t modtime[2];
+} Inode;
 
 /*
  * fs_init() - This function initializes an empty FS on a raw storage
@@ -490,7 +511,7 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   size_t usable_sector_count = total_sector - start_sector - 1;
   // This is the number of sectors we allocate to inodes
   size_t inode_sector_count = (usable_sector_count - 1) / 17;
-  size_t file_sector_count = usable_sector_count - inode_sector;
+  size_t file_sector_count = usable_sector_count - inode_sector_count;
 }
 
 /////////////////////////////////////////////////////////////////////
