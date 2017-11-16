@@ -297,6 +297,18 @@ void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
 }
 
 /*
+ * buffer_flush_all() - This function flushes all buffers and writes back
+ *                      those that are still dirty
+ */
+void buffer_flush_all(Storage *disk_p) {
+  while(buffer_head_p != NULL) {
+    buffer_flush(buffer_head_p, disk_p);
+  }
+
+  return;
+}
+
+/*
  * buffer_evict_lru() - Evicts a buffer using LRU
  * 
  * Since we move the buffer object to the head of the linked list for 
