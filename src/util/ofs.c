@@ -320,6 +320,7 @@ void buffer_flush_all_no_rm(Storage *disk_p) {
     // Write it back without removing it from the linked list
     // Also this function will clear the dirty flag
     buffer_wb(buffer_p, disk_p);
+    buffer_p = buffer_p->next_p;
   }
 
   return;
@@ -601,7 +602,8 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
     uint16_t *data = (uint16_t *)write_lba(disk_p, current_free);
     // There must be at least one free sector
     assert(free_end > (current_free + 1));
-    size_t delta = free_end - current_free - 1;
+    // current_free should not be counted as a free block
+    size_t delta = free_end - (current_free + 1);
     // These two are default values
     uint16_t next_free_list = current_free + 1;
     uint16_t free_sector_count = FS_FREE_ARRAY_MAX - 1;
@@ -613,6 +615,8 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
       free_sector_count = delta;
     }
 
+    // Do not allow empty list
+    assert(free_sector_count != 0);
     FreeArray *free_array_p = (FreeArray *)data;
     // It does not include the first element which is the next sector ID
     free_array_p->nfree = free_sector_count;
@@ -694,7 +698,7 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
     ret = sb_p->free_array.free[sb_p->free_array.nfree];
     sb_p->free_array.nfree--;
   } else {
-    uint16_t free_list_head = free_array.free[0];
+    uint16_t free_list_head = sb_p->free_array.free[0];
     // If there is no next block, then we have exhausted free blocks
     if(free_list_head == FS_INVALID_SECTOR) {
       ret = FS_INVALID_SECTOR;
