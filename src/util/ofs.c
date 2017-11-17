@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <time.h>
 
 #define DEFAULT_SECTOR_SIZE 512
 
@@ -853,14 +854,33 @@ void test_alloc_sector(Storage *disk_p) {
     }
 
     info("  ...Pass");
-    info("  Free allocated sectors...")
-    if(round == 0) {
+    info("  Free allocated sectors...");
+    if(round == 1) {
       for(uint16_t i = free_sector_start;i < total_sector_count;i++) {
         fs_free_sector(disk_p, i);
       }
-    } else if(round == 1) {
+    } else if(round == 2) {
       for(uint16_t i = total_sector_count - 1;i >= free_sector_start;i--) {
         fs_free_sector(disk_p, i);
+      }
+    } else if(round == 3) {
+      srand(time(NULL));
+      for(int i = 0;i < free_sector_count;i++) {
+        // [free_sector_start, total_sector_count)
+        uint16_t start = \
+          ((uint16_t)rand() % free_sector_count) + free_sector_start;
+        // Use the map as a hash table to find sectors that are not yet
+        // freed
+        while(sector_map[start] == 0) {
+          start++;
+          if(start == total_sector_count) {
+            start = free_sector_start;
+          }
+        }
+
+        // Clear it and then free
+        sector_map[start - free_sector_start] = 0;
+        fs_free_sector(disk_p, start);
       }
     } else {
       break;

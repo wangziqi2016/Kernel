@@ -7,7 +7,7 @@ SRC_DIR = ../
 BUILD_DIR = ../../build
 
 CXX = gcc
-CXXFLAGS = -Wall -Werror
+CXXFLAGS = -Wall -Werror -g
 LDFLAGS = 
 
 $(info = Compiling utility...)
