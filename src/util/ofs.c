@@ -655,7 +655,9 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   size_t free_start_sector = inode_start_sector + inode_sector_count;
   size_t free_list_size = \
     fs_init_free_list(disk_p, free_start_sector, total_sector);
-  info("  Free list size: %lu", free_list_size);
+  info("  Free list size: %lu; First free sector: %lu", 
+       free_list_size,
+       free_start_sector);
 
   // At last, we init the super block
   SuperBlock *sb_p = (SuperBlock *)write_lba(disk_p, start_sector);
@@ -669,15 +671,15 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   memset(sb_p->free_array.free, 0x0, sizeof(sb_p->free_array.free));
   // The first element is the sector ID for the sector that stores 
   // the free list
-  sb_p->free_array.free[0] = free_start_sector;
+  sb_p->free_array.free[0] = (uint16_t)free_start_sector;
   sb_p->ninode = 0;
   memset(sb_p->inode, 0x0, sizeof(sb_p->inode));
   sb_p->flock = sb_p->ilock = 0;
   sb_p->fmod = 0;
   sb_p->time[0] = sb_p->time[1] = 0;
+
   // Make sure the super block goes to disk
   buffer_flush_all_no_rm(disk_p);
-
   info("Finished writing the super block");
 
   return;
@@ -769,7 +771,9 @@ void test_buffer(Storage *disk_p) {
 }
 
 void test_fs_init(Storage *disk_p) {
-  fs_init(disk_p, disk_p->sector_count, 0);
+  info("Testing fs initialization...");
+  // Note that we must put the super block on the given location
+  fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR);
   return;
 }
 
@@ -780,8 +784,9 @@ void test_alloc_sector(Storage *disk_p) {
   size_t count = 0;
   do { 
     sector = fs_alloc_sector(disk_p);
-    info("%lu ", sector);
-    count++;
+    if(sector != FS_INVALID_SECTOR) {
+      count++;
+    }
   } while(sector != FS_INVALID_SECTOR);
   
   info("Allocated %lu sectors", count);
