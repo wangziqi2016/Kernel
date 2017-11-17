@@ -723,6 +723,19 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
   return ret;
 }
 
+/*
+ * fs_free_sector() - This function frees a sector.
+ *
+ * We first tries to add the freed sector into the super block's cache.
+ * If the cache is full, we then move the array into the freed block, and 
+ * then empty the super block's cache, and link the current block into
+ * the free chain
+ */
+void fs_free_sector(Storage *disk_p, uint16_t sector) {
+  SuperBlock *sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+  if(sb_p = )
+}
+
 /////////////////////////////////////////////////////////////////////
 // Test Cases
 /////////////////////////////////////////////////////////////////////
