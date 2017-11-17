@@ -811,16 +811,48 @@ void test_fs_init(Storage *disk_p) {
 void test_alloc_sector(Storage *disk_p) {
   info("Testing sector allocation...");
 
+  SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
+  const size_t sb_sector = FS_SB_SECTOR;
+  const size_t inode_sector_start = sb_sector + 1;
+  const size_t free_sector_start = inode_sector_start + sb_p->isize;
+  const size_t total_sector_count = free_sector_start + sb_p->fsize;
+  const size_t free_sector_count = (size_t)sb_p->fsize;
+  // Make sure the result is correct
+  assert(total_sector_count == disk_p->sector_count);
+
+  // Allocate a bitmap to record which sector is good and which is not
+  uint8_t *sector_map = \
+    malloc(sizeof(uint8_t) * free_sector_count);
+  assert(sector_map != NULL);
+  memset(sector_map, 
+         0x00, 
+         sizeof(uint8_t) * free_sector_count);
+
   uint16_t sector;
   size_t count = 0;
   do { 
     sector = fs_alloc_sector(disk_p);
     if(sector != FS_INVALID_SECTOR) {
       count++;
+      // Must be within free sector
+      assert(sector >= free_sector_start);
+      assert(sector < total_sector_count);
+      size_t index = sector - free_sector_start;
+      assert(sector_map[index] == 0);
+      sector_map[index] = 1;
     }
   } while(sector != FS_INVALID_SECTOR);
   
-  info("Allocated %lu sectors", count);
+  info("Allocated %lu sectors. Now verifying...", count);
+
+  // Check whether all sectors are allocated
+  for(size_t i = free_sector_start;i < total_sector_count;i++) {
+    assert(sector_map[i - free_sector_start] == 1);
+  }
+
+  info("  ...Pass");
+
+  
 
   return;
 }
