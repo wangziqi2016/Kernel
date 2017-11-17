@@ -773,10 +773,29 @@ void test_fs_init(Storage *disk_p) {
   return;
 }
 
+void test_alloc_sector(Storage *disk_p) {
+  info("Testing sector allocation...");
+
+  uint16_t sector;
+  size_t count = 0;
+  do { 
+    sector = fs_alloc_sector(disk_p);
+    info("%lu ", sector);
+    count++;
+  } while(sector != FS_INVALID_SECTOR);
+  
+  info("Allocated %lu sectors", count);
+
+  return;
+}
+
+// This is a list of function call backs that we use to test
 void (*tests[])(Storage *) = {
   test_lba_rw,
   test_buffer,
   test_fs_init,
+  test_alloc_sector,
+  // This is the last stage
   free_mem_storage,
 };
 
