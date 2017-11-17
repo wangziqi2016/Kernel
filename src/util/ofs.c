@@ -871,7 +871,7 @@ void test_alloc_sector(Storage *disk_p) {
           ((uint16_t)rand() % free_sector_count) + free_sector_start;
         // Use the map as a hash table to find sectors that are not yet
         // freed
-        while(sector_map[start] == 0) {
+        while(sector_map[start - free_sector_start] == 0) {
           start++;
           if(start == total_sector_count) {
             start = free_sector_start;
