@@ -611,18 +611,16 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
       // There is no "next" block, set it to 0
       next_free_list = FS_INVALID_SECTOR;
       free_sector_count = delta;
-    } else {
-      // Otherwise we write that many free blocks
-      delta = FS_FREE_ARRAY_MAX - 1;
     }
 
-    // Number of entries in the list
-    data[0] = next_free_list;
-    data[1] = free_sector_count;
-    for(int i = 0;i < delta;i++) {
+    FreeArray *free_array_p = (FreeArray *)data;
+    // It does not include the first element which is the next sector ID
+    free_array_p->nfree = free_sector_count;
+    free_array_p->free[0] = next_free_list;
+    for(int i = 0;i < free_sector_count;i++) {
       free_end--;
       // This is the current last free sector
-      data[i + 2] = free_end;
+      free_array_p->free[i + 1] = free_end;
     }
 
     // Go to next free block
@@ -699,11 +697,24 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
     uint16_t free_list_head = free_array.free[0];
     // If there is no next block, then we have exhausted free blocks
     if(free_list_head == FS_INVALID_SECTOR) {
-      ret = 0;
+      ret = FS_INVALID_SECTOR;
     } else {
-
+      // We use this sector as the free sector, and copy its free list into
+      // the super block
+      ret = free_list_head;
+      // Read the free list head, and copy the free array into the temp
+      // object (because the sb may have been evicted)
+      uint16_t *data_p = (uint16_t *)read_lba(disk_p, free_list_head);
+      FreeArray free_array;
+      memcpy(&free_array, data_p, sizeof(FreeArray));
+      // Then read super block again, and copies the temp free array into it
+      // as the new free array
+      sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+      memcpy(&sb_p->free_array, &free_array, sizeof(FreeArray));
     }
   }
+
+  return ret;
 }
 
 /////////////////////////////////////////////////////////////////////
