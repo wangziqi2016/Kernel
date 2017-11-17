@@ -568,8 +568,18 @@ typedef struct {
 #define FS_INODE_TYPE_MASK   0x6000
 // Whether the file is a large file
 #define FS_INODE_LARGE       0x1000
-
-
+#define FS_INODE_SET_UID     0x0800
+#define FS_INODE_SET_GID     0x0400
+// Note that there is a gap
+#define FS_INODE_OWNER_READ  0x0100
+#define FS_INODE_OWNER_WRITE 0x0080
+#define FS_INODE_OWNER_EXEC  0x0040
+#define FS_INODE_GROUP_READ  0x0020
+#define FS_INODE_GROUP_WRITE 0x0010
+#define FS_INODE_GROUP_EXEC  0x0008
+#define FS_INODE_OTHER_READ  0x0004
+#define FS_INODE_OTHER_WRITE 0x0002
+#define FS_INODE_OTHER_EXEC  0x0001
 
 /*
  * fs_init_inode() - This function initializes the inode from a given sector
