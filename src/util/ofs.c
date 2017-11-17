@@ -824,36 +824,54 @@ void test_alloc_sector(Storage *disk_p) {
   uint8_t *sector_map = \
     malloc(sizeof(uint8_t) * free_sector_count);
   assert(sector_map != NULL);
-  memset(sector_map, 
-         0x00, 
-         sizeof(uint8_t) * free_sector_count);
+  int round = 1;
+  while(1) {
+    memset(sector_map, 
+          0x00, 
+          sizeof(uint8_t) * free_sector_count);
 
-  uint16_t sector;
-  size_t count = 0;
-  do { 
-    sector = fs_alloc_sector(disk_p);
-    if(sector != FS_INVALID_SECTOR) {
-      count++;
-      // Must be within free sector
-      assert(sector >= free_sector_start);
-      assert(sector < total_sector_count);
-      size_t index = sector - free_sector_start;
-      assert(sector_map[index] == 0);
-      sector_map[index] = 1;
+    uint16_t sector;
+    size_t count = 0;
+    do { 
+      sector = fs_alloc_sector(disk_p);
+      if(sector != FS_INVALID_SECTOR) {
+        count++;
+        // Must be within free sector
+        assert(sector >= free_sector_start);
+        assert(sector < total_sector_count);
+        size_t index = sector - free_sector_start;
+        assert(sector_map[index] == 0);
+        sector_map[index] = 1;
+      }
+    } while(sector != FS_INVALID_SECTOR);
+    
+    info("Round %d: Allocated %lu sectors. Now verifying...", round, count);
+
+    // Check whether all sectors are allocated
+    for(size_t i = free_sector_start;i < total_sector_count;i++) {
+      assert(sector_map[i - free_sector_start] == 1);
     }
-  } while(sector != FS_INVALID_SECTOR);
-  
-  info("Allocated %lu sectors. Now verifying...", count);
 
-  // Check whether all sectors are allocated
-  for(size_t i = free_sector_start;i < total_sector_count;i++) {
-    assert(sector_map[i - free_sector_start] == 1);
-  }
+    info("  ...Pass");
+    info("  Free allocated sectors...")
+    if(round == 0) {
+      for(uint16_t i = free_sector_start;i < total_sector_count;i++) {
+        fs_free_sector(disk_p, i);
+      }
+    } else if(round == 1) {
+      for(uint16_t i = total_sector_count - 1;i >= free_sector_start;i--) {
+        fs_free_sector(disk_p, i);
+      }
+    } else {
+      break;
+    }
 
-  info("  ...Pass");
+    info("  ...Done");
 
-  
+    round++;
+  } // while(1)
 
+  free(sector_map);
   return;
 }
 
