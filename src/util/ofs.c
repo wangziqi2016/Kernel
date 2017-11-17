@@ -733,7 +733,25 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
  */
 void fs_free_sector(Storage *disk_p, uint16_t sector) {
   SuperBlock *sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
-  if(sb_p = )
+  assert(sb_p->free_array.nfree <= (FS_FREE_ARRAY_MAX - 1));
+  // If the free list is not full, we just put it into the sb and 
+  // increment nfree
+  if(sb_p->free_array.nfree < (FS_FREE_ARRAY_MAX - 1)) {
+    sb_p->free_array.nfree++;
+    sb_p->free_array.free[sb_p->free_array.nfree] = sector;
+  } else {
+    // Otherwise, we first copy the current free array object into the new block
+    FreeArray free_array;
+    memcpy(&free_array, &sb_p->free_array, sizeof(FreeArray));
+    // Then link the newly freed block into the super block
+    sb_p->free_array.nfree = 0;
+    sb_p->free_array.free[0] = sector;
+    // Create a buffer entry for the sector
+    void *data_p = write_lba(disk_p, sector);
+    memcpy(data_p, &free_array, sizeof(FreeArray));
+  }
+
+  return;
 }
 
 /////////////////////////////////////////////////////////////////////
