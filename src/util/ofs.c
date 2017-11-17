@@ -556,6 +556,21 @@ typedef struct {
   uint16_t modtime[2];
 } __attribute__((packed)) Inode;
 
+// Next we define flags for inode flags word
+#define FS_INODE_IN_USE      0x8000
+// The following are file type code. We should mask off other bits
+// to test which type they belong to
+#define FS_INODE_TYPE_DIR    0x4000
+#define FS_INODE_TYPE_CHAR   0x2000
+#define FS_INODE_TYPE_BLOCK  0x6000
+#define FS_INODE_TYPE_FILE   0x0000
+// Use this mask to extract the inode type
+#define FS_INODE_TYPE_MASK   0x6000
+// Whether the file is a large file
+#define FS_INODE_LARGE       0x1000
+
+
+
 /*
  * fs_init_inode() - This function initializes the inode from a given sector
  *                   of the storage
