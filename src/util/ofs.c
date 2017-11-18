@@ -890,7 +890,14 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
     // Note that here we decrement first and then get inode number
     sb_p->ninode--;
     ret = sb_p->inode[sb_p->ninode];
-
+    // Load the sector that holds the inode, and make it dirty because we 
+    // are writing into this inode
+    Inode *inode_p = load_inode_sector(disk_p, ret, 1);
+    assert((inode_p->flags & FS_INODE_IN_USE) == 0);
+    // Clear its previous content
+    memset(inode_p, 0x0, sizeof(Inode));
+    // Mark it as in-use
+    inode_p->flags |= FS_INODE_IN_USE;
   }
 
   return ret;
