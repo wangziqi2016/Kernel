@@ -780,6 +780,23 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
   return;
 }
 
+/*
+ * fs_alloc_inode() - This function allocates an unused inode
+ *
+ * We first search the super block, and if the super block does not have
+ * any cached inode, we need to scan the entire inode map and find one
+ *
+ * This function returns the inode number
+ */
+uint16_t fs_alloc_inode(Storage *disk_p) {
+  SuperBlock *sb_p = (SupberBlock *)read_lba_for_write(FS_SB_SECTOR);
+  if(sb_p->ninode != 0) {
+    // Note that here we decrement first and then get inode number
+    sb_p->ninode--;
+    ret = 
+  }
+}
+
 /////////////////////////////////////////////////////////////////////
 // Test Cases
 /////////////////////////////////////////////////////////////////////
