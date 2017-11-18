@@ -903,6 +903,26 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
   return ret;
 }
 
+/*
+ * fs_free_inode() - This function frees an inode
+ *
+ * If the inode free array in the sb is not yet full, we just add it
+ * Otherwise we discard the inode number. Because the allocation information
+ * is stored in the inode itself, we do not need to precisely track the 
+ * inode usage in the sb
+ */
+void fs_free_inode(Storage *disk_p, uint16_t inode) {
+  SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
+  if(sb_p->ninode != FS_FREE_ARRAY_MAX) {
+    // Upgrade to write
+    sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+    sb_p->inode[sb_p->ninode] = inode;
+    sb_p->ninode++;
+  }
+
+  return;
+}
+
 /////////////////////////////////////////////////////////////////////
 // Test Cases
 /////////////////////////////////////////////////////////////////////
