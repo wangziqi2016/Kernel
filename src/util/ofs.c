@@ -569,6 +569,8 @@ typedef struct {
   uint16_t free_start_sector;
   uint16_t free_end_sector;
   uint16_t free_sector_count;
+  uint16_t total_sector_count;
+  uint16_t inode_count;
   size_t inode_per_sector;
 } Context;
 
@@ -600,9 +602,34 @@ Context context;
 #define FS_INODE_OTHER_WRITE 0x0002
 #define FS_INODE_OTHER_EXEC  0x0001
 
+/*
+ * load_context() - This function loads the context object using the super block
+ *
+ * For each file system mounted, this can only be done once, and then used
+ * for the entire session
+ *
+ * This function should only be called after the fs has been initialized or 
+ * mounted.
+ */
+void load_context(Storage *disk_p) {
+  // Load the super block in read-only mode
+  SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
 
-void load_context() {
+  context.sb_sector = FS_SB_SECTOR;
+  context.inode_start_sector = FS_SB_SECTOR + 1;
+  context.inode_end_sector = FS_SB_SECTOR + 1 + sb_p->isize;
+  context.inode_sector_count = sb_p->isize;
+  context.free_start_sector = context.inode_end_sector;
+  context.free_end_sector = context.free_start_sector + sb_p->fsize;
+  context.free_sector_count = sb_p->fsize;
+  context.total_sector_count = \
+    context.free_start_sector + context.free_sector_count;
+  // Total number of inodes in the system
+  context.inode_count = context.inode_per_sector * context.inode_sector_count;
+  // This is the number of inodes per sector
+  context.inode_per_sector = disk_p->sector_size / sizeof(Inode);
 
+  return;
 }
 
 /*
@@ -815,9 +842,8 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
  * for read.
  */
 Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag) {
-  const size_t inode_per_sector = disk_p->sector_size / sizeof(Inode);
-  size_t sector_num = inode / inode_per_sector;
-  size_t offset = inode % inode_per_sector;
+  size_t sector_num = inode / context.inode_per_sector;
+  size_t offset = inode % context.inode_per_sector;
   sector_num += (FS_SB_SECTOR + 1);
 
   Inode *inode_p = NULL;
@@ -848,17 +874,14 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
   assert(sb_p->ninode == 0);
   // inode sector is just after the super block
   uint16_t current_sector = FS_SB_SECTOR + 1;
-  // Must copy it here because the buffer might be overwritten
-  const uint16_t inode_sector_count = sb_p->isize;
-  const size_t inode_per_sector = disk_p->sector_size / sizeof(Inode);
   // Number of inodes we have scanned
   int count = 0;
   uint16_t current_inode = 0;
   // It can hold 100 inodes
   uint16_t free_inode_list[FS_FREE_ARRAY_MAX];
-  for(uint16_t i = 0;i < inode_sector_count;i++) {
+  for(uint16_t i = 0;i < context.inode_sector_count;i++) {
     Inode *inode_p = (Inode *)read_lba(disk_p, current_sector);
-    for(size_t j = 0;j < inode_per_sector;j++) {
+    for(size_t j = 0;j < context.inode_per_sector;j++) {
       // If the inode is not in-use
       if((inode_p[j].flags & FS_INODE_IN_USE) == 0) {
         // Otherwise just add the inode into the list of inodes
@@ -996,6 +1019,8 @@ void test_fs_init(Storage *disk_p) {
   info("Testing fs initialization...");
   // Note that we must put the super block on the given location
   fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR);
+  // Fill the parameters
+  load_context(disk_p);
   return;
 }
 
@@ -1009,12 +1034,9 @@ void test_alloc_sector(Storage *disk_p) {
     "Verify"
   };
 
-  SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
-  const size_t sb_sector = FS_SB_SECTOR;
-  const size_t inode_sector_start = sb_sector + 1;
-  const size_t free_sector_start = inode_sector_start + sb_p->isize;
-  const size_t total_sector_count = free_sector_start + sb_p->fsize;
-  const size_t free_sector_count = (size_t)sb_p->fsize;
+  const size_t free_sector_start = context.free_start_sector;
+  const size_t total_sector_count = context.total_sector_count;
+  const size_t free_sector_count = context.free_sector_count;
   // Make sure the result is correct
   assert(total_sector_count == disk_p->sector_count);
 
@@ -1097,7 +1119,7 @@ void test_alloc_sector(Storage *disk_p) {
 
 void test_alloc_inode() {
   info("Testing allocating inode...");
-  SuperBlock
+
 }
 
 // This is a list of function call backs that we use to test
