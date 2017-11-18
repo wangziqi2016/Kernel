@@ -874,7 +874,7 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
  * This function returns the inode number. (-1) means allocation failure
  */
 uint16_t fs_alloc_inode(Storage *disk_p) {
-  SuperBlock *sb_p = (SupberBlock *)read_lba(disk_p, FS_SB_SECTOR);
+  SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
   uint16_t ret;
   // If the array is empty, we just fill it first
   if(sb_p->ninode == 0) {
@@ -886,13 +886,11 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
   if(sb_p->ninode == 0) {
     ret = FS_INVALID_INODE;
   } else {
-    sb_p = (SupberBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+    sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
     // Note that here we decrement first and then get inode number
     sb_p->ninode--;
     ret = sb_p->inode[sb_p->ninode];
-    
-    // Then mark the inode as being used by loading its sector
-    const size_t inode_per_sector = disk_p->sector_size / sizeof(Inode);
+
   }
 
   return ret;
