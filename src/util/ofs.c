@@ -577,6 +577,18 @@ typedef struct {
   uint16_t modtime[2];
 } __attribute__((packed)) Inode;
 
+#define DIR_ENTRY_NAME_MAX 14
+
+// This defines the directory structure
+typedef struct {
+  // The inode number this directory entry represents
+  // Use FS_INVALID_INODE to indicate that the entry is free
+  uint16_t inode;
+  // Note that file names are not required to terminate with 0x0
+  // but this field is null-padded
+  char name[DIR_ENTRY_NAME_MAX];
+} DirEntry;
+
 // This is the in-memory representation of the file system metadata
 // We load the super block and initialize this object
 // Once initialized it is never changed for the same fs
