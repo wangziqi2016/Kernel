@@ -1004,14 +1004,25 @@ void fs_free_inode(Storage *disk_p, uint16_t inode) {
 #define DEBUG
 #ifdef DEBUG
 
+
+
 void test_lba_rw(Storage *disk_p) {
   info("Testing LBA r/w...");
   uint8_t buffer[DEFAULT_SECTOR_SIZE];
+  int prev_percent = 0;
   for(size_t i = 0;i < disk_p->sector_count;i++) {
     memset(buffer, (char)i, DEFAULT_SECTOR_SIZE);
     disk_p->write(disk_p, i, buffer);
+    // Current progress
+    int current_percent = (int)(((double)i / disk_p->sector_count) * 100);
+    if(current_percent != prev_percent) {
+      fprintf(stderr, "\r  Write progress %d%%", current_percent);
+      prev_percent = current_percent;
+    }
   }
+  putchar('\n');
 
+  prev_percent = 0;
   for(size_t i = 0;i < disk_p->sector_count;i++) {
     disk_p->read(disk_p, i, buffer);
     for(int j = 0;j < DEFAULT_SECTOR_SIZE;j++) {
@@ -1019,7 +1030,14 @@ void test_lba_rw(Storage *disk_p) {
         fatal_error("LBA read fail (i = %lu, j = %d)", i, j);
       }
     }
+
+    int current_percent = (int)(((double)i / disk_p->sector_count) * 100);
+    if(current_percent != prev_percent) {
+      fprintf(stderr, "\r  Read progress %d%%", current_percent);
+      prev_percent = current_percent;
+    }
   }
+  putchar('\n');
 
   return;
 }
