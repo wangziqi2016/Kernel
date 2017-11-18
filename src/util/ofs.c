@@ -781,20 +781,86 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
 }
 
 /*
+ * fill_inode_free_array() - This function fills the inode free array
+ *
+ * We start from the first sector after the sb, and scans until we reach
+ * the last inode sector.
+ *
+ * Note that the passed super block must be a valid one, i.e. no other
+ * buffer operation may happen between the load of the sb and the usage of
+ * this sector.
+ *
+ * This function returns a pointer to the new SB block, which is read
+ * for write. The caller could use this pointer to allocate inodes.
+ */
+SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
+  // inode sector is just after the super block
+  uint16_t current_sector = FS_SB_SECTOR + 1;
+  // Must copy it here because the buffer might be overwritten
+  const uint16_t inode_sector_count = sb_p->isize;
+  const size_t inode_per_sector = disk_p->sector_size / sizeof(Inode);
+  // Number of inodes we have scanned
+  int count = 0;
+  uint16_t current_inode = 0;
+  // It can hold 100 inodes
+  uint16_t free_inode_list[FS_FREE_ARRAY_MAX];
+  for(uint16_t i = 0;i < inode_sector_count;i++) {
+    Inode *inode_p = (Inode *)read_lba(disk_p, current_sector);
+    for(size_t j = 0;j < inode_per_sector;j++) {
+      // If the inode is not in-use
+      if((inode_p[j].flags & FS_INODE_IN_USE) == 0) {
+        // Otherwise just add the inode into the list of inodes
+        free_inode_list[count] = current_inode;
+        count++;
+        if(count == FS_FREE_ARRAY_MAX) {
+          break;
+        }
+      }
+      // Then go to check the next inode
+      current_inode++;
+    }
+
+    if(count == FS_FREE_ARRAY_MAX) {
+      break;
+    }
+    current_sector++;
+  }
+
+  // Then update the super block
+  sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+  sb_p->ninode = count;
+  memcpy(sb_p->inode, free_inode_list, sizeof(free_inode_list[0]) * count);
+
+  return sb_p;
+}
+
+/*
  * fs_alloc_inode() - This function allocates an unused inode
  *
  * We first search the super block, and if the super block does not have
  * any cached inode, we need to scan the entire inode map and find one
  *
- * This function returns the inode number
+ * This function returns the inode number. (-1) means allocation failure
  */
 uint16_t fs_alloc_inode(Storage *disk_p) {
-  SuperBlock *sb_p = (SupberBlock *)read_lba_for_write(FS_SB_SECTOR);
-  if(sb_p->ninode != 0) {
+  SuperBlock *sb_p = (SupberBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+  uint16_t ret;
+  // If the array is empty, we just fill it first
+  if(sb_p->ninode == 0) {
+    sb_p = fill_inode_free_array(disk_p, sb_p);
+  }
+
+  // If the inode list is still empty, then we could not find 
+  // any more inodes, and return failure
+  if(sb_p->ninode == 0) {
+    ret = (uint16_t)-1;
+  } else {
     // Note that here we decrement first and then get inode number
     sb_p->ninode--;
-    ret = 
+    ret = sb_p->inode[sb_p->ninode];
   }
+
+  return ret;
 }
 
 /////////////////////////////////////////////////////////////////////
