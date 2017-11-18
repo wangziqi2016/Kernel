@@ -783,6 +783,32 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
 }
 
 /*
+ * load_inode_sector() - This function loads the sector an inode is in
+ *                       and returns the pointer to that inode
+ *
+ * Note that this function does not check whether the inode number is
+ * valid or not (it may be out of range if programming error happens)
+ *
+ * If write_flag is 1, then we load the sector for write. Otherwise load it
+ * for read.
+ */
+Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag) {
+  const size_t inode_per_sector = disk_p->sector_size / sizeof(Inode);
+  size_t sector_num = inode / inode_per_sector;
+  size_t offset = inode % inode_per_sector;
+  sector_num += (FS_SB_SECTOR + 1);
+
+  Inode *inode_p = NULL;
+  if(write_flag == 1) {
+    inode_p = (Inode *)read_lba_for_write(disk_p, sector_num);
+  } else {
+    inode_p = (Inode *)read_lba(disk_p, sector_num);
+  }
+
+  return inode_p + offset;
+}
+
+/*
  * fill_inode_free_array() - This function fills the inode free array
  *
  * We start from the first sector after the sb, and scans until we reach
@@ -848,7 +874,7 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
  * This function returns the inode number. (-1) means allocation failure
  */
 uint16_t fs_alloc_inode(Storage *disk_p) {
-  SuperBlock *sb_p = (SupberBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+  SuperBlock *sb_p = (SupberBlock *)read_lba(disk_p, FS_SB_SECTOR);
   uint16_t ret;
   // If the array is empty, we just fill it first
   if(sb_p->ninode == 0) {
@@ -858,11 +884,15 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
   // If the inode list is still empty, then we could not find 
   // any more inodes, and return failure
   if(sb_p->ninode == 0) {
-    ret = (uint16_t)-1;
+    ret = FS_INVALID_INODE;
   } else {
+    sb_p = (SupberBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
     // Note that here we decrement first and then get inode number
     sb_p->ninode--;
     ret = sb_p->inode[sb_p->ninode];
+    
+    // Then mark the inode as being used by loading its sector
+    const size_t inode_per_sector = disk_p->sector_size / sizeof(Inode);
   }
 
   return ret;
