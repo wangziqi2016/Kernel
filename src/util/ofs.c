@@ -966,6 +966,11 @@ void fs_free_inode(Storage *disk_p, uint16_t inode) {
     sb_p->ninode++;
   }
 
+  // Load the sector containing this inode, and set it as dirty
+  Inode *inode_p = load_inode_sector(disk_p, inode, 1);
+  // Mask off the inodes
+  inode_p->flags &= (~FS_INODE_IN_USE);
+
   return;
 }
 
