@@ -959,6 +959,8 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
  */
 void fs_free_inode(Storage *disk_p, uint16_t inode) {
   SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
+  // If it is not full, we just use it. Otherwise we ignore the free
+  // inode list in sb and directly mask off the flag
   if(sb_p->ninode != FS_FREE_ARRAY_MAX) {
     // Upgrade to write
     sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
@@ -1125,6 +1127,13 @@ void test_alloc_sector(Storage *disk_p) {
 
 void test_alloc_inode(Storage *disk_p) {
   info("Testing allocating inode...");
+
+  const char *round_desp[] = {
+    "Low to high",
+    "High to low",
+    "Random",
+    "Verify"
+  };
   
   // Preparing the array for recording which inode is allocated
   const size_t alloc_size = sizeof(uint8_t) * context.total_inode_count;
@@ -1151,7 +1160,10 @@ void test_alloc_inode(Storage *disk_p) {
       }
     } while(inode != FS_INVALID_INODE);
 
-    info("Allocated %d inodes", count);
+    info("Round %d (%s): Allocated %lu inodes. Now verifying...", 
+         round, 
+         round_desp[round],
+         count);
 
     for(int i = 0;i < context.total_inode_count;i++) {
       if(flag_p[i] == 0) {
@@ -1159,8 +1171,25 @@ void test_alloc_inode(Storage *disk_p) {
       }
     }
 
+    info("  ...Pass");
+    info("  Free allocated sectors...");
+
+    if(round == 0) {
+      for(int i = 0;i < context.total_inode_count;i++) {
+        fs_free_inode(disk_p, i);
+      }
+    } else if(round == 1) {
+      for(int i = context.total_inode_count - 1;i >= 0;i++) {
+        fs_free_inode(disk_p, i);
+      }
+    } else if(round == 2) {
+      
+    } else {
+      break;
+    }
+
+    info("  ...Done");
     round++;
-    break;    
   }
 
   free(flag_p);
