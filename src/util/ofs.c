@@ -570,7 +570,7 @@ typedef struct {
   uint16_t free_end_sector;
   uint16_t free_sector_count;
   uint16_t total_sector_count;
-  uint16_t inode_count;
+  uint16_t total_inode_count;
   size_t inode_per_sector;
 } Context;
 
@@ -625,7 +625,7 @@ void load_context(Storage *disk_p) {
   context.total_sector_count = \
     context.free_start_sector + context.free_sector_count;
   // Total number of inodes in the system
-  context.inode_count = context.inode_per_sector * context.inode_sector_count;
+  context.total_inode_count = context.inode_per_sector * context.inode_sector_count;
   // This is the number of inodes per sector
   context.inode_per_sector = disk_p->sector_size / sizeof(Inode);
 
@@ -1119,7 +1119,26 @@ void test_alloc_sector(Storage *disk_p) {
 
 void test_alloc_inode() {
   info("Testing allocating inode...");
+  
+  // Preparing the array for recording which inode is allocated
+  const size_t alloc_size = sizeof(uint8_t) * context.total_inode_count;
+  uint8_t *inode_p = (uint8_t *)malloc(alloc_size);
 
+  while(1) {
+    memset(inode_p, 0x00, alloc_size);
+    uint16_t inode;
+    do {
+      // Starts from 0 and ends at max inode
+      inode = fs_alloc_inode(disk_p);
+      assert(inode < context.total_inode_count);
+      if(inode != FS_INVALID_INODE) {
+        inode_p[inode] = 1;
+      }
+    } while(inode != FS_INVALID_INODE);
+  }
+
+  free(inode_p);
+  return;
 }
 
 // This is a list of function call backs that we use to test
