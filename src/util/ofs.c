@@ -558,6 +558,23 @@ typedef struct {
   uint16_t modtime[2];
 } __attribute__((packed)) Inode;
 
+// This is the in-memory representation of the file system metadata
+// We load the super block and initialize this object
+// Once initialized it is never changed for the same fs
+typedef struct {
+  uint16_t sb_sector;
+  uint16_t inode_start_sector;
+  uint16_t inode_end_sector;
+  uint16_t inode_sector_count;
+  uint16_t free_start_sector;
+  uint16_t free_end_sector;
+  uint16_t free_sector_count;
+  size_t inode_per_sector;
+} Context;
+
+// This is the content of the fs
+Context context;
+
 // Next we define flags for inode flags word
 #define FS_INODE_IN_USE      0x8000
 // The following are file type code. We should mask off other bits
@@ -582,6 +599,11 @@ typedef struct {
 #define FS_INODE_OTHER_READ  0x0004
 #define FS_INODE_OTHER_WRITE 0x0002
 #define FS_INODE_OTHER_EXEC  0x0001
+
+
+void load_context() {
+
+}
 
 /*
  * fs_init_inode() - This function initializes the inode from a given sector
@@ -1074,7 +1096,8 @@ void test_alloc_sector(Storage *disk_p) {
 }
 
 void test_alloc_inode() {
-
+  info("Testing allocating inode...");
+  SuperBlock
 }
 
 // This is a list of function call backs that we use to test
