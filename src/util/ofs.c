@@ -179,6 +179,8 @@ typedef struct Buffer_t {
   // These two are status bit for the buffer
   uint64_t in_use : 1;
   uint64_t dirty  : 1;
+  // If this is set, then do not evict this buffer
+  uint64_t pinned : 1;
   // This is the LBA of the buffer object
   uint64_t lba;
   struct Buffer_t *next_p;
@@ -302,9 +304,13 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
  *                  and then writes back if it is dirty
  * 
  * We also clear the in_use and dirty flag for the buffer
+ *
+ * Note that we could not flush a pinned buffer, because it might be still 
+ * in-use
  */
 void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
   assert(buffer_p->in_use == 1);
+  assert(buffer_p->pinned == 0);
 #ifdef BUFFER_FLUSH_DEBUG
   info("Flushing buffer %lu (LBA %lu)", 
        (size_t)(buffer_p - buffers),
@@ -321,9 +327,13 @@ void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
 /*
  * buffer_flush_all() - This function flushes all buffers and writes back
  *                      those that are still dirty
+ *
+ * Note that if there is any buffer that is still pinned, then this function
+ * would fail
  */
 void buffer_flush_all(Storage *disk_p) {
   while(buffer_head_p != NULL) {
+    assert(buffer_head_p->pinned == 0);
     buffer_flush(buffer_head_p, disk_p);
   }
 
@@ -357,11 +367,24 @@ void buffer_flush_all_no_rm(Storage *disk_p) {
  * 
  * We return the evicted buffer from this function for the caller to make
  * use of it. The returned buffer has its in_use and dirty flag cleared
+ *
+ * We do not remove pinned buffers. Instead, we start from the tail of the
+ * linked list, and iterate towards the head. If we could not find any unpinned
+ * buffer, then this function fails (i.e. the working set of the fs should not
+ * exceed the buffer pool size)
  */
 Buffer *buffer_evict_lru(Storage *disk_p) {
   assert(buffer_head_p != NULL && buffer_tail_p != NULL);
   // We just take the tail and remove it and then write back
   Buffer *buffer_p = buffer_tail_p;
+  // Go forward until we find an unpinned buffer
+  while(buffer_p->pinned == 1) {
+    buffer_p = buffer_p->prev_p;
+    if(buffer_p == NULL) {
+      fatal_error("All buffers are pinned; could not evict");
+    }
+  }
+  
   buffer_flush(buffer_p, disk_p);
 
   return buffer_p;
@@ -398,7 +421,9 @@ Buffer *get_empty_buffer(Storage *disk_p) {
   if(buffer_p == NULL) {
     // The buffer has been removed from the linked list
     buffer_p = buffer_evict_lru(disk_p);
-    assert(buffer_p->in_use == 0 && buffer_p->dirty == 0);
+    assert(buffer_p->in_use == 0 && 
+           buffer_p->dirty == 0 && 
+           buffer_p->pinned == 0);
     buffer_p->in_use = 1;
   }
 
@@ -779,7 +804,7 @@ void fs_init_root() {
 
   Inode *inode_p = load_inode_sector(disk_p, FS_ROOT_INODE, 1);
   // Size of a directory is the number of sectors it occupies
-  inode_p->size1 = disk_p->sector_size;
+  fs_set_file_size(inode_p, disk_p->sector_size);
 }
 
 /*
