@@ -980,6 +980,13 @@ void test_fs_init(Storage *disk_p) {
 void test_alloc_sector(Storage *disk_p) {
   info("Testing sector allocation...");
 
+  const char *round_desp[] = {
+    "Low to high",
+    "High to low",
+    "Random",
+    "Verify"
+  };
+
   SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
   const size_t sb_sector = FS_SB_SECTOR;
   const size_t inode_sector_start = sb_sector + 1;
@@ -993,7 +1000,7 @@ void test_alloc_sector(Storage *disk_p) {
   uint8_t *sector_map = \
     malloc(sizeof(uint8_t) * free_sector_count);
   assert(sector_map != NULL);
-  int round = 1;
+  int round = 0;
   while(1) {
     memset(sector_map, 
           0x00, 
@@ -1014,7 +1021,10 @@ void test_alloc_sector(Storage *disk_p) {
       }
     } while(sector != FS_INVALID_SECTOR);
     
-    info("Round %d: Allocated %lu sectors. Now verifying...", round, count);
+    info("Round %d (%s): Allocated %lu sectors. Now verifying...", 
+         round, 
+         round_desp[round],
+         count);
 
     // Check whether all sectors are allocated
     for(size_t i = free_sector_start;i < total_sector_count;i++) {
@@ -1023,15 +1033,15 @@ void test_alloc_sector(Storage *disk_p) {
 
     info("  ...Pass");
     info("  Free allocated sectors...");
-    if(round == 1) {
+    if(round == 0) {
       for(uint16_t i = free_sector_start;i < total_sector_count;i++) {
         fs_free_sector(disk_p, i);
       }
-    } else if(round == 2) {
+    } else if(round == 1) {
       for(uint16_t i = total_sector_count - 1;i >= free_sector_start;i--) {
         fs_free_sector(disk_p, i);
       }
-    } else if(round == 3) {
+    } else if(round == 2) {
       srand(time(NULL));
       for(int i = 0;i < free_sector_count;i++) {
         // [free_sector_start, total_sector_count)
@@ -1061,6 +1071,10 @@ void test_alloc_sector(Storage *disk_p) {
 
   free(sector_map);
   return;
+}
+
+void test_alloc_inode() {
+
 }
 
 // This is a list of function call backs that we use to test
