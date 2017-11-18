@@ -1090,6 +1090,7 @@ void test_alloc_sector(Storage *disk_p) {
     malloc(sizeof(uint8_t) * free_sector_count);
   assert(sector_map != NULL);
   int round = 0;
+  int prev_percent = 0;
   while(1) {
     memset(sector_map, 
           0x00, 
@@ -1107,8 +1108,17 @@ void test_alloc_sector(Storage *disk_p) {
         size_t index = sector - free_sector_start;
         assert(sector_map[index] == 0);
         sector_map[index] = 1;
+
+        int current_percent = \
+          (int)(((double)count / context.free_sector_count) * 100);
+        if(current_percent != prev_percent) {
+          prev_percent = current_percent;
+          fprintf(stderr, "\r  Allocated %d%% of all free blocks", 
+                  prev_percent);
+        }
       }
     } while(sector != FS_INVALID_SECTOR);
+    putchar('\n');
     
     info("Round %d (%s): Allocated %lu sectors. Now verifying...", 
          round, 
@@ -1171,6 +1181,9 @@ void test_alloc_inode(Storage *disk_p) {
     "Random",
     "Verify"
   };
+
+  // Number of rounds
+  int round_count = sizeof(round_desp) / sizeof(round_desp[0]);
   
   // Preparing the array for recording which inode is allocated
   const size_t alloc_size = sizeof(uint8_t) * context.total_inode_count;
@@ -1181,6 +1194,7 @@ void test_alloc_inode(Storage *disk_p) {
     memset(flag_p, 0x00, alloc_size);
     uint16_t inode;
     int count = 0;
+    int prev_percent = 0;
     do {
       // Starts from 0 and ends at max inode
       inode = fs_alloc_inode(disk_p);
@@ -1194,8 +1208,16 @@ void test_alloc_inode(Storage *disk_p) {
         // Also check that the inode is indeed allocated (do not write)
         Inode *inode_p = load_inode_sector(disk_p, inode, 0);
         assert(inode_p->flags & FS_INODE_IN_USE);
+
+        int current_percent = \
+          (int)(((double)count / context.total_inode_count) * 100);
+        if(current_percent != prev_percent) {
+          prev_percent = current_percent;
+          fprintf(stderr, "\r  Allocated %d%% inodes", current_percent);
+        }
       }
     } while(inode != FS_INVALID_INODE);
+    putchar('\n');
 
     info("Round %d (%s): Allocated %lu inodes. Now verifying...", 
          round, 
@@ -1209,7 +1231,9 @@ void test_alloc_inode(Storage *disk_p) {
     }
 
     info("  ...Pass");
-    info("  Free allocated sectors...");
+    if(round < round_count - 1) {
+      info("  Free allocated sectors...");
+    }
 
     if(round == 0) {
       for(int i = 0;i < context.total_inode_count;i++) {
