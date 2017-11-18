@@ -624,10 +624,11 @@ void load_context(Storage *disk_p) {
   context.free_sector_count = sb_p->fsize;
   context.total_sector_count = \
     context.free_start_sector + context.free_sector_count;
-  // Total number of inodes in the system
-  context.total_inode_count = context.inode_per_sector * context.inode_sector_count;
   // This is the number of inodes per sector
   context.inode_per_sector = disk_p->sector_size / sizeof(Inode);
+  // Total number of inodes in the system
+  context.total_inode_count = \
+    context.inode_per_sector * context.inode_sector_count;
 
   return;
 }
@@ -1132,9 +1133,9 @@ void test_alloc_inode(Storage *disk_p) {
     do {
       // Starts from 0 and ends at max inode
       inode = fs_alloc_inode(disk_p);
-      assert(inode < context.total_inode_count);
       // If allocation is a success we set it to 1
       if(inode != FS_INVALID_INODE) {
+        assert(inode < context.total_inode_count);
         assert(flag_p[inode] == 0);
         flag_p[inode] = 1;
         count++;
@@ -1143,18 +1144,18 @@ void test_alloc_inode(Storage *disk_p) {
         Inode *inode_p = load_inode_sector(disk_p, inode, 0);
         assert(inode_p->flags & FS_INODE_IN_USE);
       }
-
-      for(int i = 0;i < context.total_inode_count;i++) {
-        if(flag_p[i] == 0) {
-          fatal_error("Inode %d is not allocated", i);
-        }
-      }
-
-      round++;
-      break;
     } while(inode != FS_INVALID_INODE);
 
     info("Allocated %d inodes", count);
+
+    for(int i = 0;i < context.total_inode_count;i++) {
+      if(flag_p[i] == 0) {
+        fatal_error("Inode %d is not allocated", i);
+      }
+    }
+
+    round++;
+    break;    
   }
 
   free(flag_p);
