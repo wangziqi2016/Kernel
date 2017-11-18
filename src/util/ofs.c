@@ -1004,22 +1004,6 @@ void fs_free_inode(Storage *disk_p, uint16_t inode) {
 #define DEBUG
 #ifdef DEBUG
 
-// This structured is used to record the current progress in a long-running
-// process
-typedef struct {
-  int prev_percent;
-  int current_percent;
-} ProgressCounter;
-
-/*
- * start_progress_counter() - This function returns a progress counter object
- */
-ProgressCounter start_progress_counter() {
-  ProgressCounter pc;
-  pc.prev_percent = pc.current_percent = 0;
-  return pc;
-}
-
 void test_lba_rw(Storage *disk_p) {
   info("Testing LBA r/w...");
   uint8_t buffer[DEFAULT_SECTOR_SIZE];
