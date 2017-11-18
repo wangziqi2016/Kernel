@@ -9,8 +9,13 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <time.h>
+#include <stdlib.h>
 
 #define DEFAULT_SECTOR_SIZE 512
+// If we simulate IO delay, then this is the # of ms
+// each IO operation will have
+#define IO_OVERHEAD_MS 2
+#define SIMULATE_IO
 
 /*
  * fatal_error() - Reports error and then exit
@@ -75,6 +80,13 @@ void mem_read(Storage *disk_p, uint64_t lba, void *buffer) {
   size_t offset = lba * disk_p->sector_size;
   memcpy(buffer, disk_p->data_p + offset, disk_p->sector_size);
 
+#ifdef SIMULATE_IO
+  struct timespec ts;
+  ts.tv_sec = IO_OVERHEAD_MS / 1000;
+  ts.tv_nsec = (IO_OVERHEAD_MS % 1000) * 1000000;
+  nanosleep(&ts, NULL);
+#endif
+
   return;
 }
 
@@ -88,6 +100,13 @@ void mem_write(Storage *disk_p, uint64_t lba, void *buffer) {
 
   size_t offset = lba * disk_p->sector_size;
   memcpy(disk_p->data_p + offset, buffer, disk_p->sector_size);
+
+#ifdef SIMULATE_IO
+  struct timespec ts;
+  ts.tv_sec = IO_OVERHEAD_MS / 1000;
+  ts.tv_nsec = (IO_OVERHEAD_MS % 1000) * 1000000;
+  nanosleep(&ts, NULL);
+#endif
 
   return;
 }
