@@ -1117,27 +1117,47 @@ void test_alloc_sector(Storage *disk_p) {
   return;
 }
 
-void test_alloc_inode() {
+void test_alloc_inode(Storage *disk_p) {
   info("Testing allocating inode...");
   
   // Preparing the array for recording which inode is allocated
   const size_t alloc_size = sizeof(uint8_t) * context.total_inode_count;
-  uint8_t *inode_p = (uint8_t *)malloc(alloc_size);
+  uint8_t *flag_p = (uint8_t *)malloc(alloc_size);
+  int round = 0;
 
   while(1) {
-    memset(inode_p, 0x00, alloc_size);
+    memset(flag_p, 0x00, alloc_size);
     uint16_t inode;
+    int count = 0;
     do {
       // Starts from 0 and ends at max inode
       inode = fs_alloc_inode(disk_p);
       assert(inode < context.total_inode_count);
+      // If allocation is a success we set it to 1
       if(inode != FS_INVALID_INODE) {
-        inode_p[inode] = 1;
+        assert(flag_p[inode] == 0);
+        flag_p[inode] = 1;
+        count++;
+
+        // Also check that the inode is indeed allocated (do not write)
+        Inode *inode_p = load_inode_sector(disk_p, inode, 0);
+        assert(inode_p->flags & FS_INODE_IN_USE);
       }
+
+      for(int i = 0;i < context.total_inode_count;i++) {
+        if(flag_p[i] == 0) {
+          fatal_error("Inode %d is not allocated", i);
+        }
+      }
+
+      round++;
+      break;
     } while(inode != FS_INVALID_INODE);
+
+    info("Allocated %d inodes", count);
   }
 
-  free(inode_p);
+  free(flag_p);
   return;
 }
 
@@ -1147,6 +1167,7 @@ void (*tests[])(Storage *) = {
   test_buffer,
   test_fs_init,
   test_alloc_sector,
+  test_alloc_inode,
   // This is the last stage
   free_mem_storage,
 };
