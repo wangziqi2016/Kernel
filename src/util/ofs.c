@@ -1179,11 +1179,26 @@ void test_alloc_inode(Storage *disk_p) {
         fs_free_inode(disk_p, i);
       }
     } else if(round == 1) {
-      for(int i = context.total_inode_count - 1;i >= 0;i++) {
+      for(int i = context.total_inode_count - 1;i >= 0;i--) {
         fs_free_inode(disk_p, i);
       }
     } else if(round == 2) {
-      
+      srand(time(NULL));
+      for(int i = 0;i < context.total_inode_count;i++) {
+        uint16_t start = (uint16_t)rand() % context.total_inode_count;
+        // Use the map as a hash table to find sectors that are not yet
+        // freed
+        while(flag_p[start] == 0) {
+          start++;
+          if(start == context.total_inode_count) {
+            start = 0;
+          }
+        }
+
+        // Clear it and then free
+        flag_p[start] = 0;
+        fs_free_inode(disk_p, start);
+      }
     } else {
       break;
     }
