@@ -501,6 +501,8 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 #define FS_SB_SECTOR 1
 // This indicates invalid sector numbers
 #define FS_INVALID_SECTOR 0
+// Since inode #0 is a valid one, we define invalid inode to be -1
+#define FS_INVALID_INODE  ((uint16_t)-1)
 
 typedef struct {
   // Number of elements in the local array
@@ -794,6 +796,8 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
  * for write. The caller could use this pointer to allocate inodes.
  */
 SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
+  // Only call this function when the inode array is empty
+  assert(sb_p->ninode == 0);
   // inode sector is just after the super block
   uint16_t current_sector = FS_SB_SECTOR + 1;
   // Must copy it here because the buffer might be overwritten
@@ -829,6 +833,7 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
   // Then update the super block
   sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
   sb_p->ninode = count;
+  // Just copy the inodes we have in the list
   memcpy(sb_p->inode, free_inode_list, sizeof(free_inode_list[0]) * count);
 
   return sb_p;
