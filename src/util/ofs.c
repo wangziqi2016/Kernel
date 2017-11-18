@@ -522,6 +522,8 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 #define FS_INVALID_SECTOR 0
 // Since inode #0 is a valid one, we define invalid inode to be -1
 #define FS_INVALID_INODE  ((uint16_t)-1)
+// Root inode is the first inode in the system
+#define FS_ROOT_INODE 0
 
 typedef struct {
   // Number of elements in the local array
@@ -743,6 +745,41 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
   buffer_flush_all_no_rm(disk_p);
 
   return current_free - free_start;
+}
+
+/*
+ * fs_get_file_size() - This function returns the size of an inode's file
+ */
+size_t fs_get_file_size(Inode *inode_p) {
+  // Note that we must first convert it to size_t and then shift
+  // Otherwise we will just get 0
+  return ((size_t)inode_p->size0 << 16) + (size_t)inode_p->size1;
+}
+
+/*
+ * fs_set_file_size() - This function sets the file size field for 
+ *                      an inode
+ */
+void fs_set_file_size(Inode *inode_p, size_t sz) {
+  inode_p->size1 = (uint16_t)sz;
+  // Note that we need to shift first and then convert
+  inode_p->size0 = (uint8_t)(sz >> 16);
+  return;
+}
+
+/*
+ * fs_init_root() - This function initializes the root directory
+ */
+void fs_init_root() {
+  // Allocate a sector for inode 0
+  uint16_t sector = fs_alloc_sector(disk_p);
+  if(sector == FS_INVALID_SECTOR) {
+    fatal_error("Failed to allocate sector for root directory");
+  }
+
+  Inode *inode_p = load_inode_sector(disk_p, FS_ROOT_INODE, 1);
+  // Size of a directory is the number of sectors it occupies
+  inode_p->size1 = disk_p->sector_size;
 }
 
 /*
