@@ -792,10 +792,11 @@ void fs_set_file_size(Inode *inode_p, size_t sz) {
   return;
 }
 
+
 /*
  * fs_init_root() - This function initializes the root directory
  */
-void fs_init_root() {
+void fs_init_root(Storage *disk_p) {
   // Allocate a sector for inode 0
   uint16_t sector = fs_alloc_sector(disk_p);
   if(sector == FS_INVALID_SECTOR) {
