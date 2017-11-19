@@ -792,6 +792,16 @@ void fs_set_file_size(Inode *inode_p, size_t sz) {
   return;
 }
 
+/*
+ * fs_set_file_type() - This function sets the type of the file
+ */
+void fs_set_file_type(Inode *inode_p, uint16_t type) {
+
+}
+
+// These two are used for init root dir
+uint16_t fs_alloc_sector(Storage *disk_p);
+Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
 
 /*
  * fs_init_root() - This function initializes the root directory
@@ -804,6 +814,8 @@ void fs_init_root(Storage *disk_p) {
   }
 
   Inode *inode_p = load_inode_sector(disk_p, FS_ROOT_INODE, 1);
+  inode_p->flags |= FS_INODE_IN_USE;
+
   // Size of a directory is the number of sectors it occupies
   fs_set_file_size(inode_p, disk_p->sector_size);
 }
@@ -979,6 +991,11 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
     for(size_t j = 0;j < context.inode_per_sector;j++) {
       // If the inode is not in-use
       if((inode_p[j].flags & FS_INODE_IN_USE) == 0) {
+        // The inode could not be the root inode, otherwise the fs is broken
+        assert(current_inode != FS_ROOT_INODE);
+        // Also the inode could not be the invalid value, otherwise uint16_t
+        // would overflow
+        assert(current_inode != FS_INVALID_INODE);
         // Otherwise just add the inode into the list of inodes
         free_inode_list[count] = current_inode;
         count++;
