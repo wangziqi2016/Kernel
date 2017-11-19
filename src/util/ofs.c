@@ -645,6 +645,7 @@ Context context;
 #define FS_INODE_TYPE_FILE   0x0000
 // Use this mask to extract the inode type
 #define FS_INODE_TYPE_MASK   0x6000
+#define FS_INODE_TYPE_SHIFT_BITS 13
 // Whether the file is a large file
 #define FS_INODE_LARGE       0x1000
 #define FS_INODE_SET_UID     0x0800
@@ -796,7 +797,18 @@ void fs_set_file_size(Inode *inode_p, size_t sz) {
  * fs_set_file_type() - This function sets the type of the file
  */
 void fs_set_file_type(Inode *inode_p, uint16_t type) {
+  // First shift it to the correct position
+  type <<= FS_INODE_TYPE_SHIFT_BITS;
+  // The type must be 0b00, 0b01, 0b10 or 0b11
+  assert(type == FS_INODE_TYPE_BLOCK ||
+         type == FS_INODE_TYPE_CHAR ||
+         type == FS_INODE_TYPE_FILE ||
+         type == FS_INODE_TYPE_DIR);
+  // First clear the bits, and then apply the type
+  inode_p->flags &= (~(FS_INODE_TYPE_MASK));
+  inode_p->flags |= type;
 
+  return;
 }
 
 // These two are used for init root dir
