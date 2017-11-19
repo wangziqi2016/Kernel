@@ -1130,7 +1130,7 @@ void fs_free_inode(Storage *disk_p, uint16_t inode) {
 #ifdef DEBUG
 
 void test_lba_rw(Storage *disk_p) {
-  info("Testing LBA r/w...");
+  info("=\n=Testing LBA r/w...\n=");
   uint8_t buffer[DEFAULT_SECTOR_SIZE];
   int prev_percent = 0;
   for(size_t i = 0;i < disk_p->sector_count;i++) {
@@ -1166,7 +1166,7 @@ void test_lba_rw(Storage *disk_p) {
 }
 
 void test_buffer(Storage *disk_p) {
-  info("Testing buffer...");
+  info("=\n=Testing buffer...\n=");
   for(int i = 0;i < MAX_BUFFER * 2;i++) {
     void *p = read_lba(disk_p, (uint64_t)i);
     memset(p, (char)i, disk_p->sector_size);
@@ -1186,7 +1186,7 @@ void test_buffer(Storage *disk_p) {
 }
 
 void test_fs_init(Storage *disk_p) {
-  info("Testing fs initialization...");
+  info("=\n=Testing fs initialization...\n=");
   // Note that we must put the super block on the given location
   // Call the special version
   _fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR, 0);
@@ -1299,7 +1299,7 @@ void test_alloc_sector(Storage *disk_p) {
 }
 
 void test_alloc_inode(Storage *disk_p) {
-  info("Testing allocating inode...");
+  info("=\n=Testing allocating inode...\n=");
 
   const char *round_desp[] = {
     "Low to high",
@@ -1398,6 +1398,14 @@ void test_alloc_inode(Storage *disk_p) {
   return;
 }
 
+void test_init_root(Storage *disk_p) {
+  info("=\n=Testing init the root directory...\n=");
+  // This is the complete version of fs_init
+  fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR);
+
+  return;
+}
+
 // This is a list of function call backs that we use to test
 void (*tests[])(Storage *) = {
   test_lba_rw,
@@ -1405,6 +1413,7 @@ void (*tests[])(Storage *) = {
   test_fs_init,
   test_alloc_sector,
   test_alloc_inode,
+  test_init_root,
   // This is the last stage
   free_mem_storage,
 };
