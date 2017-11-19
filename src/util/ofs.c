@@ -15,7 +15,7 @@
 // If we simulate IO delay, then this is the # of ms
 // each IO operation will have
 #define IO_OVERHEAD_MS 2
-#define SIMULATE_IO
+//#define SIMULATE_IO
 
 /*
  * fatal_error() - Reports error and then exit
@@ -661,7 +661,7 @@ Context context;
 #define FS_INODE_OTHER_EXEC  0x0001
 
 /*
- * load_context() - This function loads the context object using the super block
+ * fs_load_context() - This function loads the context object using the super block
  *
  * For each file system mounted, this can only be done once, and then used
  * for the entire session
@@ -669,7 +669,7 @@ Context context;
  * This function should only be called after the fs has been initialized or 
  * mounted.
  */
-void load_context(Storage *disk_p) {
+void fs_load_context(Storage *disk_p) {
   // Load the super block in read-only mode
   SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
 
@@ -805,6 +805,8 @@ Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
 
 /*
  * fs_init_root() - This function initializes the root directory
+ *
+ * This function must be called after the context is loaded
  */
 void fs_init_root(Storage *disk_p) {
   // Allocate a sector for inode 0
@@ -818,12 +820,19 @@ void fs_init_root(Storage *disk_p) {
 
   // Size of a directory is the number of sectors it occupies
   fs_set_file_size(inode_p, disk_p->sector_size);
+
+  return;
 }
 
 /*
  * fs_init() - This function initializes an empty FS on a raw storage
+ *
+ * The init_root flag is used for debugging purposes. It indicates whether
+ * we initialize the root directory also. For debugging we do not wish
+ * so, because it will disrupt sector and inode allocator
  */
-void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
+void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector, 
+             int init_root) {
   assert(start_sector < total_sector - 1);
   assert(total_sector <= disk_p->sector_count);
   size_t inode_start_sector = start_sector + 1;
@@ -861,6 +870,12 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   sb_p->flock = sb_p->ilock = 0;
   sb_p->fmod = 0;
   sb_p->time[0] = sb_p->time[1] = 0;
+
+  fs_load_context(disk_p);
+  if(init_root == 1) {
+    // Set up the root node (also allocate inode 0)
+    fs_init_root(disk_p);
+  }
 
   // Make sure the super block goes to disk
   buffer_flush_all_no_rm(disk_p);
@@ -992,10 +1007,11 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
       // If the inode is not in-use
       if((inode_p[j].flags & FS_INODE_IN_USE) == 0) {
         // The inode could not be the root inode, otherwise the fs is broken
-        assert(current_inode != FS_ROOT_INODE);
+        //assert(current_inode != FS_ROOT_INODE);
         // Also the inode could not be the invalid value, otherwise uint16_t
         // would overflow
-        assert(current_inode != FS_INVALID_INODE);
+        //assert(current_inode != FS_INVALID_INODE);
+
         // Otherwise just add the inode into the list of inodes
         free_inode_list[count] = current_inode;
         count++;
@@ -1155,9 +1171,9 @@ void test_buffer(Storage *disk_p) {
 void test_fs_init(Storage *disk_p) {
   info("Testing fs initialization...");
   // Note that we must put the super block on the given location
-  fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR);
+  fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR, 0);
   // Fill the parameters
-  load_context(disk_p);
+  fs_load_context(disk_p);
   return;
 }
 
