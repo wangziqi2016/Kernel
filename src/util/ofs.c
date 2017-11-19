@@ -797,8 +797,6 @@ void fs_set_file_size(Inode *inode_p, size_t sz) {
  * fs_set_file_type() - This function sets the type of the file
  */
 void fs_set_file_type(Inode *inode_p, uint16_t type) {
-  // First shift it to the correct position
-  type <<= FS_INODE_TYPE_SHIFT_BITS;
   // The type must be 0b00, 0b01, 0b10 or 0b11
   assert(type == FS_INODE_TYPE_BLOCK ||
          type == FS_INODE_TYPE_CHAR ||
@@ -811,6 +809,17 @@ void fs_set_file_type(Inode *inode_p, uint16_t type) {
   return;
 }
 
+/*
+ * get_file_type() - This function returns the file type
+ *
+ * The returned type is one of the following:
+ *   FS_INODE_TYPE_BLOCK, FS_INODE_TYPE_CHAR, FS_INODE_TYPE_FILE, 
+ *   FS_INODE_TYPE_DIR
+ */
+uint16_t get_file_type(Inode *inode_p) {
+  return inode_p->flags & FS_INODE_TYPE_MASK;
+}
+
 // These two are used for init root dir
 uint16_t fs_alloc_sector(Storage *disk_p);
 Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
@@ -821,7 +830,7 @@ Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
  * This function must be called after the context is loaded
  */
 void fs_init_root(Storage *disk_p) {
-  // Allocate a sector for inode 0
+  // Allocate a sector for inode 0 to hold its initial default dir
   uint16_t sector = fs_alloc_sector(disk_p);
   if(sector == FS_INVALID_SECTOR) {
     fatal_error("Failed to allocate sector for root directory");
@@ -833,6 +842,8 @@ void fs_init_root(Storage *disk_p) {
   // Size of a directory is the number of sectors it occupies
   fs_set_file_size(inode_p, disk_p->sector_size);
   fs_set_file_type(inode_p, FS_INODE_TYPE_DIR);
+
+  info("Finished initializing root directory");
 
   return;
 }
@@ -884,15 +895,15 @@ void _fs_init(Storage *disk_p, size_t total_sector, size_t start_sector,
   sb_p->fmod = 0;
   sb_p->time[0] = sb_p->time[1] = 0;
 
+  // Make sure the super block goes to disk
+  buffer_flush_all_no_rm(disk_p);
+  info("Finished writing the super block");
+
   fs_load_context(disk_p);
   if(init_root == 1) {
     // Set up the root node (also allocate inode 0)
     fs_init_root(disk_p);
   }
-
-  // Make sure the super block goes to disk
-  buffer_flush_all_no_rm(disk_p);
-  info("Finished writing the super block");
 
   return;
 }
