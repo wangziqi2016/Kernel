@@ -832,6 +832,7 @@ void fs_init_root(Storage *disk_p) {
 
   // Size of a directory is the number of sectors it occupies
   fs_set_file_size(inode_p, disk_p->sector_size);
+  fs_set_file_type(inode_p, FS_INODE_TYPE_DIR);
 
   return;
 }
@@ -843,7 +844,7 @@ void fs_init_root(Storage *disk_p) {
  * we initialize the root directory also. For debugging we do not wish
  * so, because it will disrupt sector and inode allocator
  */
-void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector, 
+void _fs_init(Storage *disk_p, size_t total_sector, size_t start_sector, 
              int init_root) {
   assert(start_sector < total_sector - 1);
   assert(total_sector <= disk_p->sector_count);
@@ -894,6 +895,10 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector,
   info("Finished writing the super block");
 
   return;
+}
+
+void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
+  _fs_init(disk_p, total_sector, start_sector, 1);
 }
 
 /*
@@ -1183,7 +1188,8 @@ void test_buffer(Storage *disk_p) {
 void test_fs_init(Storage *disk_p) {
   info("Testing fs initialization...");
   // Note that we must put the super block on the given location
-  fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR, 0);
+  // Call the special version
+  _fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR, 0);
   // Fill the parameters
   fs_load_context(disk_p);
   return;
