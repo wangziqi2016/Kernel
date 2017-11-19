@@ -908,6 +908,7 @@ void _fs_init(Storage *disk_p, size_t total_sector, size_t start_sector,
   return;
 }
 
+// This is called by non-debugging routines
 void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
   _fs_init(disk_p, total_sector, start_sector, 1);
 }
@@ -1131,6 +1132,22 @@ void fs_free_inode(Storage *disk_p, uint16_t inode) {
   inode_p->flags &= (~FS_INODE_IN_USE);
 
   return;
+}
+
+/*
+ * fs_get_free_dir_entry() - This function creates and returns a free dir entry
+ *                           in a given directory inode
+ *
+ * It does not following:
+ *   1. Get the last sector of the entry, and check whether there is any
+ *      free entry
+ *   2. If not, then scan from the first sector to see if there is any
+ *      free or deleted entry
+ *   3. If not, then allocate a new sector, and initialize all enrties to
+ *      free, and return the first entry in the sector
+ */
+void fs_get_free_dir_entry() {
+
 }
 
 /////////////////////////////////////////////////////////////////////
