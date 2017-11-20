@@ -810,13 +810,13 @@ void fs_set_file_type(Inode *inode_p, uint16_t type) {
 }
 
 /*
- * get_file_type() - This function returns the file type
+ * fs_get_file_type() - This function returns the file type
  *
  * The returned type is one of the following:
  *   FS_INODE_TYPE_BLOCK, FS_INODE_TYPE_CHAR, FS_INODE_TYPE_FILE, 
  *   FS_INODE_TYPE_DIR
  */
-uint16_t get_file_type(Inode *inode_p) {
+uint16_t fs_get_file_type(Inode *inode_p) {
   return inode_p->flags & FS_INODE_TYPE_MASK;
 }
 
