@@ -820,6 +820,14 @@ uint16_t fs_get_file_type(Inode *inode_p) {
   return inode_p->flags & FS_INODE_TYPE_MASK;
 }
 
+/*
+ * fs_is_file_large() - Returns 1 if the file is large. 0 if not
+ */
+int fs_is_file_large(Inode *inode_p) {
+  // We need to convert the mask into 0 or 1
+  return !!(inode_p->flags & FS_INODE_LARGE);
+}
+
 // These two are used for init root dir
 uint16_t fs_alloc_sector(Storage *disk_p);
 Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
