@@ -839,6 +839,25 @@ int fs_is_file_extra_large(const Inode *inode_p) {
   return !!(fs_is_file_large(inode_p) && \
             inode_p->addr[FS_ADDR_ARRAY_SIZE - 1] != FS_INVALID_SECTOR);
 }
+ 
+/*
+ * fs_get_sector() - This function returns the sector ID given an offset in
+ *                   the file
+ */
+uint16_t fs_get_sector(Storage *disk_p, const Inode *inode_p, size_t offset) {
+  // This is the linear ID in the file
+  size_t sector = offset / disk_p->sector_size;
+  uint16_t ret;
+  // If the file is small, then the sector ID must be less than 8
+  if(fs_is_file_large(inode_p) == 0) {
+    assert(sector < FS_ADDR_ARRAY_SIZE);
+    ret = inode_p->addr[sector];
+  } else {
+
+  }
+
+  return ret;
+}
 
 // These two are used for init root dir
 uint16_t fs_alloc_sector(Storage *disk_p);
