@@ -776,7 +776,7 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
 /*
  * fs_get_file_size() - This function returns the size of an inode's file
  */
-size_t fs_get_file_size(Inode *inode_p) {
+size_t fs_get_file_size(const Inode *inode_p) {
   // Note that we must first convert it to size_t and then shift
   // Otherwise we will just get 0
   return ((size_t)inode_p->size0 << 16) + (size_t)inode_p->size1;
@@ -816,16 +816,28 @@ void fs_set_file_type(Inode *inode_p, uint16_t type) {
  *   FS_INODE_TYPE_BLOCK, FS_INODE_TYPE_CHAR, FS_INODE_TYPE_FILE, 
  *   FS_INODE_TYPE_DIR
  */
-uint16_t fs_get_file_type(Inode *inode_p) {
+uint16_t fs_get_file_type(const Inode *inode_p) {
   return inode_p->flags & FS_INODE_TYPE_MASK;
 }
 
 /*
  * fs_is_file_large() - Returns 1 if the file is large. 0 if not
  */
-int fs_is_file_large(Inode *inode_p) {
+int fs_is_file_large(const Inode *inode_p) {
   // We need to convert the mask into 0 or 1
   return !!(inode_p->flags & FS_INODE_LARGE);
+}
+
+/*
+ * fs_is_file_extra_large() - Returns 1 if the file is extra large
+ *
+ * We determine whether a file is extra large using two sub-conditions:
+ *   1. The file has large bit set
+ *   2. The file has a valid sector number on addr[7]
+ */
+int fs_is_file_extra_large(const Inode *inode_p) {
+  return !!(fs_is_file_large(inode_p) && \
+            inode_p->addr[FS_ADDR_ARRAY_SIZE - 1] != FS_INVALID_SECTOR);
 }
 
 // These two are used for init root dir
