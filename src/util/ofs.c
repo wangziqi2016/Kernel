@@ -1525,6 +1525,22 @@ void test_buffer(Storage *disk_p) {
   return;
 }
 
+void test_pin_buffer(Storage *disk_p) {
+  // First remove all buffers to make it into a known state
+  buffer_flush_all(disk_p);
+  // Then read 5 buffers
+  for(int i = 0;i < 5;i++) {
+    uint8_t *p = (uint8_t *)read_lba(disk_p, (uint64_t)i);
+    // Pin the buffer using some pointer to the middle of the buffer
+    buffer_pin(disk_p, p + i * 20);
+  }
+
+  // Print to see whether we have the pinned flag set
+  buffer_print();
+
+  return;
+}
+
 void test_fs_init(Storage *disk_p) {
   info("=\n=Testing fs initialization...\n=");
   // Note that we must put the super block on the given location
@@ -1750,6 +1766,7 @@ void test_init_root(Storage *disk_p) {
 void (*tests[])(Storage *) = {
   test_lba_rw,
   test_buffer,
+  test_pin_buffer,
   test_fs_init,
   test_alloc_sector,
   test_alloc_inode,
