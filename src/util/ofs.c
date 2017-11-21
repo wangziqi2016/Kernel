@@ -320,13 +320,14 @@ Buffer *buffer_find_using_data(Storage *disk_p, void *data_p) {
  *                the buffer
  *
  * The data pointer can be anywhere inside a buffer's data area. If the 
- * buffer is not currently in-use then we error
+ * buffer is not currently in-use then we error. Also reports error when
+ * the buffer is pinned
  */
 void buffer_pin(Storage *disk_p, void *data_p) {
   // Find the buffer first
   Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
   if(buffer_p == NULL) {
-    fatal_error("Data pointer out of buffer's reach");
+    fatal_error("Data pointer out of buffer's reach (pin)");
   } else if(buffer_p->in_use == 0) {
     fatal_error("Could not pin an unused buffer");
   }
@@ -337,8 +338,24 @@ void buffer_pin(Storage *disk_p, void *data_p) {
   return;
 }
 
-void buffer_unpin() {
+/*
+ * buffer_unpin() - This function unpins a buffer. 
+ *
+ * The error condition is the same as buffer_pin(), except that it reports error
+ * when the buffer is already unpinned.
+ */
+void buffer_unpin(Storage *disk_p, void *data_p) {
+  Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
+  if(buffer_p == NULL) {
+    fatal_error("Data pointer out of buffer's reach (unpin)");
+  } else if(buffer_p->in_use == 0) {
+    fatal_error("Could not unpin an unused buffer");
+  }
 
+  assert(buffer_p->pinned == 1);
+  buffer_p->pinned = 0;
+
+  return;
 }
 
 //#define BUFFER_FLUSH_DEBUG
