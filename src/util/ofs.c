@@ -846,6 +846,17 @@ void fs_set_file_large(Inode *inode_p) {
 }
 
 /*
+ * fs_reset_addr() - This function resets the addr array of a given inode
+ */
+void fs_reset_addr(Inode *inode_p) {
+  for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
+    inode_p->addr[i] = FS_INVALID_SECTOR;
+  }
+
+  return;
+}
+
+/*
  * fs_is_file_extra_large() - Returns 1 if the file is extra large
  *
  * We determine whether a file is extra large using two sub-conditions:
@@ -939,9 +950,10 @@ uint16_t fs_get_file_sector(Storage *disk_p,
  * blocks. In these cases, the slot has value invalid sector ID. Any read 
  * operation to these ranges should return 0
  *
- * This function returns a sector ID for write
+ * This function returns a sector ID for write. If it returns invalid ID then
+ * we have run out of blocks.
  */
-void fs_get_file_sector_for_write(Storage *disk_p,
+uint16_t fs_get_file_sector_for_write(Storage *disk_p,
                                   Inode *inode_p,
                                   size_t offset) {
   uint16_t ret;
@@ -950,14 +962,30 @@ void fs_get_file_sector_for_write(Storage *disk_p,
   if(fs_is_file_large(inode_p) == 0) {
     // If it is not large, then check the sector offset
     if(sector >= FS_ADDR_ARRAY_SIZE) {
-      // If the offset is greater than the array size, then we should 
-      // convert it to a large block first
+      // First use an indirection sector to hold all pointers
+      uint16_t indir_sector = fs_alloc_sector(disk_p);
+      // If allocation fail we return fail
+      if(indir_sector == FS_INVALID_SECTOR) {
+        ret = FS_INVALID_SECTOR;
+      } else {
+        // Copy the addr array into the indir sector
+        uint16_t *data_p = (uint16_t *)write_lba(disk_p, indir_secor);
+        memcpy(data_p, inode_p->addr, sizeof(inode_p->addr));
+        memset(inode_p->addr)
+        // It must be the first indir sector as we only have 8 in addr.
+        inode_p->addr[0] = indir_sector;
+        // If the offset is greater than the array size, then we should 
+        // convert it to a large block first
+        fs_set_file_large(inode_p);
+        // After this point the inode is still valid
+      }
+
     }
   } else {
 
   }
 
-  return 
+  return ret;
 }
 
 // These two are used for init root dir
