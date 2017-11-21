@@ -1101,10 +1101,15 @@ sector_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
   return ret;
 }
 
+// These two are used to distinguish data and indir sector when allocating
+// a new sector
+#define FS_INDIR_SECTOR 1
+#define FS_DATA_SECTOR  0
+
 /*
- * read_or_alloc() - This function either reads and returns a given
- *                   sector pointer's value, or allocate a new block
- *                   for it. 
+ * fs_addr_read_or_alloc() - This function either reads and returns a given
+ *                           sector pointer's value, or allocate a new block
+ *                           for it. 
  *
  * The return value is either the value read or allocated. Return 
  * invalid sector if allocation fails
@@ -1114,7 +1119,8 @@ sector_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
  *
  * Note that the pointer must be in the buffer area because we will pin it
  */
-sector_t read_or_alloc(Storage *disk_p, sector_t *sector_p, int indir) {
+sector_t fs_addr_read_or_alloc(Storage *disk_p, sector_t *sector_p, int type) {
+  assert(type == FS_INDIR_SECTOR || type == FS_DATA_SECTOR);
   buffer_pin(disk_p, sector_p);
   sector_t sector = *sector_p;
   if(sector == FS_INVALID_SECTOR) {
@@ -1122,9 +1128,8 @@ sector_t read_or_alloc(Storage *disk_p, sector_t *sector_p, int indir) {
     // This is valid even when the allocation fails, because we did not
     // change the value by doing this when it fails.
     *sector_p = sector;
-
     // If allocation succeeds and indir is 1 we also initialize it
-    if(indir == 1 && sector != FS_INVALID_SECTOR) {
+    if(type == FS_INDIR_SECTOR && sector != FS_INVALID_SECTOR) {
       // Blind write
       sector_t *data_p = (sector_t *)write_lba(disk_p, sector);
       for(sector_t i = 0;i < context.id_per_indir_sector;i++) {
@@ -1162,20 +1167,10 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
   sector_t indir_offset = sector % context.id_per_indir_sector;
   // If the index is still in large file range but not extra large file range
   if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
-    sector_t indir_sector = inode_p->addr[indir_index];
-    // If the indir sector does not exist we need to first add it
-    if(indir_sector == FS_INVALID_SECTOR) {
-      sector_t new_sector = fs_alloc_indir_sector(disk_p);
-      // If allocation fail just exit with failure
-      if(new_sector == FS_INVALID_SECTOR) {
-        // Return here will not hurt, as we have not pinned any buffer yet
-        ret = FS_INVALID_SECTOR;
-        failed = 1;
-      } else {
-        // Setting this even if the following fails does not hurt
-        inode_p->addr[indir_index] = new_sector;
-      }
-    }
+    sector_t indir_sector = \
+      fs_addr_read_or_alloc(disk_p, 
+                            &inode_p->addr[indir_index], 
+                            FS_INDIR_SECTOR);
 
     // Only proceed to check the indir sector if we have not failed
     // in the previous stage
@@ -1254,22 +1249,10 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
         ret = fs_get_file_sector_for_write_large_file(disk_p, inode_p, sector);
       }
     } else {
-      // Small file, and sector does not exceeds small file's sector range
-      // Then we just return or allocate the block
-      if(inode_p->addr[sector] == FS_INVALID_SECTOR) {
-        // Allocate the sector and set it as addr[sector]
-        sector_t new_sector = fs_alloc_sector(disk_p);
-        if(new_sector == FS_INVALID_SECTOR) {
-          // If new sector allocation failed, we return this to
-          // indicate that we have run out of sectors
-          ret = FS_INVALID_SECTOR;
-        } else {
-          ret = new_sector;
-          inode_p->addr[sector] = new_sector;
-        }
-      } else {
-        ret = inode_p->addr[sector];
-      }
+      // If it fails then ret will be invalid sector
+      ret = fs_addr_read_or_alloc(disk_p, 
+                                  &inode_p->addr[sector], 
+                                  FS_DATA_SECTOR);
     }
   } else {
     // Just forward it to the function
