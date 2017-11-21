@@ -1160,42 +1160,35 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
   assert(sector >= FS_ADDR_ARRAY_SIZE);
   assert(fs_is_file_large(inode_p) == 1);
   sector_t ret;
-  // This will set if we fail at early stages
-  int failed = 0;
   // These two are the index and offset of/within the first indirection level
   sector_t indir_index = sector / context.id_per_indir_sector;
   sector_t indir_offset = sector % context.id_per_indir_sector;
   // If the index is still in large file range but not extra large file range
   if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
+    // Read or alloc the first indir sector
     sector_t indir_sector = \
-      fs_addr_read_or_alloc(disk_p, 
+      fs_addr_read_or_alloc(disk_p,
                             &inode_p->addr[indir_index], 
                             FS_INDIR_SECTOR);
 
     // Only proceed to check the indir sector if we have not failed
     // in the previous stage
-    if(failed == 0) {
+    if(indir_sector == FS_INVALID_SECTOR) {
+      ret = FS_INVALID_SECTOR;
+    } else {
       assert(inode_p->addr[indir_index] != FS_INVALID_SECTOR);
       // If the target sector is not in the extra large range
       // we just write the sector
       // Should pin it because we called alloc sector
       sector_t *data_p = \
-        (sector_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
+        (sector_t *)read_lba_for_write(disk_p, indir_sector);
       buffer_pin(disk_p, data_p);
 
-      // If the sector is not present then allocate one, or report failure
-      // Otherwise just return it because we have found a sector
-      if(data_p[indir_offset] == FS_INVALID_SECTOR) {
-        sector_t data_sector = fs_alloc_sector(disk_p);
-        if(data_sector == FS_INVALID_SECTOR) {
-          ret = FS_INVALID_SECTOR;
-        } else {
-          ret = data_sector;
-          data_p[indir_offset] = data_sector;
-        }
-      } else {
-        ret = data_p[indir_offset];
-      }
+      // Then read or alloc a data sector for the first indir sector
+      // If fails then ret will be invalid sector
+      ret = fs_addr_read_or_alloc(disk_p,
+                                  &data_p[indir_offset], 
+                                  FS_DATA_SECTOR);
 
       // Unpin the indirection buffer here before return
       buffer_unpin(disk_p, data_p);
@@ -1203,7 +1196,7 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
   } else {
     // If we are in this branch, then we fall into the extra large range
     assert(sector >= context.extra_large_start_sector);
-    sector -= extra_large_start_sector;
+    sector -= context.extra_large_start_sector;
     indir_index = sector / context.id_per_indir_sector;
     assert(indir_index < context.id_per_indir_sector);
     indir_offset = sector % context.id_per_indir_sector;
