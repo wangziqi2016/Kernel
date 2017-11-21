@@ -1961,6 +1961,46 @@ void test_alloc_inode(Storage *disk_p) {
   return;
 }
 
+void test_get_sector(Storage *disk_p) {
+  info("=\n=Testing getting sector for read/write...\n=");
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+
+  // Allocate an inode object and then try filling its sectors
+  Inode *inode_p = fs_alloc_inode();
+  // This is the maximum number of sectors we could support in one file
+  const sector_count_t block_for_test = \
+    context.id_per_indir_sector * \
+      (FS_ADDR_ARRAY_SIZE - 1 + context.id_per_indir_sector);
+  // Index is the sector in the file and content is the sector ID on the disk
+  sector_t *file_sector_map = malloc(sizeof(sector_t) * block_for_test);
+  // Index is the sector on the disk - free start sector, and content is 1
+  // or 0
+  uint8_t *disk_sector_map = \
+    malloc(sizeof(uint8_t) * context.free_sector_count);
+  memset(disk_sector_map, 0x00, sizeof(uint8_t) * context.free_sector_count);
+
+  for(sector_t i = 0;i < block_for_test;i++) {
+    // Note that this function requires byte offset
+    sector_t sector = \
+      fs_get_file_sector_for_write(disk_p, inode_p, i * disk_p->sector_size);
+    
+    assert(sector != FS_INVALID_SECTOR);
+    assert(sector >= context.free_start_sector);
+    assert(sector < context.free_end_sector);
+    file_sector_map[i] = sector;
+    // The sector must not be allocated
+    assert(disk_sector_map[sector - context.free_start_sector] == 0);
+    disk_sector_map[sector - context.free_start_sector] = 1;
+  }
+
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+  free(file_sector_map);
+  free(disk_sector_map);
+  return;
+}
+
 void test_init_root(Storage *disk_p) {
   info("=\n=Testing init the root directory...\n=");
   // This is the complete version of fs_init
