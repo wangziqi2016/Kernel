@@ -1198,8 +1198,38 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
     assert(sector >= context.extra_large_start_sector);
     sector -= context.extra_large_start_sector;
     indir_index = sector / context.id_per_indir_sector;
+    // The index cannot overflow a indir sector
     assert(indir_index < context.id_per_indir_sector);
     indir_offset = sector % context.id_per_indir_sector;
+    // Read or allocate it
+    sector_t first_indir_sector = \
+      fs_addr_read_or_alloc(disk_p,
+                            &inode_p->addr[FS_ADDR_ARRAY_SIZE - 1], 
+                            FS_INDIR_SECTOR);
+    if(first_indir_sector != FS_INVALID_SECTOR) {
+      sector_t *first_indir_p = \
+        (sector_t *)read_lba_for_write(disk_p, first_indir_sector);
+      buffer_pin(disk_p, first_indir_p);
+      sector_t second_indir_sector = \
+        fs_addr_read_or_alloc(disk_p,
+                              &first_indir_p[indir_index], 
+                              FS_INDIR_SECTOR);
+      if(second_indir_sector != FS_INVALID_SECTOR) {
+        sector_t *second_indir_p = \
+          (sector_t *)read_lba_for_write(disk_p, second_indir_sector);
+        buffer_pin(disk_p, second_indir_p);
+        // If the allocation fails then ret will naturally be invalid sector
+        ret = fs_addr_read_or_alloc(disk_p,
+                                    &second_indir_p[indir_offset], 
+                                    FS_DATA_SECTOR);
+        buffer_unpin(disk_p, second_indir_p);
+      } else {
+        ret = FS_INVALID_SECTOR;
+      }
+      buffer_unpin(disk_p, first_indir_p);
+    } else {
+      ret = FS_INVALID_SECTOR;
+    }
   }
 
   return ret;
