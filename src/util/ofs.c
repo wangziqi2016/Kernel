@@ -304,7 +304,7 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
  * Note that the data pointer can be anywhere inside the data area. We search
  * all the buffer, including those not in-use
  */
-Buffer *buffer_find_using_data(Storage *disk_p, void *data_p) {
+Buffer *buffer_find_using_data(Storage *disk_p, const void *data_p) {
   for(int i = 0;i < MAX_BUFFER;i++) {
     if((uint8_t *)data_p >= buffers[i].data && 
        (uint8_t *)data_p < buffers[i].data + disk_p->sector_size) {
@@ -323,7 +323,7 @@ Buffer *buffer_find_using_data(Storage *disk_p, void *data_p) {
  * buffer is not currently in-use then we error. Also reports error when
  * the buffer is pinned
  */
-void buffer_pin(Storage *disk_p, void *data_p) {
+void buffer_pin(Storage *disk_p, const void *data_p) {
   // Find the buffer first
   Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
   if(buffer_p == NULL) {
@@ -343,7 +343,7 @@ void buffer_pin(Storage *disk_p, void *data_p) {
  * The error condition is the same as buffer_pin(), except that it reports error
  * when the buffer is already unpinned.
  */
-void buffer_unpin(Storage *disk_p, void *data_p) {
+void buffer_unpin(Storage *disk_p, const void *data_p) {
   Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
   if(buffer_p == NULL) {
     fatal_error("Data pointer out of buffer's reach (unpin)");
@@ -363,7 +363,7 @@ void buffer_unpin(Storage *disk_p, void *data_p) {
  *
  * Return 1 if yes, 0 if not
  */
-int buffer_is_pinned(Storage *disk_p, void *data_p) {
+int buffer_is_pinned(Storage *disk_p, const void *data_p) {
   Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
   if(buffer_p == NULL) {
     fatal_error("Data pointer out of buffer's reach (is_pinned)");
@@ -983,11 +983,14 @@ int fs_is_file_extra_large(const Inode *inode_p) {
  * This function is for read. It does not allocate any sector or change the 
  * layout of the inode's addr list.
  *
- * inode_p should be pinned, because we read at most 2 sectors in this function
+ * This function pins the inode passed in, such that its buffer remains valid
+ * after return
  */
 uint16_t fs_get_file_sector(Storage *disk_p, 
                             const Inode *inode_p, 
                             size_t offset) {
+  buffer_pin(disk_p, inode_p);
+
   // This is the linear ID in the file. Note that we can only address 16 bit
   // sector size
   uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
@@ -1043,6 +1046,7 @@ uint16_t fs_get_file_sector(Storage *disk_p,
     }
   }
 
+  buffer_unpin(disk_p, inode_p);
   return ret;
 }
 
@@ -1060,6 +1064,8 @@ uint16_t fs_get_file_sector(Storage *disk_p,
  */
 uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
   assert(fs_is_file_large(inode_p) == 0);
+  assert(buffer_is_pinned(disk_p, inode_p) == 1);
+
   uint16_t ret;
   // First use an indirection sector to hold all pointers
   uint16_t indir_sector = fs_alloc_sector(disk_p);
@@ -1101,11 +1107,15 @@ uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
  * This function returns a sector ID for write. If it returns invalid ID then
  * we have run out of blocks.
  *
- * inode_p should be pinned
+ * This function will pin the inode such that its buffer remains valid
+ * after function return
  */
 uint16_t fs_get_file_sector_for_write(Storage *disk_p,
                                       Inode *inode_p,
                                       size_t offset) {
+  // First pin the buffer, because we will read sectors
+  buffer_pin(disk_p, inode_p);
+
   uint16_t ret;
   uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
   assert(((size_t)sector * disk_p->sector_size) == offset);
@@ -1148,7 +1158,8 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
   } else {
 
   }
-
+  
+  buffer_unpin(disk_p, inode_p);
   return ret;
 }
 
