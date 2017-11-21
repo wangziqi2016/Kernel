@@ -510,7 +510,19 @@ Buffer *get_empty_buffer(Storage *disk_p) {
   return buffer_p;
 }
 
+/*
+ * buffer_count_pinned() - This function counts the number of pinned buffers
+ */
+size_t buffer_count_pinned() {
+  size_t count = 0UL;
+  for(int i = 0;i < MAX_BUFFER;i++) {
+    if(buffers[i].pinned_count != 0) {
+      count++;
+    }
+  }
 
+  return count;
+}
 
 /*
  * buffer_print() - This function prints the buffers in-use from the head to
