@@ -850,12 +850,15 @@ int fs_is_file_extra_large(const Inode *inode_p) {
 }
  
 /*
- * fs_get_sector() - This function returns the sector ID given an offset in
- *                   the file
+ * fs_get_file_sector() - This function returns the sector ID given an offset in
+ *                        the file
  *
- * This function returns invalid sector ID if the offset is too large
+ * This function returns invalid sector ID if the offset falls in a region
+ * that no data has been written. By default this should map to all-zero sector
  */
-uint16_t fs_get_sector(Storage *disk_p, const Inode *inode_p, size_t offset) {
+uint16_t fs_get_file_sector(Storage *disk_p, 
+                            const Inode *inode_p, 
+                            size_t offset) {
   // This is the linear ID in the file. Note that we can only address 16 bit
   // sector size
   uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
@@ -865,6 +868,7 @@ uint16_t fs_get_sector(Storage *disk_p, const Inode *inode_p, size_t offset) {
   // If the file is small, then the sector ID must be less than 8
   if(fs_is_file_large(inode_p) == 0) {
     assert(sector < FS_ADDR_ARRAY_SIZE);
+    // This could be invalid sector
     ret = inode_p->addr[sector];
   } else {
     // Number of IDs inside an indirection sector
@@ -892,7 +896,8 @@ uint16_t fs_get_sector(Storage *disk_p, const Inode *inode_p, size_t offset) {
       assert(sector >= context.extra_large_start_sector);
       // This branch handles extra large file
       // This is the address of the first indirection sector
-      const uint16_t first_indir_sector = addr[FS_ADDR_ARRAY_SIZE - 1];
+      const uint16_t first_indir_sector = \
+        inode_p->addr[FS_ADDR_ARRAY_SIZE - 1];
       // Starts with 0 in the extra large area
       sector -= context.extra_large_start_sector;
       // Just treat it as another array of indir blocks
