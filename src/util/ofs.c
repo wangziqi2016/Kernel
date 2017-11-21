@@ -1154,6 +1154,23 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
 
         }
       }
+    } else {
+      // Small file, and sector does not exceeds small file's sector range
+      // Then we just return or allocate the block
+      if(inode_p->addr[sector] == FS_INVALID_SECTOR) {
+        // Allocate the sector and set it as addr[sector]
+        uint16_t new_sector = fs_alloc_sector(disk_p);
+        if(new_sector == FS_INVALID_SECTOR) {
+          // If new sector allocation failed, we return this to
+          // indicate that we have run out of sectors
+          ret = FS_INVALID_SECTOR;
+        } else {
+          ret = new_sector;
+          inode_p->addr[sector] = new_sector;
+        }
+      } else {
+        ret = inode_p->addr[sector];
+      }
     }
   } else {
 
