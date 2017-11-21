@@ -358,6 +358,22 @@ void buffer_unpin(Storage *disk_p, void *data_p) {
   return;
 }
 
+/*
+ * buffer_is_pinned() - This function checks whether the buffer is pinned
+ *
+ * Return 1 if yes, 0 if not
+ */
+int buffer_is_pinned(Storage *disk_p, void *data_p) {
+  Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
+  if(buffer_p == NULL) {
+    fatal_error("Data pointer out of buffer's reach (is_pinned)");
+  } else if(buffer_p->in_use == 0) {
+    fatal_error("Could not check an unused buffer");
+  }
+
+  return buffer->pinned;
+}
+
 //#define BUFFER_FLUSH_DEBUG
 
 /*
