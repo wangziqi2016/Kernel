@@ -632,8 +632,10 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 
 // Sector type
 typedef uint16_t sector_t;
-typedef uint16_t inode_id_t
-typedef size_t   offset_t;
+typedef sector_t sector_count_t;
+// Inode ID type
+typedef uint16_t inode_id_t;
+typedef inode_id_t inode_count_t;
 
 // This is the length of the free array
 #define FS_FREE_ARRAY_MAX 100
@@ -650,11 +652,11 @@ typedef size_t   offset_t;
 
 typedef struct {
   // Number of elements in the local array
-  sector_t nfree;
+  sector_count_t nfree;
   // The first word of this structure is the block number
   // to the next block that holds this list
   // All elements after the first one is the free blocks
-  sector_t free[FS_FREE_ARRAY_MAX];
+  sector_t       free[FS_FREE_ARRAY_MAX];
 } __attribute__((packed)) FreeArray;
 
 // This defines the first block of the file system
@@ -673,8 +675,8 @@ typedef struct {
   FreeArray free_array;
   // Number of free inodes as a fast cache in the following
   // array
-  inode_id_t ninode;
-  inode_id_t inode[FS_FREE_ARRAY_MAX];
+  inode_count_t ninode;
+  inode_id_t    inode[FS_FREE_ARRAY_MAX];
   char flock;
   char ilock;
   char fmod;
@@ -721,15 +723,15 @@ typedef struct {
   sector_t sb_sector;
   sector_t inode_start_sector;
   sector_t inode_end_sector;
-  sector_t inode_sector_count;
+  sector_count_t inode_sector_count;
   sector_t free_start_sector;
   sector_t free_end_sector;
-  sector_t free_sector_count;
-  sector_t total_sector_count;
-  inode_id_t total_inode_count;
-  inode_id_t inode_per_sector;
+  sector_count_t free_sector_count;
+  sector_count_t total_sector_count;
+  inode_count_t total_inode_count;
+  inode_count_t inode_per_sector;
   // Number of sector IDs per indirection sector
-  sector_t id_per_indir_sector;
+  sector_count_t id_per_indir_sector;
   // The start sector for extra large blocks
   sector_t extra_large_start_sector;
 } Context;
