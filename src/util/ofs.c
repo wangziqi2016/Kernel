@@ -838,6 +838,14 @@ int fs_is_file_large(const Inode *inode_p) {
 }
 
 /*
+ * fs_set_file_large() - Sets the large flag for the file
+ */
+void fs_set_file_large(Inode *inode_p) {
+  inode_p->flags |= FS_INODE_LARGE;
+  return;
+}
+
+/*
  * fs_is_file_extra_large() - Returns 1 if the file is extra large
  *
  * We determine whether a file is extra large using two sub-conditions:
@@ -924,12 +932,32 @@ uint16_t fs_get_file_sector(Storage *disk_p,
  * fs_get_file_sector_for_write() - This function returns the sector ID
  *                                  to write into.
  *
- * If the sector does not exist, or the 
+ * If the sector does not exist, or the offset exceeds the current file
+ * end, then we allocate sector for the indirection block, and then try again
+ *
+ * Note that this function may leave holes in the array of blocks or indirection
+ * blocks. In these cases, the slot has value invalid sector ID. Any read 
+ * operation to these ranges should return 0
+ *
+ * This function returns a sector ID for write
  */
 void fs_get_file_sector_for_write(Storage *disk_p,
                                   Inode *inode_p,
                                   size_t offset) {
+  uint16_t ret;
+  uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
+  assert(((size_t)sector * disk_p->sector_size) == offset);
+  if(fs_is_file_large(inode_p) == 0) {
+    // If it is not large, then check the sector offset
+    if(sector >= FS_ADDR_ARRAY_SIZE) {
+      // If the offset is greater than the array size, then we should 
+      // convert it to a large block first
+    }
+  } else {
 
+  }
+
+  return 
 }
 
 // These two are used for init root dir
