@@ -179,8 +179,8 @@ typedef struct Buffer_t {
   // These two are status bit for the buffer
   uint64_t in_use : 1;
   uint64_t dirty  : 1;
-  // If this is set, then do not evict this buffer
-  uint64_t pinned : 1;
+  // This is number of pins the buffer has seen
+  uint64_t pinned_count;
   // This is the LBA of the buffer object
   uint64_t lba;
   struct Buffer_t *next_p;
@@ -332,8 +332,7 @@ void buffer_pin(Storage *disk_p, void *data_p) {
     fatal_error("Could not pin an unused buffer");
   }
 
-  assert(buffer_p->pinned == 0);
-  buffer_p->pinned = 1;
+  buffer_p->pinned_count++;
 
   return;
 }
@@ -352,8 +351,9 @@ void buffer_unpin(Storage *disk_p, void *data_p) {
     fatal_error("Could not unpin an unused buffer");
   }
 
-  assert(buffer_p->pinned == 1);
-  buffer_p->pinned = 0;
+  // Cannot unpin a buffer if it is not pinned
+  assert(buffer_p->pinned_count != 0);
+  buffer_p->pinned_count--;
 
   return;
 }
@@ -371,7 +371,7 @@ int buffer_is_pinned(Storage *disk_p, void *data_p) {
     fatal_error("Could not check an unused buffer");
   }
 
-  return buffer_p->pinned;
+  return !!(buffer_p->pinned_count != 0);
 }
 
 //#define BUFFER_FLUSH_DEBUG
@@ -387,7 +387,7 @@ int buffer_is_pinned(Storage *disk_p, void *data_p) {
  */
 void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
   assert(buffer_p->in_use == 1);
-  assert(buffer_p->pinned == 0);
+  assert(buffer_p->pinned_count == 0);
 #ifdef BUFFER_FLUSH_DEBUG
   info("Flushing buffer %lu (LBA %lu)", 
        (size_t)(buffer_p - buffers),
@@ -410,7 +410,7 @@ void buffer_flush(Buffer *buffer_p, Storage *disk_p) {
  */
 void buffer_flush_all(Storage *disk_p) {
   while(buffer_head_p != NULL) {
-    assert(buffer_head_p->pinned == 0);
+    assert(buffer_head_p->pinned_count == 0);
     buffer_flush(buffer_head_p, disk_p);
   }
 
@@ -455,7 +455,7 @@ Buffer *buffer_evict_lru(Storage *disk_p) {
   // We just take the tail and remove it and then write back
   Buffer *buffer_p = buffer_tail_p;
   // Go forward until we find an unpinned buffer
-  while(buffer_p->pinned == 1) {
+  while(buffer_p->pinned_count != 0) {
     buffer_p = buffer_p->prev_p;
     if(buffer_p == NULL) {
       fatal_error("All buffers are pinned; could not evict");
@@ -500,7 +500,7 @@ Buffer *get_empty_buffer(Storage *disk_p) {
     buffer_p = buffer_evict_lru(disk_p);
     assert(buffer_p->in_use == 0 && 
            buffer_p->dirty == 0 && 
-           buffer_p->pinned == 0);
+           buffer_p->pinned_count == 0);
     buffer_p->in_use = 1;
   }
 
@@ -509,6 +509,8 @@ Buffer *get_empty_buffer(Storage *disk_p) {
 
   return buffer_p;
 }
+
+
 
 /*
  * buffer_print() - This function prints the buffers in-use from the head to
@@ -524,7 +526,7 @@ void buffer_print() {
       fprintf(stderr, "%lu,%lu(%X) ", 
               buffer_p - buffers,
               buffer_p->lba, 
-              (uint32_t)((buffer_p->pinned << 2) | 
+              (uint32_t)((!!(buffer_p->pinned_count != 0) << 2) | 
                          (buffer_p->dirty << 1) | 
                          (buffer_p->in_use)));
       buffer_p = buffer_p->next_p;
@@ -1236,6 +1238,8 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
 uint16_t fs_alloc_sector(Storage *disk_p) {
   // First read the super block, setting dirty flag
   SuperBlock *sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+  buffer_pin(disk_p, sb_p);
+
   uint16_t ret = 0;
   // If there are cached free values, then just get one
   if(sb_p->free_array.nfree != 0) {
@@ -1253,15 +1257,12 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
       // Read the free list head, and copy the free array into the temp
       // object (because the sb may have been evicted)
       uint16_t *data_p = (uint16_t *)read_lba(disk_p, free_list_head);
-      FreeArray free_array;
-      memcpy(&free_array, data_p, sizeof(FreeArray));
-      // Then read super block again, and copies the temp free array into it
-      // as the new free array
-      sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
-      memcpy(&sb_p->free_array, &free_array, sizeof(FreeArray));
+      memcpy(&sb_p->free_array, data_p, sizeof(FreeArray));
     }
   }
 
+  // Make sure no buffer is pinned at the end
+  buffer_unpin(disk_p, sb_p);
   return ret;
 }
 
@@ -1275,6 +1276,8 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
  */
 void fs_free_sector(Storage *disk_p, uint16_t sector) {
   SuperBlock *sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
+  buffer_pin(disk_p, sb_p);
+
   assert(sb_p->free_array.nfree <= (FS_FREE_ARRAY_MAX - 1));
   // If the free list is not full, we just put it into the sb and 
   // increment nfree
@@ -1293,6 +1296,7 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
     memcpy(data_p, &free_array, sizeof(FreeArray));
   }
 
+  buffer_unpin(disk_p, sb_p);
   return;
 }
 
@@ -1305,6 +1309,8 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
  *
  * If write_flag is 1, then we load the sector for write. Otherwise load it
  * for read.
+ *
+ * Note that we do not pin the inode. The caller should be responsible for this
  */
 Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag) {
   size_t sector_num = inode / context.inode_per_sector;
@@ -1333,10 +1339,14 @@ Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag) {
  *
  * This function returns a pointer to the new SB block, which is read
  * for write. The caller could use this pointer to allocate inodes.
+ *
+ * sb should be pinned in the buffer
  */
 SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
   // Only call this function when the inode array is empty
   assert(sb_p->ninode == 0);
+  assert(buffer_is_pinned(disk_p, sb_p));
+
   // inode sector is just after the super block
   uint16_t current_sector = FS_SB_SECTOR + 1;
   // Number of inodes we have scanned
@@ -1373,7 +1383,6 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
   }
 
   // Then update the super block
-  sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
   sb_p->ninode = count;
   // Just copy the inodes we have in the list
   memcpy(sb_p->inode, free_inode_list, sizeof(free_inode_list[0]) * count);
@@ -1391,6 +1400,8 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
  */
 uint16_t fs_alloc_inode(Storage *disk_p) {
   SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
+  buffer_pin(disk_p, sb_p);
+
   uint16_t ret;
   // If the array is empty, we just fill it first
   if(sb_p->ninode == 0) {
@@ -1402,7 +1413,6 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
   if(sb_p->ninode == 0) {
     ret = FS_INVALID_INODE;
   } else {
-    sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
     // Note that here we decrement first and then get inode number
     sb_p->ninode--;
     ret = sb_p->inode[sb_p->ninode];
@@ -1415,7 +1425,8 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
     // Mark it as in-use
     inode_p->flags |= FS_INODE_IN_USE;
   }
-
+  
+  buffer_unpin(disk_p, sb_p);
   return ret;
 }
 
@@ -1429,6 +1440,8 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
  */
 void fs_free_inode(Storage *disk_p, uint16_t inode) {
   SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
+  buffer_pin(disk_p, sb_p);
+
   // If it is not full, we just use it. Otherwise we ignore the free
   // inode list in sb and directly mask off the flag
   if(sb_p->ninode != FS_FREE_ARRAY_MAX) {
@@ -1445,6 +1458,7 @@ void fs_free_inode(Storage *disk_p, uint16_t inode) {
   // Mask off the inodes
   inode_p->flags &= (~FS_INODE_IN_USE);
 
+  buffer_unpin(disk_p, sb_p);
   return;
 }
 
