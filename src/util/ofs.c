@@ -973,6 +973,10 @@ uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
     ret = indir_sector;
     // Copy the addr array into the indir sector
     uint16_t *data_p = (uint16_t *)write_lba(disk_p, indir_sector);
+    // Fill the entire disk with INVALID SECTOR
+    for(int i = 0;i < context.id_per_indir_sector;i++) {
+      data_p[i] = INVALID_SECTOR;
+    }
     memcpy(data_p, inode_p->addr, sizeof(inode_p->addr));
     // Reset all sectors of the array
     fs_reset_addr(inode_p);
@@ -1011,8 +1015,38 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
   if(fs_is_file_large(inode_p) == 0) {
     // If it is not large, then check the sector offset
     if(sector >= FS_ADDR_ARRAY_SIZE) {
-      fs_convert_to_large(disk_p, inode_p);
-        // After this point the inode is still valid
+      // This does not logically change the file
+      uint16_t indir_sector = fs_convert_to_large(disk_p, inode_p);
+      if(indir_sector == FS_INVALID_SECTOR) {
+        ret = FS_INVALID_SECTOR;
+      } else {
+        // Then compute the position in the large block
+        uint16_t indir_index = sector / context.id_per_indir_sector;
+        uint16_t indir_offset = sector % context.id_per_indir_sector;
+        if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
+          // If the target sector is not in the extra large range
+          // we just write the sector
+          // Should pin it because we called alloc sector
+          uint16_t *data_p = \
+            fs_read_lba_for_write(disk_p, inode_p->addr[indir_index]);
+          // If the sector is not present then allocate one, or report failure
+          // Otherwise just return it because we have found a sector
+          if(data_p[indir_offset] == INVALID_SECTOR) {
+            uint16_t data_sector = fs_alloc_sector(disk_p);
+            if(data_sector == INVALID_SECTOR) {
+              ret = INVALID_SECTOR;
+            } else {
+              ret = data_sector;
+              data_p[indir_offset] = data_sector;
+            }
+          } else {
+            ret = data_p[indir_offset];
+          }
+          
+        } else {
+
+        }
+      }
     }
   } else {
 
