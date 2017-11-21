@@ -524,7 +524,9 @@ void buffer_print() {
       fprintf(stderr, "%lu,%lu(%X) ", 
               buffer_p - buffers,
               buffer_p->lba, 
-              (uint32_t)((buffer_p->dirty << 1) | (buffer_p->in_use)));
+              (uint32_t)((buffer_p->pinned << 2) | 
+                         (buffer_p->dirty << 1) | 
+                         (buffer_p->in_use)));
       buffer_p = buffer_p->next_p;
     }
   }
@@ -1526,6 +1528,7 @@ void test_buffer(Storage *disk_p) {
 }
 
 void test_pin_buffer(Storage *disk_p) {
+  info("=\n=Testing buffer pin/unpin...\n=");
   // First remove all buffers to make it into a known state
   buffer_flush_all(disk_p);
   // Then read 5 buffers
