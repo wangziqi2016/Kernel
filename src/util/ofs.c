@@ -371,7 +371,7 @@ int buffer_is_pinned(Storage *disk_p, void *data_p) {
     fatal_error("Could not check an unused buffer");
   }
 
-  return buffer->pinned;
+  return buffer_p->pinned;
 }
 
 //#define BUFFER_FLUSH_DEBUG
@@ -742,6 +742,10 @@ Context context;
 #define FS_INODE_OTHER_WRITE 0x0002
 #define FS_INODE_OTHER_EXEC  0x0001
 
+uint16_t fs_alloc_sector(Storage *disk_p);
+Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
+uint16_t fs_alloc_sector(Storage *disk_p);
+
 /*
  * fs_load_context() - This function loads the context object using the super block
  *
@@ -1052,7 +1056,7 @@ uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
     uint16_t *data_p = (uint16_t *)write_lba(disk_p, indir_sector);
     // Fill the entire disk with INVALID SECTOR
     for(int i = 0;i < context.id_per_indir_sector;i++) {
-      data_p[i] = INVALID_SECTOR;
+      data_p[i] = FS_INVALID_SECTOR;
     }
     memcpy(data_p, inode_p->addr, sizeof(inode_p->addr));
     // Reset all sectors of the array
@@ -1105,13 +1109,13 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
           // we just write the sector
           // Should pin it because we called alloc sector
           uint16_t *data_p = \
-            fs_read_lba_for_write(disk_p, inode_p->addr[indir_index]);
+            (uint16_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
           // If the sector is not present then allocate one, or report failure
           // Otherwise just return it because we have found a sector
-          if(data_p[indir_offset] == INVALID_SECTOR) {
+          if(data_p[indir_offset] == FS_INVALID_SECTOR) {
             uint16_t data_sector = fs_alloc_sector(disk_p);
-            if(data_sector == INVALID_SECTOR) {
-              ret = INVALID_SECTOR;
+            if(data_sector == FS_INVALID_SECTOR) {
+              ret = FS_INVALID_SECTOR;
             } else {
               ret = data_sector;
               data_p[indir_offset] = data_sector;
@@ -1131,10 +1135,6 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
 
   return ret;
 }
-
-// These two are used for init root dir
-uint16_t fs_alloc_sector(Storage *disk_p);
-Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
 
 /*
  * fs_init_root() - This function initializes the root directory
