@@ -297,6 +297,44 @@ void buffer_wb(Buffer *buffer_p, Storage *disk_p) {
   return;
 }
 
+/*
+ * buffer_find_using_data() - This function returns the corresponding buffer
+ *                            given the data pointer into the buffer's data
+ *
+ * Note that the data pointer can be anywhere inside the data area. We search
+ * all the buffer, including those not in-use
+ */
+Buffer *buffer_find_using_data(Storage *disk_p, void *data_p) {
+  for(int i = 0;i < MAX_BUFFER;i++) {
+    if((uint8_t *)data_p >= buffers[i].data && 
+       (uint8_t *)data_p < buffers[i].data + disk_p->sector_size) {
+      return buffers + i;
+    }
+  }
+
+  return NULL;
+}
+
+/*
+ * buffer_pin() - This function accepts a buffer's data pointer and pins 
+ *                the buffer
+ *
+ * The data pointer can be anywhere inside a buffer's data area. If the 
+ * buffer is not currently in-use then we error
+ */
+void buffer_pin(Storage *disk_p, void *data_p) {
+  Buffer *buffer_p = buffer_head_p;
+  while(buffer_p != NULL) {
+    if((uint8_t *)data_p >= buffer_p->data_p && 
+       (uint8_t *)data_p < buffer_p->data_p + disk_p->sector_size) {
+      assert(buffer_p->pinned == 0);
+      // We pin the buffer
+      buffer_p->pinned = 1;
+    }
+    buffer_p = buffer_p->next_p;
+  }
+}
+
 //#define BUFFER_FLUSH_DEBUG
 
 /*
