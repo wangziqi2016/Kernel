@@ -1541,6 +1541,14 @@ void test_pin_buffer(Storage *disk_p) {
   // Print to see whether we have the pinned flag set
   buffer_print();
 
+  // Read another 50 buffers and see whether the previous 5 are evicted
+  for(int i = 100;i < 150;i++) {
+    read_lba(disk_p, (uint64_t)i);
+  }
+
+  // Print to see whether pinned buffer is still in the buffer list
+  buffer_print();
+
   return;
 }
 
