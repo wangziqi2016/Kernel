@@ -885,6 +885,8 @@ int fs_is_file_extra_large(const Inode *inode_p) {
  *
  * This function is for read. It does not allocate any sector or change the 
  * layout of the inode's addr list.
+ *
+ * inode_p should be pinned, because we read at most 2 sectors in this function
  */
 uint16_t fs_get_file_sector(Storage *disk_p, 
                             const Inode *inode_p, 
@@ -948,6 +950,43 @@ uint16_t fs_get_file_sector(Storage *disk_p,
 }
 
 /*
+ * fs_convert_to_large() - Converts a given inode to large file and changes the
+ *                         inode addr layout accordingly
+ *
+ * The inode passed in must not be an inode itself. If this function fails 
+ * for lacking free sector, we return INVALID_SECTOR; otherwise return the
+ * sector for new indir sector.
+ *
+ * This function does not logically change the file
+ *
+ * inode_p should be pinned as we read another sector
+ */
+uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
+  assert(fs_is_file_large(inode_p) == 0);
+  uint16_t ret;
+  // First use an indirection sector to hold all pointers
+  uint16_t indir_sector = fs_alloc_sector(disk_p);
+  // If allocation fail we return fail
+  if(indir_sector == FS_INVALID_SECTOR) {
+    ret = FS_INVALID_SECTOR;
+  } else {
+    ret = indir_sector;
+    // Copy the addr array into the indir sector
+    uint16_t *data_p = (uint16_t *)write_lba(disk_p, indir_sector);
+    memcpy(data_p, inode_p->addr, sizeof(inode_p->addr));
+    // Reset all sectors of the array
+    fs_reset_addr(inode_p);
+    // It must be the first indir sector as we only have 8 in addr.
+    inode_p->addr[0] = indir_sector;
+    // If the offset is greater than the array size, then we should 
+    // convert it to a large block first
+    fs_set_file_large(inode_p);
+  }
+
+  return ret;
+}
+
+/*
  * fs_get_file_sector_for_write() - This function returns the sector ID
  *                                  to write into.
  *
@@ -960,34 +999,20 @@ uint16_t fs_get_file_sector(Storage *disk_p,
  *
  * This function returns a sector ID for write. If it returns invalid ID then
  * we have run out of blocks.
+ *
+ * inode_p should be pinned
  */
 uint16_t fs_get_file_sector_for_write(Storage *disk_p,
-                                  Inode *inode_p,
-                                  size_t offset) {
+                                      Inode *inode_p,
+                                      size_t offset) {
   uint16_t ret;
   uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
   assert(((size_t)sector * disk_p->sector_size) == offset);
   if(fs_is_file_large(inode_p) == 0) {
     // If it is not large, then check the sector offset
     if(sector >= FS_ADDR_ARRAY_SIZE) {
-      // First use an indirection sector to hold all pointers
-      uint16_t indir_sector = fs_alloc_sector(disk_p);
-      // If allocation fail we return fail
-      if(indir_sector == FS_INVALID_SECTOR) {
-        ret = FS_INVALID_SECTOR;
-      } else {
-        // Copy the addr array into the indir sector
-        uint16_t *data_p = (uint16_t *)write_lba(disk_p, indir_secor);
-        memcpy(data_p, inode_p->addr, sizeof(inode_p->addr));
-        memset(inode_p->addr)
-        // It must be the first indir sector as we only have 8 in addr.
-        inode_p->addr[0] = indir_sector;
-        // If the offset is greater than the array size, then we should 
-        // convert it to a large block first
-        fs_set_file_large(inode_p);
+      fs_convert_to_large(disk_p, inode_p);
         // After this point the inode is still valid
-      }
-
     }
   } else {
 
