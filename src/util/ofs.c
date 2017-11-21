@@ -1093,6 +1093,42 @@ uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
   return ret;
 }
 
+uint16_t fs_get_file_sector_for_write_large_file(Storage *disk_p, 
+                                                 Inode *inode_p, 
+                                                 uint16_t sector) {
+  // These two are the index and offset of/within the first indirection level
+  uint16_t indir_index = sector / context.id_per_indir_sector;
+  uint16_t indir_offset = sector % context.id_per_indir_sector;
+  if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
+    uint16_t indir_sector = inode_p->addr[indir_index];
+    if(indir_sector == )
+    // If the target sector is not in the extra large range
+    // we just write the sector
+    // Should pin it because we called alloc sector
+    uint16_t *data_p = \
+      (uint16_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
+    buffer_pin(data_p);
+    // If the sector is not present then allocate one, or report failure
+    // Otherwise just return it because we have found a sector
+    if(data_p[indir_offset] == FS_INVALID_SECTOR) {
+      uint16_t data_sector = fs_alloc_sector(disk_p);
+      if(data_sector == FS_INVALID_SECTOR) {
+        ret = FS_INVALID_SECTOR;
+      } else {
+        ret = data_sector;
+        data_p[indir_offset] = data_sector;
+      }
+    } else {
+      ret = data_p[indir_offset];
+    }
+    
+  } else {
+
+  }
+
+  return ret;
+}
+
 /*
  * fs_get_file_sector_for_write() - This function returns the sector ID
  *                                  to write into.
@@ -1127,32 +1163,11 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
       if(indir_sector == FS_INVALID_SECTOR) {
         ret = FS_INVALID_SECTOR;
       } else {
+        assert(fs_is_file_large(inode_p) == 1);
         // Then compute the position in the large block
         uint16_t indir_index = sector / context.id_per_indir_sector;
         uint16_t indir_offset = sector % context.id_per_indir_sector;
-        if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
-          // If the target sector is not in the extra large range
-          // we just write the sector
-          // Should pin it because we called alloc sector
-          uint16_t *data_p = \
-            (uint16_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
-          // If the sector is not present then allocate one, or report failure
-          // Otherwise just return it because we have found a sector
-          if(data_p[indir_offset] == FS_INVALID_SECTOR) {
-            uint16_t data_sector = fs_alloc_sector(disk_p);
-            if(data_sector == FS_INVALID_SECTOR) {
-              ret = FS_INVALID_SECTOR;
-            } else {
-              ret = data_sector;
-              data_p[indir_offset] = data_sector;
-            }
-          } else {
-            ret = data_p[indir_offset];
-          }
-          
-        } else {
-
-        }
+        
       }
     } else {
       // Small file, and sector does not exceeds small file's sector range
