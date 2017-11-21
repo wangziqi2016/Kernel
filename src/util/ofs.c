@@ -702,6 +702,17 @@ void fs_load_context(Storage *disk_p) {
 }
 
 /*
+ * fs_reset_addr() - This function resets the addr array of a given inode
+ */
+void fs_reset_addr(Inode *inode_p) {
+  for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
+    inode_p->addr[i] = FS_INVALID_SECTOR;
+  }
+
+  return;
+}
+
+/*
  * fs_init_inode() - This function initializes the inode from a given sector
  *                   of the storage
  *
@@ -721,6 +732,14 @@ size_t fs_init_inode(Storage *disk_p,
   while(total_end > current_inode) {
     void *data = write_lba(disk_p, current_inode);
     memset(data, 0x00, disk_p->sector_size);
+
+    // Reset the addr array (we may use an arbitrary value for invalid sector,
+    // so setting it to 0x00 may not be sufficient)
+    Inode *inode_p = (Inode *)data;
+    for(int i = 0;i < inode_per_sector;i++) {
+      fs_reset_addr(inode_p + i);
+    }
+
     // Go to the next inode sector
     current_inode++;
     // We have allocated inode for each of the blocks in this range
@@ -842,17 +861,6 @@ int fs_is_file_large(const Inode *inode_p) {
  */
 void fs_set_file_large(Inode *inode_p) {
   inode_p->flags |= FS_INODE_LARGE;
-  return;
-}
-
-/*
- * fs_reset_addr() - This function resets the addr array of a given inode
- */
-void fs_reset_addr(Inode *inode_p) {
-  for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
-    inode_p->addr[i] = FS_INVALID_SECTOR;
-  }
-
   return;
 }
 
