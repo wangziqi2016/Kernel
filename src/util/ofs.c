@@ -1094,6 +1094,29 @@ uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
 }
 
 /*
+ * fs_alloc_indir_sector() - Allocates a sector for indirection (any level)
+ *
+ * This function fills the sector with INVALID sector words. Return invalid
+ * sector if fails
+ *
+ * Return value is not pinned.
+ */
+uint16_t *fs_alloc_indir_sector(Storage *disk_p) {
+  uint16_t sector = fs_alloc_sector(disk_p);
+  if(sector == FS_INVALID_SECTOR) {
+    return sector;
+  }
+
+  // Blind write
+  uint16_t *data_p = (uint16_t *)write_lba(disk_p, sector);
+  for(int i = 0;i < context.id_per_indir_sector;i++) {
+    data_p[i] = FS_INVALID_SECTOR;
+  }
+
+  return sector;
+}
+
+/*
  * fs_get_file_sector_for_write_large_file() - This function finds or creates a
  *                                             sector for write in a large file
  *
@@ -1119,12 +1142,13 @@ uint16_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
     uint16_t indir_sector = inode_p->addr[indir_index];
     // If the indir sector does not exist we need to first add it
     if(indir_sector == FS_INVALID_SECTOR) {
-      uint16_t new_sector = fs_alloc_sector(disk_p);
+      uint16_t new_sector = fs_alloc_indir_sector(disk_p);
       // If allocation fail just exit with failure
-      if(new_sector == FS_INVALID_SECTOR) {
+      if(new_sector_p == NULL) {
         ret = FS_INVALID_SECTOR;
       } else {
-        inode_p->addr
+        // Setting this even if the following fails does not hurt
+        inode_p->addr[indir_index] = new_sector;
       }
     }
     // If the target sector is not in the extra large range
@@ -1152,29 +1176,6 @@ uint16_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
   }
 
   return ret;
-}
-
-/*
- * fs_alloc_indir_sector() - Allocates a sector for indirection (any level)
- *
- * This function fills the sector with INVALID sector words. Return NULL
- * if allocation fail. Otherwise return the pointer to the data area.
- *
- * Return value is not pinned.
- */
-uint16_t *fs_alloc_indir_sector(Storage *disk_p) {
-  uint16_t sector = fs_alloc_sector(disk_p);
-  if(sector == FS_INVALID_SECTOR) {
-    return NULL;
-  }
-
-  // Blind write
-  uint16_t *data_p = (uint16_t *)write_lba(disk_p, sector);
-  for(int i = 0;i < context.id_per_indir_sector;i++) {
-    data_p[i] = FS_INVALID_SECTOR;
-  }
-
-  return data_p;
 }
 
 /*
