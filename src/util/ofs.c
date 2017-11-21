@@ -1557,8 +1557,13 @@ void test_pin_buffer(Storage *disk_p) {
   info("=\n=Testing buffer pin/unpin...\n=");
   // First remove all buffers to make it into a known state
   buffer_flush_all(disk_p);
+
+  // First make sure there is no pinned buffer
+  assert(buffer_count_pinned() == 0UL);
+
+  const int pinned_count = 5;
   // Then read 5 buffers
-  for(int i = 0;i < 5;i++) {
+  for(int i = 0;i < pinned_count;i++) {
     uint8_t *p = (uint8_t *)read_lba(disk_p, (uint64_t)i);
     // Pin the buffer using some pointer to the middle of the buffer
     buffer_pin(disk_p, p + i * 20);
@@ -1566,6 +1571,7 @@ void test_pin_buffer(Storage *disk_p) {
 
   // Print to see whether we have the pinned flag set
   buffer_print();
+  assert(buffer_count_pinned() == (size_t)pinned_count);
 
   // Read another 50 buffers and see whether the previous 5 are evicted
   for(int i = 100;i < 150;i++) {
@@ -1574,6 +1580,17 @@ void test_pin_buffer(Storage *disk_p) {
 
   // Print to see whether pinned buffer is still in the buffer list
   buffer_print();
+  assert(buffer_count_pinned() == (size_t)pinned_count);
+
+  // Finally, unpin these buffers and then test the pinned count
+  for(int i = pinned_count - 1;i >= 0;i--) {
+    uint8_t *p = (uint8_t *)read_lba(disk_p, (uint64_t)i);
+    // Pin the buffer using some pointer to the middle of the buffer
+    buffer_unpin(disk_p, p + 511);
+  }
+
+  buffer_print();
+  assert(buffer_count_pinned() == 0UL);
 
   return;
 }
