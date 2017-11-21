@@ -1597,16 +1597,27 @@ void test_pin_buffer(Storage *disk_p) {
 
 void test_fs_init(Storage *disk_p) {
   info("=\n=Testing fs initialization...\n=");
+
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+
   // Note that we must put the super block on the given location
   // Call the special version
   _fs_init(disk_p, disk_p->sector_count, FS_SB_SECTOR, 0);
   // Fill the parameters
   fs_load_context(disk_p);
+
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+
   return;
 }
 
 void test_alloc_sector(Storage *disk_p) {
-  info("Testing sector allocation...");
+  info("=\n=Testing sector allocation...\n=");
+
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
 
   const char *round_desp[] = {
     "Low to high",
@@ -1705,11 +1716,17 @@ void test_alloc_sector(Storage *disk_p) {
   } // while(1)
 
   free(sector_map);
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+
   return;
 }
 
 void test_alloc_inode(Storage *disk_p) {
   info("=\n=Testing allocating inode...\n=");
+
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
 
   const char *round_desp[] = {
     "Low to high",
@@ -1805,6 +1822,8 @@ void test_alloc_inode(Storage *disk_p) {
   }
 
   free(flag_p);
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
   return;
 }
 
