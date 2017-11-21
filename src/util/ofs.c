@@ -766,7 +766,7 @@ Context context;
 #define FS_INODE_OTHER_EXEC  0x0001
 
 sector_t fs_alloc_sector(Storage *disk_p);
-Inode *load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag);
+Inode *fs_load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag);
 
 /*
  * fs_load_context() - This function loads the context object using the super block
@@ -1298,7 +1298,7 @@ void fs_init_root(Storage *disk_p) {
     fatal_error("Failed to allocate sector for root directory");
   }
 
-  Inode *inode_p = load_inode_sector(disk_p, FS_ROOT_INODE, 1);
+  Inode *inode_p = fs_load_inode_sector(disk_p, FS_ROOT_INODE, 1);
   inode_p->flags |= FS_INODE_IN_USE;
 
   // Size of a directory is the number of sectors it occupies
@@ -1447,8 +1447,8 @@ void fs_free_sector(Storage *disk_p, sector_t sector) {
 }
 
 /*
- * load_inode_sector() - This function loads the sector an inode is in
- *                       and returns the pointer to that inode
+ * fs_load_inode_sector() - This function loads the sector an inode is in
+ *                          and returns the pointer to that inode
  *
  * Note that this function does not check whether the inode number is
  * valid or not (it may be out of range if programming error happens)
@@ -1458,7 +1458,7 @@ void fs_free_sector(Storage *disk_p, sector_t sector) {
  *
  * Note that we do not pin the inode. The caller should be responsible for this
  */
-Inode *load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag) {
+Inode *fs_load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag) {
   sector_t sector_num = inode / context.inode_per_sector;
   size_t offset = inode % context.inode_per_sector;
   sector_num += (FS_SB_SECTOR + 1);
@@ -1564,7 +1564,7 @@ inode_id_t fs_alloc_inode(Storage *disk_p) {
     ret = sb_p->inode[sb_p->ninode];
     // Load the sector that holds the inode, and make it dirty because we 
     // are writing into this inode
-    Inode *inode_p = load_inode_sector(disk_p, ret, 1);
+    Inode *inode_p = fs_load_inode_sector(disk_p, ret, 1);
     assert((inode_p->flags & FS_INODE_IN_USE) == 0);
     // Clear its previous content
     memset(inode_p, 0x0, sizeof(Inode));
@@ -1598,7 +1598,7 @@ void fs_free_inode(Storage *disk_p, inode_id_t inode) {
   }
 
   // Load the sector containing this inode, and set it as dirty
-  Inode *inode_p = load_inode_sector(disk_p, inode, 1);
+  Inode *inode_p = fs_load_inode_sector(disk_p, inode, 1);
   // Make sure it is an allocated inode
   assert(inode_p->flags & FS_INODE_IN_USE);
   // Mask off the inodes
@@ -1841,6 +1841,11 @@ void test_alloc_sector(Storage *disk_p) {
         fs_free_sector(disk_p, start);
       }
     } else {
+      info("  ...for clean up...");
+      for(sector_t i = free_sector_start;i < total_sector_count;i++) {
+        fs_free_sector(disk_p, i);
+      }
+
       break;
     }
 
@@ -1893,7 +1898,7 @@ void test_alloc_inode(Storage *disk_p) {
         count++;
 
         // Also check that the inode is indeed allocated (do not write)
-        Inode *inode_p = load_inode_sector(disk_p, inode, 0);
+        Inode *inode_p = fs_load_inode_sector(disk_p, inode, 0);
         assert(inode_p->flags & FS_INODE_IN_USE);
 
         int current_percent = \
@@ -1948,6 +1953,10 @@ void test_alloc_inode(Storage *disk_p) {
         fs_free_inode(disk_p, start);
       }
     } else {
+      info("  ...for clean up...");
+      for(int i = 0;i < context.total_inode_count;i++) {
+        fs_free_inode(disk_p, i);
+      }
       break;
     }
 
@@ -1967,7 +1976,11 @@ void test_get_sector(Storage *disk_p) {
   assert(buffer_count_pinned() == 0UL);
 
   // Allocate an inode object and then try filling its sectors
-  Inode *inode_p = fs_alloc_inode();
+  inode_id_t inode = fs_alloc_inode(disk_p);
+  assert(inode != FS_INVALID_INODE);
+  Inode *inode_p = fs_load_inode_sector(disk_p, inode, 1);
+  assert(fs_is_file_large(inode_p) == 0 && 
+         fs_is_file_extra_large(inode_p) == 0);
   // This is the maximum number of sectors we could support in one file
   const sector_count_t block_for_test = \
     context.id_per_indir_sector * \
@@ -2017,6 +2030,7 @@ void (*tests[])(Storage *) = {
   test_fs_init,
   test_alloc_sector,
   test_alloc_inode,
+  test_get_sector,
   test_init_root,
   // This is the last stage
   free_mem_storage,
