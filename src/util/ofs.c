@@ -1107,7 +1107,7 @@ sector_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
  *
  * Return value is not pinned.
  */
-sector_t *fs_alloc_indir_sector(Storage *disk_p) {
+sector_t fs_alloc_indir_sector(Storage *disk_p) {
   sector_t sector = fs_alloc_sector(disk_p);
   if(sector == FS_INVALID_SECTOR) {
     return sector;
@@ -1136,7 +1136,7 @@ sector_t *fs_alloc_indir_sector(Storage *disk_p) {
 sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p, 
                                                  Inode *inode_p, 
                                                  sector_t sector) {
-  assert(buffer_is_pinned(inode_p) == 1);
+  assert(buffer_is_pinned(disk_p, inode_p) == 1);
   assert(sector >= FS_ADDR_ARRAY_SIZE);
   assert(fs_is_file_large(inode_p) == 1);
   sector_t ret;
@@ -1159,13 +1159,13 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
       }
     }
 
-    assert(inode_p->addr[indir_index] != INVALID_SECTOR);
+    assert(inode_p->addr[indir_index] != FS_INVALID_SECTOR);
     // If the target sector is not in the extra large range
     // we just write the sector
     // Should pin it because we called alloc sector
     sector_t *data_p = \
       (sector_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
-    buffer_pin(data_p);
+    buffer_pin(disk_p, data_p);
 
     // If the sector is not present then allocate one, or report failure
     // Otherwise just return it because we have found a sector
