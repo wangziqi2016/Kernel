@@ -1093,15 +1093,40 @@ uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
   return ret;
 }
 
+/*
+ * fs_get_file_sector_for_write_large_file() - This function finds or creates a
+ *                                             sector for write in a large file
+ *
+ * The inode should be pinned. The sector should be larger than ADDR size.
+ * The inode must point to a large file
+ *
+ * This function returns invalid sector if allocation fails when trying to
+ * add an indirection sector or a data sector. Otherwise it returns the new 
+ * data sector we added for found.
+ */
 uint16_t fs_get_file_sector_for_write_large_file(Storage *disk_p, 
                                                  Inode *inode_p, 
                                                  uint16_t sector) {
+  assert(buffer_is_pinned(inode_p) == 1);
+  assert(sector >= FS_ADDR_ARRAY_SIZE);
+  assert(fs_is_file_large(inode_p) == 1);
+  uint16_t ret;
   // These two are the index and offset of/within the first indirection level
   uint16_t indir_index = sector / context.id_per_indir_sector;
   uint16_t indir_offset = sector % context.id_per_indir_sector;
+  // If the index is still in large file range but not extra large file range
   if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
     uint16_t indir_sector = inode_p->addr[indir_index];
-    if(indir_sector == )
+    // If the indir sector does not exist we need to first add it
+    if(indir_sector == FS_INVALID_SECTOR) {
+      uint16_t new_sector = fs_alloc_sector(disk_p);
+      // If allocation fail just exit with failure
+      if(new_sector == FS_INVALID_SECTOR) {
+        ret = FS_INVALID_SECTOR;
+      } else {
+        inode_p->addr
+      }
+    }
     // If the target sector is not in the extra large range
     // we just write the sector
     // Should pin it because we called alloc sector
@@ -1130,6 +1155,29 @@ uint16_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
 }
 
 /*
+ * fs_alloc_indir_sector() - Allocates a sector for indirection (any level)
+ *
+ * This function fills the sector with INVALID sector words. Return NULL
+ * if allocation fail. Otherwise return the pointer to the data area.
+ *
+ * Return value is not pinned.
+ */
+uint16_t *fs_alloc_indir_sector(Storage *disk_p) {
+  uint16_t sector = fs_alloc_sector(disk_p);
+  if(sector == FS_INVALID_SECTOR) {
+    return NULL;
+  }
+
+  // Blind write
+  uint16_t *data_p = (uint16_t *)write_lba(disk_p, sector);
+  for(int i = 0;i < context.id_per_indir_sector;i++) {
+    data_p[i] = FS_INVALID_SECTOR;
+  }
+
+  return data_p;
+}
+
+/*
  * fs_get_file_sector_for_write() - This function returns the sector ID
  *                                  to write into.
  *
@@ -1153,7 +1201,7 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
   buffer_pin(disk_p, inode_p);
 
   uint16_t ret;
-  uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
+  int16_t sector = (uint16_t)(offset / disk_p->sector_size);
   assert(((size_t)sector * disk_p->sector_size) == offset);
   if(fs_is_file_large(inode_p) == 0) {
     // If it is not large, then check the sector offset
@@ -1163,11 +1211,7 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
       if(indir_sector == FS_INVALID_SECTOR) {
         ret = FS_INVALID_SECTOR;
       } else {
-        assert(fs_is_file_large(inode_p) == 1);
-        // Then compute the position in the large block
-        uint16_t indir_index = sector / context.id_per_indir_sector;
-        uint16_t indir_offset = sector % context.id_per_indir_sector;
-        
+        ret = fs_get_file_sector_for_write_large_file(disk_p, inode_p, sector);
       }
     } else {
       // Small file, and sector does not exceeds small file's sector range
@@ -1188,7 +1232,8 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
       }
     }
   } else {
-
+    // Just forward it to the function
+    ret = fs_get_file_sector_for_write_large_file(disk_p, inode_p, sector);
   }
   
   buffer_unpin(disk_p, inode_p);
