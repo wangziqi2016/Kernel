@@ -846,14 +846,39 @@ int fs_is_file_extra_large(const Inode *inode_p) {
  */
 uint16_t fs_get_sector(Storage *disk_p, const Inode *inode_p, size_t offset) {
   // This is the linear ID in the file
-  size_t sector = offset / disk_p->sector_size;
+  uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
   uint16_t ret;
   // If the file is small, then the sector ID must be less than 8
   if(fs_is_file_large(inode_p) == 0) {
     assert(sector < FS_ADDR_ARRAY_SIZE);
     ret = inode_p->addr[sector];
   } else {
-
+    // Number of IDs inside an indirection sector
+    const uint16_t id_per_sector = disk_p->sector_size / sizeof(uint16_t);
+    uint16_t addr_index = sector / id_per_sector;
+    uint16_t addr_offset = sector % id_per_sector;
+    
+    // Then if the file is large file, and the index is not the last one
+    // then we know we can always use the indirection sector
+    if(addr_index < (FS_ADDR_ARRAY_SIZE - 1)) {
+      uint16_t indir_sector = inode_p->addr[addr_index];
+      uint16_t *data_p = (uint16_t *)read_lba(disk_p, indir_sector);
+      ret = data_p[addr_offset]; 
+    } else if(fs_is_file_extra_large(inode_p) == 0) {
+      // If the offset implies that the file should be extra large
+      // but actually the file is not extra large, we return invalid
+      // sector because there is no way to find the correct sector
+      ret = FS_INVALID_SECTOR;
+    } else {
+      // The first 7 sectors all point to indirection blocks
+      // which holds sectors. This value is the starting sector handled
+      // by the last pointer
+      uint16_t extra_start_sector = id_per_sector * (FS_ADDR_ARRAY_SIZE - 1);
+      assert(sector)
+      // This branch handles extra large file
+      // This is the address of the first indirection sector
+      uint16_t first_indir_sector = addr[FS_ADDR_ARRAY_SIZE - 1];
+    }
   }
 
   return ret;
