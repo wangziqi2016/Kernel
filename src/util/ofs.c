@@ -855,6 +855,9 @@ int fs_is_file_extra_large(const Inode *inode_p) {
  *
  * This function returns invalid sector ID if the offset falls in a region
  * that no data has been written. By default this should map to all-zero sector
+ *
+ * This function is for read. It does not allocate any sector or change the 
+ * layout of the inode's addr list.
  */
 uint16_t fs_get_file_sector(Storage *disk_p, 
                             const Inode *inode_p, 
@@ -915,6 +918,18 @@ uint16_t fs_get_file_sector(Storage *disk_p,
   }
 
   return ret;
+}
+
+/*
+ * fs_get_file_sector_for_write() - This function returns the sector ID
+ *                                  to write into.
+ *
+ * If the sector does not exist, or the 
+ */
+void fs_get_file_sector_for_write(Storage *disk_p,
+                                  Inode *inode_p,
+                                  size_t offset) {
+
 }
 
 // These two are used for init root dir
