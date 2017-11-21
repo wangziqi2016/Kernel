@@ -1207,6 +1207,9 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
                             &inode_p->addr[FS_ADDR_ARRAY_SIZE - 1], 
                             FS_INDIR_SECTOR);
     if(first_indir_sector != FS_INVALID_SECTOR) {
+      // If we have set the last sector in addr. array then the file is also
+      // extra large
+      assert(fs_is_file_extra_large(inode_p) == 1);
       sector_t *first_indir_p = \
         (sector_t *)read_lba_for_write(disk_p, first_indir_sector);
       buffer_pin(disk_p, first_indir_p);
@@ -1259,7 +1262,7 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
   buffer_pin(disk_p, inode_p);
 
   sector_t ret;
-  int16_t sector = (sector_t)(offset / disk_p->sector_size);
+  sector_t sector = (sector_t)(offset / disk_p->sector_size);
   assert(((size_t)sector * disk_p->sector_size) == offset);
   if(fs_is_file_large(inode_p) == 0) {
     // If it is not large, then check the sector offset
@@ -1979,26 +1982,35 @@ void test_get_sector(Storage *disk_p) {
   inode_id_t inode = fs_alloc_inode(disk_p);
   assert(inode != FS_INVALID_INODE);
   Inode *inode_p = fs_load_inode_sector(disk_p, inode, 1);
+  //buffer_pin(disk_p, inode_p);
   assert(fs_is_file_large(inode_p) == 0 && 
          fs_is_file_extra_large(inode_p) == 0);
   // This is the maximum number of sectors we could support in one file
-  const sector_count_t block_for_test = \
+  const size_t sector_count_for_test = \
     context.id_per_indir_sector * \
       (FS_ADDR_ARRAY_SIZE - 1 + context.id_per_indir_sector);
+  info("# of sector ID per indirection sector: %u", 
+       (uint32_t)context.id_per_indir_sector); 
+  info("Allocating %u sectors for a single file...", 
+       (uint32_t)sector_count_for_test);
   // Index is the sector in the file and content is the sector ID on the disk
-  sector_t *file_sector_map = malloc(sizeof(sector_t) * block_for_test);
+  sector_t *file_sector_map = malloc(sizeof(sector_t) * sector_count_for_test);
   // Index is the sector on the disk - free start sector, and content is 1
   // or 0
   uint8_t *disk_sector_map = \
     malloc(sizeof(uint8_t) * context.free_sector_count);
   memset(disk_sector_map, 0x00, sizeof(uint8_t) * context.free_sector_count);
 
-  for(sector_t i = 0;i < block_for_test;i++) {
+  for(size_t i = 0;i < sector_count_for_test;i++) {
     // Note that this function requires byte offset
     sector_t sector = \
       fs_get_file_sector_for_write(disk_p, inode_p, i * disk_p->sector_size);
     
-    assert(sector != FS_INVALID_SECTOR);
+    // Run out of blocks
+    if(sector == FS_INVALID_SECTOR) {
+      break;
+    }
+    //assert(sector != FS_INVALID_SECTOR);
     assert(sector >= context.free_start_sector);
     assert(sector < context.free_end_sector);
     file_sector_map[i] = sector;
@@ -2007,6 +2019,15 @@ void test_get_sector(Storage *disk_p) {
     disk_sector_map[sector - context.free_start_sector] = 1;
   }
 
+  // Also fill the bl
+  // Every sector in the file should be occupied
+  for(sector_count_t i = 0;i < context.free_sector_count;i++) {
+    info("%u", i);
+    assert(file_sector_map[i] == 1);
+  }
+  assert(fs_is_file_extra_large(inode_p) == 1);
+
+  //buffer_unpin(disk_p, inode_p);
   buffer_flush_all(disk_p);
   assert(buffer_count_pinned() == 0UL);
   free(file_sector_map);
