@@ -323,16 +323,22 @@ Buffer *buffer_find_using_data(Storage *disk_p, void *data_p) {
  * buffer is not currently in-use then we error
  */
 void buffer_pin(Storage *disk_p, void *data_p) {
-  Buffer *buffer_p = buffer_head_p;
-  while(buffer_p != NULL) {
-    if((uint8_t *)data_p >= buffer_p->data_p && 
-       (uint8_t *)data_p < buffer_p->data_p + disk_p->sector_size) {
-      assert(buffer_p->pinned == 0);
-      // We pin the buffer
-      buffer_p->pinned = 1;
-    }
-    buffer_p = buffer_p->next_p;
+  // Find the buffer first
+  Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
+  if(buffer_p == NULL) {
+    fatal_error("Data pointer out of buffer's reach");
+  } else if(buffer_p->in_use == 0) {
+    fatal_error("Could not pin an unused buffer");
   }
+
+  assert(buffer_p->pinned == 0);
+  buffer_p->pinned = 1;
+
+  return;
+}
+
+void buffer_unpin() {
+
 }
 
 //#define BUFFER_FLUSH_DEBUG
