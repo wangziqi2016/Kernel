@@ -630,6 +630,11 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 // FS Layer
 /////////////////////////////////////////////////////////////////////
 
+// Sector type
+typedef uint16_t sector_t;
+typedef uint16_t inode_id_t
+typedef size_t   offset_t;
+
 // This is the length of the free array
 #define FS_FREE_ARRAY_MAX 100
 #define FS_SIG_SIZE 4
@@ -639,17 +644,17 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 // This indicates invalid sector numbers
 #define FS_INVALID_SECTOR 0
 // Since inode #0 is a valid one, we define invalid inode to be -1
-#define FS_INVALID_INODE  ((uint16_t)-1)
+#define FS_INVALID_INODE  ((sector_t)-1)
 // Root inode is the first inode in the system
 #define FS_ROOT_INODE 0
 
 typedef struct {
   // Number of elements in the local array
-  uint16_t nfree;
+  sector_t nfree;
   // The first word of this structure is the block number
   // to the next block that holds this list
   // All elements after the first one is the free blocks
-  uint16_t free[FS_FREE_ARRAY_MAX];
+  sector_t free[FS_FREE_ARRAY_MAX];
 } __attribute__((packed)) FreeArray;
 
 // This defines the first block of the file system
@@ -657,19 +662,19 @@ typedef struct {
   // We use this to identify a valid super block
   char signature[FS_SIG_SIZE];
   // Number of sectors for i-node
-  uint16_t isize;
+  sector_t isize;
   // Number of sectors for file storage
   // NOTE: We modified the semantics of this field.
   // In the original OFS design this is the absolute number of blocks
   // used by the FS and the bootsect. We make it relative to the inode
   // blocks
-  uint16_t fsize;
+  sector_t fsize;
   // Linked list of free blocks and the free array
   FreeArray free_array;
   // Number of free inodes as a fast cache in the following
   // array
-  uint16_t ninode;
-  uint16_t inode[FS_FREE_ARRAY_MAX];
+  inode_id_t ninode;
+  inode_id_t inode[FS_FREE_ARRAY_MAX];
   char flock;
   char ilock;
   char fmod;
@@ -690,7 +695,7 @@ typedef struct {
   uint8_t size0;
   // Low word of 24 bit size field
   uint16_t size1;
-  uint16_t addr[FS_ADDR_ARRAY_SIZE];
+  sector_t addr[FS_ADDR_ARRAY_SIZE];
   // Access time
   uint16_t actime[2];
   // Modification time
@@ -703,7 +708,7 @@ typedef struct {
 typedef struct {
   // The inode number this directory entry represents
   // Use FS_INVALID_INODE to indicate that the entry is free
-  uint16_t inode;
+  inode_id_t inode;
   // Note that file names are not required to terminate with 0x0
   // but this field is null-padded
   char name[DIR_ENTRY_NAME_MAX];
@@ -713,20 +718,20 @@ typedef struct {
 // We load the super block and initialize this object
 // Once initialized it is never changed for the same fs
 typedef struct {
-  uint16_t sb_sector;
-  uint16_t inode_start_sector;
-  uint16_t inode_end_sector;
-  uint16_t inode_sector_count;
-  uint16_t free_start_sector;
-  uint16_t free_end_sector;
-  uint16_t free_sector_count;
-  uint16_t total_sector_count;
-  uint16_t total_inode_count;
-  size_t inode_per_sector;
+  sector_t sb_sector;
+  sector_t inode_start_sector;
+  sector_t inode_end_sector;
+  sector_t inode_sector_count;
+  sector_t free_start_sector;
+  sector_t free_end_sector;
+  sector_t free_sector_count;
+  sector_t total_sector_count;
+  inode_id_t total_inode_count;
+  inode_id_t inode_per_sector;
   // Number of sector IDs per indirection sector
-  uint16_t id_per_indir_sector;
+  sector_t id_per_indir_sector;
   // The start sector for extra large blocks
-  uint16_t extra_large_start_sector;
+  sector_t extra_large_start_sector;
 } Context;
 
 // This is the content of the fs
@@ -758,9 +763,8 @@ Context context;
 #define FS_INODE_OTHER_WRITE 0x0002
 #define FS_INODE_OTHER_EXEC  0x0001
 
-uint16_t fs_alloc_sector(Storage *disk_p);
-Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag);
-uint16_t fs_alloc_sector(Storage *disk_p);
+sector_t fs_alloc_sector(Storage *disk_p);
+Inode *load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag);
 
 /*
  * fs_load_context() - This function loads the context object using the super block
@@ -791,7 +795,7 @@ void fs_load_context(Storage *disk_p) {
     context.inode_per_sector * context.inode_sector_count;
   
   // These two are used for computing the sector ID of a given offset
-  context.id_per_indir_sector = disk_p->sector_size / sizeof(uint16_t);
+  context.id_per_indir_sector = disk_p->sector_size / sizeof(sector_t);
   context.extra_large_start_sector = \
     context.id_per_indir_sector * (FS_ADDR_ARRAY_SIZE - 1);
 
@@ -861,14 +865,14 @@ size_t fs_init_inode(Storage *disk_p,
 size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
   size_t current_free = free_start;
   while(free_end > current_free) {
-    uint16_t *data = (uint16_t *)write_lba(disk_p, current_free);
+    sector_t *data = (sector_t *)write_lba(disk_p, current_free);
     // There must be at least one free sector
     assert(free_end > (current_free + 1));
     // current_free should not be counted as a free block
     size_t delta = free_end - (current_free + 1);
     // These two are default values
-    uint16_t next_free_list = current_free + 1;
-    uint16_t free_sector_count = FS_FREE_ARRAY_MAX - 1;
+    sector_t next_free_list = current_free + 1;
+    sector_t free_sector_count = FS_FREE_ARRAY_MAX - 1;
     // We do not need more free blocks, the current one is the 
     // last one
     if(delta <= free_sector_count) {
@@ -986,17 +990,17 @@ int fs_is_file_extra_large(const Inode *inode_p) {
  * This function pins the inode passed in, such that its buffer remains valid
  * after return
  */
-uint16_t fs_get_file_sector(Storage *disk_p, 
+sector_t fs_get_file_sector(Storage *disk_p, 
                             const Inode *inode_p, 
                             size_t offset) {
   buffer_pin(disk_p, inode_p);
 
   // This is the linear ID in the file. Note that we can only address 16 bit
   // sector size
-  uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
-  // Make sure we did not overflow uint16_t
+  sector_t sector = (sector_t)(offset / disk_p->sector_size);
+  // Make sure we did not overflow sector_t
   assert(((size_t)sector * disk_p->sector_size) == offset);
-  uint16_t ret;
+  sector_t ret;
   // If the file is small, then the sector ID must be less than 8
   if(fs_is_file_large(inode_p) == 0) {
     assert(sector < FS_ADDR_ARRAY_SIZE);
@@ -1004,19 +1008,19 @@ uint16_t fs_get_file_sector(Storage *disk_p,
     ret = inode_p->addr[sector];
   } else {
     // Number of IDs inside an indirection sector
-    uint16_t indir_index = sector / context.id_per_indir_sector;
-    uint16_t indir_offset = sector % context.id_per_indir_sector;
+    sector_t indir_index = sector / context.id_per_indir_sector;
+    sector_t indir_offset = sector % context.id_per_indir_sector;
     
     // Then if the file is large file, and the index is not the last one
     // then we know we can always use the indirection sector
     if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
-      uint16_t indir_sector = inode_p->addr[indir_index];
+      sector_t indir_sector = inode_p->addr[indir_index];
       // If the sector does not exist, then we assume the range it covers 
       // contains all zero, and just return invalid
       if(indir_sector == FS_INVALID_SECTOR) {
         ret = FS_INVALID_SECTOR;
       } else {
-        uint16_t *data_p = (uint16_t *)read_lba(disk_p, indir_sector);
+        sector_t *data_p = (sector_t *)read_lba(disk_p, indir_sector);
         ret = data_p[indir_offset]; 
       }
     } else if(fs_is_file_extra_large(inode_p) == 0) {
@@ -1028,19 +1032,19 @@ uint16_t fs_get_file_sector(Storage *disk_p,
       assert(sector >= context.extra_large_start_sector);
       // This branch handles extra large file
       // This is the address of the first indirection sector
-      const uint16_t first_indir_sector = \
+      const sector_t first_indir_sector = \
         inode_p->addr[FS_ADDR_ARRAY_SIZE - 1];
       // Starts with 0 in the extra large area
       sector -= context.extra_large_start_sector;
       // Just treat it as another array of indir blocks
       indir_index = sector / context.id_per_indir_sector;
       indir_offset = sector % context.id_per_indir_sector;
-      uint16_t *data_p = (uint16_t *)read_lba(disk_p, first_indir_sector);
-      uint16_t second_indir_sector = data_p[indir_index];
+      sector_t *data_p = (sector_t *)read_lba(disk_p, first_indir_sector);
+      sector_t second_indir_sector = data_p[indir_index];
       if(second_indir_sector == FS_INVALID_SECTOR) {
         ret = FS_INVALID_SECTOR;
       } else {
-        uint16_t *data_p = (uint16_t *)read_lba(disk_p, second_indir_sector);
+        sector_t *data_p = (sector_t *)read_lba(disk_p, second_indir_sector);
         ret = data_p[indir_offset];
       }
     }
@@ -1062,20 +1066,20 @@ uint16_t fs_get_file_sector(Storage *disk_p,
  *
  * inode_p should be pinned as we read another sector
  */
-uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
+sector_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
   assert(fs_is_file_large(inode_p) == 0);
   assert(buffer_is_pinned(disk_p, inode_p) == 1);
 
-  uint16_t ret;
+  sector_t ret;
   // First use an indirection sector to hold all pointers
-  uint16_t indir_sector = fs_alloc_sector(disk_p);
+  sector_t indir_sector = fs_alloc_sector(disk_p);
   // If allocation fail we return fail
   if(indir_sector == FS_INVALID_SECTOR) {
     ret = FS_INVALID_SECTOR;
   } else {
     ret = indir_sector;
     // Copy the addr array into the indir sector
-    uint16_t *data_p = (uint16_t *)write_lba(disk_p, indir_sector);
+    sector_t *data_p = (sector_t *)write_lba(disk_p, indir_sector);
     // Fill the entire disk with INVALID SECTOR
     for(int i = 0;i < context.id_per_indir_sector;i++) {
       data_p[i] = FS_INVALID_SECTOR;
@@ -1101,14 +1105,14 @@ uint16_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
  *
  * Return value is not pinned.
  */
-uint16_t *fs_alloc_indir_sector(Storage *disk_p) {
-  uint16_t sector = fs_alloc_sector(disk_p);
+sector_t *fs_alloc_indir_sector(Storage *disk_p) {
+  sector_t sector = fs_alloc_sector(disk_p);
   if(sector == FS_INVALID_SECTOR) {
     return sector;
   }
 
   // Blind write
-  uint16_t *data_p = (uint16_t *)write_lba(disk_p, sector);
+  sector_t *data_p = (sector_t *)write_lba(disk_p, sector);
   for(int i = 0;i < context.id_per_indir_sector;i++) {
     data_p[i] = FS_INVALID_SECTOR;
   }
@@ -1127,40 +1131,44 @@ uint16_t *fs_alloc_indir_sector(Storage *disk_p) {
  * add an indirection sector or a data sector. Otherwise it returns the new 
  * data sector we added for found.
  */
-uint16_t fs_get_file_sector_for_write_large_file(Storage *disk_p, 
+sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p, 
                                                  Inode *inode_p, 
-                                                 uint16_t sector) {
+                                                 sector_t sector) {
   assert(buffer_is_pinned(inode_p) == 1);
   assert(sector >= FS_ADDR_ARRAY_SIZE);
   assert(fs_is_file_large(inode_p) == 1);
-  uint16_t ret;
+  sector_t ret;
   // These two are the index and offset of/within the first indirection level
-  uint16_t indir_index = sector / context.id_per_indir_sector;
-  uint16_t indir_offset = sector % context.id_per_indir_sector;
+  sector_t indir_index = sector / context.id_per_indir_sector;
+  sector_t indir_offset = sector % context.id_per_indir_sector;
   // If the index is still in large file range but not extra large file range
   if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
-    uint16_t indir_sector = inode_p->addr[indir_index];
+    sector_t indir_sector = inode_p->addr[indir_index];
     // If the indir sector does not exist we need to first add it
     if(indir_sector == FS_INVALID_SECTOR) {
-      uint16_t new_sector = fs_alloc_indir_sector(disk_p);
+      sector_t new_sector = fs_alloc_indir_sector(disk_p);
       // If allocation fail just exit with failure
-      if(new_sector_p == NULL) {
-        ret = FS_INVALID_SECTOR;
+      if(new_sector == FS_INVALID_SECTOR) {
+        // Return here will not hurt, as we have not pinned any buffer yet
+        return FS_INVALID_SECTOR;
       } else {
         // Setting this even if the following fails does not hurt
         inode_p->addr[indir_index] = new_sector;
       }
     }
+
+    assert(inode_p->addr[indir_index] != INVALID_SECTOR);
     // If the target sector is not in the extra large range
     // we just write the sector
     // Should pin it because we called alloc sector
-    uint16_t *data_p = \
-      (uint16_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
+    sector_t *data_p = \
+      (sector_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
     buffer_pin(data_p);
+
     // If the sector is not present then allocate one, or report failure
     // Otherwise just return it because we have found a sector
     if(data_p[indir_offset] == FS_INVALID_SECTOR) {
-      uint16_t data_sector = fs_alloc_sector(disk_p);
+      sector_t data_sector = fs_alloc_sector(disk_p);
       if(data_sector == FS_INVALID_SECTOR) {
         ret = FS_INVALID_SECTOR;
       } else {
@@ -1195,20 +1203,20 @@ uint16_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
  * This function will pin the inode such that its buffer remains valid
  * after function return
  */
-uint16_t fs_get_file_sector_for_write(Storage *disk_p,
+sector_t fs_get_file_sector_for_write(Storage *disk_p,
                                       Inode *inode_p,
                                       size_t offset) {
   // First pin the buffer, because we will read sectors
   buffer_pin(disk_p, inode_p);
 
-  uint16_t ret;
-  int16_t sector = (uint16_t)(offset / disk_p->sector_size);
+  sector_t ret;
+  int16_t sector = (sector_t)(offset / disk_p->sector_size);
   assert(((size_t)sector * disk_p->sector_size) == offset);
   if(fs_is_file_large(inode_p) == 0) {
     // If it is not large, then check the sector offset
     if(sector >= FS_ADDR_ARRAY_SIZE) {
       // This does not logically change the file
-      uint16_t indir_sector = fs_convert_to_large(disk_p, inode_p);
+      sector_t indir_sector = fs_convert_to_large(disk_p, inode_p);
       if(indir_sector == FS_INVALID_SECTOR) {
         ret = FS_INVALID_SECTOR;
       } else {
@@ -1219,7 +1227,7 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
       // Then we just return or allocate the block
       if(inode_p->addr[sector] == FS_INVALID_SECTOR) {
         // Allocate the sector and set it as addr[sector]
-        uint16_t new_sector = fs_alloc_sector(disk_p);
+        sector_t new_sector = fs_alloc_sector(disk_p);
         if(new_sector == FS_INVALID_SECTOR) {
           // If new sector allocation failed, we return this to
           // indicate that we have run out of sectors
@@ -1248,7 +1256,7 @@ uint16_t fs_get_file_sector_for_write(Storage *disk_p,
  */
 void fs_init_root(Storage *disk_p) {
   // Allocate a sector for inode 0 to hold its initial default dir
-  uint16_t sector = fs_alloc_sector(disk_p);
+  sector_t sector = fs_alloc_sector(disk_p);
   if(sector == FS_INVALID_SECTOR) {
     fatal_error("Failed to allocate sector for root directory");
   }
@@ -1297,15 +1305,15 @@ void _fs_init(Storage *disk_p, size_t total_sector, size_t start_sector,
   SuperBlock *sb_p = (SuperBlock *)write_lba(disk_p, start_sector);
   // We use the signature to verify the fs type
   memcpy(sb_p->signature, FS_SIG, FS_SIG_SIZE);
-  sb_p->isize = (uint16_t)inode_sector_count;
-  sb_p->fsize = (uint16_t)free_sector_count;
+  sb_p->isize = (sector_t)inode_sector_count;
+  sb_p->fsize = (sector_t)free_sector_count;
   // There is no cached free block and free inodes. The first write operation
   // into the file system will find one
   sb_p->free_array.nfree = 0;
   memset(sb_p->free_array.free, 0x0, sizeof(sb_p->free_array.free));
   // The first element is the sector ID for the sector that stores 
   // the free list
-  sb_p->free_array.free[0] = (uint16_t)free_start_sector;
+  sb_p->free_array.free[0] = (sector_t)free_start_sector;
   sb_p->ninode = 0;
   memset(sb_p->inode, 0x0, sizeof(sb_p->inode));
   sb_p->flock = sb_p->ilock = 0;
@@ -1336,18 +1344,18 @@ void fs_init(Storage *disk_p, size_t total_sector, size_t start_sector) {
  *
  * Returns 0 if allocation failed (0 is not a valid block ID)
  */
-uint16_t fs_alloc_sector(Storage *disk_p) {
+sector_t fs_alloc_sector(Storage *disk_p) {
   // First read the super block, setting dirty flag
   SuperBlock *sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
   buffer_pin(disk_p, sb_p);
 
-  uint16_t ret = 0;
+  sector_t ret = 0;
   // If there are cached free values, then just get one
   if(sb_p->free_array.nfree != 0) {
     ret = sb_p->free_array.free[sb_p->free_array.nfree];
     sb_p->free_array.nfree--;
   } else {
-    uint16_t free_list_head = sb_p->free_array.free[0];
+    sector_t free_list_head = sb_p->free_array.free[0];
     // If there is no next block, then we have exhausted free blocks
     if(free_list_head == FS_INVALID_SECTOR) {
       ret = FS_INVALID_SECTOR;
@@ -1357,7 +1365,7 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
       ret = free_list_head;
       // Read the free list head, and copy the free array into the temp
       // object (because the sb may have been evicted)
-      uint16_t *data_p = (uint16_t *)read_lba(disk_p, free_list_head);
+      sector_t *data_p = (sector_t *)read_lba(disk_p, free_list_head);
       memcpy(&sb_p->free_array, data_p, sizeof(FreeArray));
     }
   }
@@ -1375,7 +1383,7 @@ uint16_t fs_alloc_sector(Storage *disk_p) {
  * then empty the super block's cache, and link the current block into
  * the free chain
  */
-void fs_free_sector(Storage *disk_p, uint16_t sector) {
+void fs_free_sector(Storage *disk_p, sector_t sector) {
   SuperBlock *sb_p = (SuperBlock *)read_lba_for_write(disk_p, FS_SB_SECTOR);
   buffer_pin(disk_p, sb_p);
 
@@ -1413,8 +1421,8 @@ void fs_free_sector(Storage *disk_p, uint16_t sector) {
  *
  * Note that we do not pin the inode. The caller should be responsible for this
  */
-Inode *load_inode_sector(Storage *disk_p, uint16_t inode, int write_flag) {
-  size_t sector_num = inode / context.inode_per_sector;
+Inode *load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag) {
+  sector_t sector_num = inode / context.inode_per_sector;
   size_t offset = inode % context.inode_per_sector;
   sector_num += (FS_SB_SECTOR + 1);
 
@@ -1449,20 +1457,20 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
   assert(buffer_is_pinned(disk_p, sb_p));
 
   // inode sector is just after the super block
-  uint16_t current_sector = FS_SB_SECTOR + 1;
+  sector_t current_sector = FS_SB_SECTOR + 1;
   // Number of inodes we have scanned
   int count = 0;
-  uint16_t current_inode = 0;
+  inode_id_t current_inode = 0;
   // It can hold 100 inodes
-  uint16_t free_inode_list[FS_FREE_ARRAY_MAX];
-  for(uint16_t i = 0;i < context.inode_sector_count;i++) {
+  inode_id_t free_inode_list[FS_FREE_ARRAY_MAX];
+  for(sector_t i = 0;i < context.inode_sector_count;i++) {
     Inode *inode_p = (Inode *)read_lba(disk_p, current_sector);
     for(size_t j = 0;j < context.inode_per_sector;j++) {
       // If the inode is not in-use
       if((inode_p[j].flags & FS_INODE_IN_USE) == 0) {
         // The inode could not be the root inode, otherwise the fs is broken
         //assert(current_inode != FS_ROOT_INODE);
-        // Also the inode could not be the invalid value, otherwise uint16_t
+        // Also the inode could not be the invalid value, otherwise sector_t
         // would overflow
         //assert(current_inode != FS_INVALID_INODE);
 
@@ -1499,11 +1507,11 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
  *
  * This function returns the inode number. (-1) means allocation failure
  */
-uint16_t fs_alloc_inode(Storage *disk_p) {
+inode_id_t fs_alloc_inode(Storage *disk_p) {
   SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
   buffer_pin(disk_p, sb_p);
 
-  uint16_t ret;
+  inode_id_t ret;
   // If the array is empty, we just fill it first
   if(sb_p->ninode == 0) {
     sb_p = fill_inode_free_array(disk_p, sb_p);
@@ -1539,7 +1547,7 @@ uint16_t fs_alloc_inode(Storage *disk_p) {
  * is stored in the inode itself, we do not need to precisely track the 
  * inode usage in the sb
  */
-void fs_free_inode(Storage *disk_p, uint16_t inode) {
+void fs_free_inode(Storage *disk_p, inode_id_t inode) {
   SuperBlock *sb_p = (SuperBlock *)read_lba(disk_p, FS_SB_SECTOR);
   buffer_pin(disk_p, sb_p);
 
@@ -1732,7 +1740,7 @@ void test_alloc_sector(Storage *disk_p) {
           0x00, 
           sizeof(uint8_t) * free_sector_count);
 
-    uint16_t sector;
+    sector_t sector;
     size_t count = 0;
     do { 
       sector = fs_alloc_sector(disk_p);
@@ -1769,19 +1777,19 @@ void test_alloc_sector(Storage *disk_p) {
     info("  ...Pass");
     info("  Free allocated sectors...");
     if(round == 0) {
-      for(uint16_t i = free_sector_start;i < total_sector_count;i++) {
+      for(sector_t i = free_sector_start;i < total_sector_count;i++) {
         fs_free_sector(disk_p, i);
       }
     } else if(round == 1) {
-      for(uint16_t i = total_sector_count - 1;i >= free_sector_start;i--) {
+      for(sector_t i = total_sector_count - 1;i >= free_sector_start;i--) {
         fs_free_sector(disk_p, i);
       }
     } else if(round == 2) {
       srand(time(NULL));
       for(int i = 0;i < free_sector_count;i++) {
         // [free_sector_start, total_sector_count)
-        uint16_t start = \
-          ((uint16_t)rand() % free_sector_count) + free_sector_start;
+        sector_t start = \
+          ((sector_t)rand() % free_sector_count) + free_sector_start;
         // Use the map as a hash table to find sectors that are not yet
         // freed
         while(sector_map[start - free_sector_start] == 0) {
@@ -1834,7 +1842,7 @@ void test_alloc_inode(Storage *disk_p) {
 
   while(1) {
     memset(flag_p, 0x00, alloc_size);
-    uint16_t inode;
+    inode_id_t inode;
     int count = 0;
     int prev_percent = 0;
     do {
@@ -1888,7 +1896,7 @@ void test_alloc_inode(Storage *disk_p) {
     } else if(round == 2) {
       srand(time(NULL));
       for(int i = 0;i < context.total_inode_count;i++) {
-        uint16_t start = (uint16_t)rand() % context.total_inode_count;
+        inode_id_t start = (inode_id_t)rand() % context.total_inode_count;
         // Use the map as a hash table to find sectors that are not yet
         // freed
         while(flag_p[start] == 0) {
