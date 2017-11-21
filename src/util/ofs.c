@@ -1038,8 +1038,10 @@ sector_t fs_get_file_sector(Storage *disk_p,
         inode_p->addr[FS_ADDR_ARRAY_SIZE - 1];
       // Starts with 0 in the extra large area
       sector -= context.extra_large_start_sector;
-      // Just treat it as another array of indir blocks
+      // Just treat it as another array of indir sector
       indir_index = sector / context.id_per_indir_sector;
+      // It could not overflow the first indirection sector
+      assert(indir_index < context.id_per_indir_sector);
       indir_offset = sector % context.id_per_indir_sector;
       sector_t *data_p = (sector_t *)read_lba(disk_p, first_indir_sector);
       sector_t second_indir_sector = data_p[indir_index];
@@ -1100,25 +1102,38 @@ sector_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
 }
 
 /*
- * fs_alloc_indir_sector() - Allocates a sector for indirection (any level)
+ * read_or_alloc() - This function either reads and returns a given
+ *                   sector pointer's value, or allocate a new block
+ *                   for it. 
  *
- * This function fills the sector with INVALID sector words. Return invalid
- * sector if fails
+ * The return value is either the value read or allocated. Return 
+ * invalid sector if allocation fails
  *
- * Return value is not pinned.
+ * If the indir flag is set to 1, then we also initialize it as an indirection
+ * sector. Otherwise the sector is not initialized
+ *
+ * Note that the pointer must be in the buffer area because we will pin it
  */
-sector_t fs_alloc_indir_sector(Storage *disk_p) {
-  sector_t sector = fs_alloc_sector(disk_p);
+sector_t read_or_alloc(Storage *disk_p, sector_t *sector_p, int indir) {
+  buffer_pin(disk_p, sector_p);
+  sector_t sector = *sector_p;
   if(sector == FS_INVALID_SECTOR) {
-    return sector;
+    sector = fs_alloc_sector(disk_p);
+    // This is valid even when the allocation fails, because we did not
+    // change the value by doing this when it fails.
+    *sector_p = sector;
+
+    // If allocation succeeds and indir is 1 we also initialize it
+    if(indir == 1 && sector != FS_INVALID_SECTOR) {
+      // Blind write
+      sector_t *data_p = (sector_t *)write_lba(disk_p, sector);
+      for(sector_t i = 0;i < context.id_per_indir_sector;i++) {
+        data_p[i] = FS_INVALID_SECTOR;
+      }
+    }
   }
 
-  // Blind write
-  sector_t *data_p = (sector_t *)write_lba(disk_p, sector);
-  for(int i = 0;i < context.id_per_indir_sector;i++) {
-    data_p[i] = FS_INVALID_SECTOR;
-  }
-
+  buffer_unpin(disk_p, sector_p);
   return sector;
 }
 
@@ -1140,6 +1155,8 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
   assert(sector >= FS_ADDR_ARRAY_SIZE);
   assert(fs_is_file_large(inode_p) == 1);
   sector_t ret;
+  // This will set if we fail at early stages
+  int failed = 0;
   // These two are the index and offset of/within the first indirection level
   sector_t indir_index = sector / context.id_per_indir_sector;
   sector_t indir_offset = sector % context.id_per_indir_sector;
@@ -1152,37 +1169,49 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
       // If allocation fail just exit with failure
       if(new_sector == FS_INVALID_SECTOR) {
         // Return here will not hurt, as we have not pinned any buffer yet
-        return FS_INVALID_SECTOR;
+        ret = FS_INVALID_SECTOR;
+        failed = 1;
       } else {
         // Setting this even if the following fails does not hurt
         inode_p->addr[indir_index] = new_sector;
       }
     }
 
-    assert(inode_p->addr[indir_index] != FS_INVALID_SECTOR);
-    // If the target sector is not in the extra large range
-    // we just write the sector
-    // Should pin it because we called alloc sector
-    sector_t *data_p = \
-      (sector_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
-    buffer_pin(disk_p, data_p);
+    // Only proceed to check the indir sector if we have not failed
+    // in the previous stage
+    if(failed == 0) {
+      assert(inode_p->addr[indir_index] != FS_INVALID_SECTOR);
+      // If the target sector is not in the extra large range
+      // we just write the sector
+      // Should pin it because we called alloc sector
+      sector_t *data_p = \
+        (sector_t *)read_lba_for_write(disk_p, inode_p->addr[indir_index]);
+      buffer_pin(disk_p, data_p);
 
-    // If the sector is not present then allocate one, or report failure
-    // Otherwise just return it because we have found a sector
-    if(data_p[indir_offset] == FS_INVALID_SECTOR) {
-      sector_t data_sector = fs_alloc_sector(disk_p);
-      if(data_sector == FS_INVALID_SECTOR) {
-        ret = FS_INVALID_SECTOR;
+      // If the sector is not present then allocate one, or report failure
+      // Otherwise just return it because we have found a sector
+      if(data_p[indir_offset] == FS_INVALID_SECTOR) {
+        sector_t data_sector = fs_alloc_sector(disk_p);
+        if(data_sector == FS_INVALID_SECTOR) {
+          ret = FS_INVALID_SECTOR;
+        } else {
+          ret = data_sector;
+          data_p[indir_offset] = data_sector;
+        }
       } else {
-        ret = data_sector;
-        data_p[indir_offset] = data_sector;
+        ret = data_p[indir_offset];
       }
-    } else {
-      ret = data_p[indir_offset];
-    }
-    
-  } else {
 
+      // Unpin the indirection buffer here before return
+      buffer_unpin(disk_p, data_p);
+    }
+  } else {
+    // If we are in this branch, then we fall into the extra large range
+    assert(sector >= context.extra_large_start_sector);
+    sector -= extra_large_start_sector;
+    indir_index = sector / context.id_per_indir_sector;
+    assert(indir_index < context.id_per_indir_sector);
+    indir_offset = sector % context.id_per_indir_sector;
   }
 
   return ret;
