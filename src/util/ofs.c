@@ -630,6 +630,10 @@ typedef struct {
   uint16_t total_sector_count;
   uint16_t total_inode_count;
   size_t inode_per_sector;
+  // Number of sector IDs per indirection sector
+  uint16_t id_per_indir_sector;
+  // The start sector for extra large blocks
+  uint16_t extra_large_start_sector;
 } Context;
 
 // This is the content of the fs
@@ -688,6 +692,11 @@ void fs_load_context(Storage *disk_p) {
   // Total number of inodes in the system
   context.total_inode_count = \
     context.inode_per_sector * context.inode_sector_count;
+  
+  // These two are used for computing the sector ID of a given offset
+  context.id_per_indir_sector = disk_p->sector_size / sizeof(uint16_t);
+  context.extra_large_start_sector = \
+    context.id_per_indir_sector * (FS_ADDR_ARRAY_SIZE - 1);
 
   return;
 }
@@ -843,10 +852,15 @@ int fs_is_file_extra_large(const Inode *inode_p) {
 /*
  * fs_get_sector() - This function returns the sector ID given an offset in
  *                   the file
+ *
+ * This function returns invalid sector ID if the offset is too large
  */
 uint16_t fs_get_sector(Storage *disk_p, const Inode *inode_p, size_t offset) {
-  // This is the linear ID in the file
+  // This is the linear ID in the file. Note that we can only address 16 bit
+  // sector size
   uint16_t sector = (uint16_t)(offset / disk_p->sector_size);
+  // Make sure we did not overflow uint16_t
+  assert(((size_t)sector * disk_p->sector_size) == offset);
   uint16_t ret;
   // If the file is small, then the sector ID must be less than 8
   if(fs_is_file_large(inode_p) == 0) {
@@ -854,30 +868,44 @@ uint16_t fs_get_sector(Storage *disk_p, const Inode *inode_p, size_t offset) {
     ret = inode_p->addr[sector];
   } else {
     // Number of IDs inside an indirection sector
-    const uint16_t id_per_sector = disk_p->sector_size / sizeof(uint16_t);
-    uint16_t addr_index = sector / id_per_sector;
-    uint16_t addr_offset = sector % id_per_sector;
+    uint16_t indir_index = sector / context.id_per_indir_sector;
+    uint16_t indir_offset = sector % context.id_per_indir_sector;
     
     // Then if the file is large file, and the index is not the last one
     // then we know we can always use the indirection sector
-    if(addr_index < (FS_ADDR_ARRAY_SIZE - 1)) {
-      uint16_t indir_sector = inode_p->addr[addr_index];
-      uint16_t *data_p = (uint16_t *)read_lba(disk_p, indir_sector);
-      ret = data_p[addr_offset]; 
+    if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
+      uint16_t indir_sector = inode_p->addr[indir_index];
+      // If the sector does not exist, then we assume the range it covers 
+      // contains all zero, and just return invalid
+      if(indir_sector == FS_INVALID_SECTOR) {
+        ret = FS_INVALID_SECTOR;
+      } else {
+        uint16_t *data_p = (uint16_t *)read_lba(disk_p, indir_sector);
+        ret = data_p[indir_offset]; 
+      }
     } else if(fs_is_file_extra_large(inode_p) == 0) {
       // If the offset implies that the file should be extra large
       // but actually the file is not extra large, we return invalid
       // sector because there is no way to find the correct sector
       ret = FS_INVALID_SECTOR;
     } else {
-      // The first 7 sectors all point to indirection blocks
-      // which holds sectors. This value is the starting sector handled
-      // by the last pointer
-      uint16_t extra_start_sector = id_per_sector * (FS_ADDR_ARRAY_SIZE - 1);
-      assert(sector)
+      assert(sector >= context.extra_large_start_sector);
       // This branch handles extra large file
       // This is the address of the first indirection sector
-      uint16_t first_indir_sector = addr[FS_ADDR_ARRAY_SIZE - 1];
+      const uint16_t first_indir_sector = addr[FS_ADDR_ARRAY_SIZE - 1];
+      // Starts with 0 in the extra large area
+      sector -= context.extra_large_start_sector;
+      // Just treat it as another array of indir blocks
+      indir_index = sector / context.id_per_indir_sector;
+      indir_offset = sector % context.id_per_indir_sector;
+      uint16_t *data_p = (uint16_t *)read_lba(disk_p, first_indir_sector);
+      uint16_t second_indir_sector = data_p[indir_index];
+      if(second_indir_sector == FS_INVALID_SECTOR) {
+        ret = FS_INVALID_SECTOR;
+      } else {
+        uint16_t *data_p = (uint16_t *)read_lba(disk_p, second_indir_sector);
+        ret = data_p[indir_offset];
+      }
     }
   }
 
