@@ -1844,7 +1844,7 @@ void test_alloc_sector(Storage *disk_p) {
         fs_free_sector(disk_p, start);
       }
     } else {
-      info("  ...for clean up...");
+      info("Cleaning up");
       for(sector_t i = free_sector_start;i < total_sector_count;i++) {
         fs_free_sector(disk_p, i);
       }
@@ -1956,7 +1956,7 @@ void test_alloc_inode(Storage *disk_p) {
         fs_free_inode(disk_p, start);
       }
     } else {
-      info("  ...for clean up...");
+      info("Cleaning up");
       for(int i = 0;i < context.total_inode_count;i++) {
         fs_free_inode(disk_p, i);
       }
@@ -2001,6 +2001,7 @@ void test_get_sector(Storage *disk_p) {
     malloc(sizeof(uint8_t) * context.free_sector_count);
   memset(disk_sector_map, 0x00, sizeof(uint8_t) * context.free_sector_count);
 
+  int count = 0;
   for(size_t i = 0;i < sector_count_for_test;i++) {
     // Note that this function requires byte offset
     sector_t sector = \
@@ -2009,6 +2010,8 @@ void test_get_sector(Storage *disk_p) {
     // Run out of blocks
     if(sector == FS_INVALID_SECTOR) {
       break;
+    } else {
+      count++;
     }
     //assert(sector != FS_INVALID_SECTOR);
     assert(sector >= context.free_start_sector);
@@ -2018,10 +2021,13 @@ void test_get_sector(Storage *disk_p) {
     assert(disk_sector_map[sector - context.free_start_sector] == 0);
     disk_sector_map[sector - context.free_start_sector] = 1;
   }
-
+  
+  info("  Allocated %d sectors to the inode", count);
+  info("  (total free sector: %u)", context.free_sector_count);
   assert(fs_is_file_large(inode_p) == 1);
   assert(fs_is_file_extra_large(inode_p) == 1);
 
+  info("Checking whether indirection sectors are allocated...");
   buffer_pin(disk_p, inode_p);
   // Iterate to find indirection sectors and also set it
   for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
@@ -2046,12 +2052,37 @@ void test_get_sector(Storage *disk_p) {
     disk_sector_map[sector] = 1;
   }
   buffer_unpin(disk_p, inode_p);
+  info("  ...Pass");
 
+  info("Checking whether all sectors are used...");
   // Validate the disk map to make sure that the entire disk is full
   for(sector_count_t i = 0;i < context.free_sector_count;i++) {
     assert(disk_sector_map[i] == 1);
   }
+  info("  ...Pass");
 
+  info("Reading the sector to verify...");
+  int read_count = 0;
+  // We can only read that many sectors
+  for(size_t i = 0;i < sector_count_for_test;i++) {
+    // If we exceed the maximum size
+    if(i >= (size_t)((sector_t)-1)) {
+      break;
+    } else {
+      read_count++;
+    }
+
+    sector_t sector = \
+      fs_get_file_sector(disk_p, inode_p, i * disk_p->sector_size);
+    if(i < count) {
+      assert(sector == file_sector_map[i]);
+    } else {
+      assert(sector == FS_INVALID_SECTOR);
+    }
+  }
+  info("  Verified %d sectors for read", read_count);
+  info("  ...Pass");
+  
   //buffer_unpin(disk_p, inode_p);
   buffer_flush_all(disk_p);
   assert(buffer_count_pinned() == 0UL);
