@@ -1360,10 +1360,17 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
  *
  * We fill the sector with unused entries.
  *
- * If allocation fails we return invalid sector
+ * If allocation fails we return invalid sector. The buffer should be pinned
  */
-sector_t fs_alloc_sector_for_dir(Storage *disk_p) {
-  sector_t sector = fs_alloc_sector(disk_p);
+sector_t fs_alloc_sector_for_dir(Storage *disk_p, 
+                                 Inode *inode_p, 
+                                 sector_t alloc_for) {
+  assert(buffer_is_pinned(disk_p, inode_p) == 1);
+  // Allocate for the linear sector specifid in the argument
+  sector_t sector = \
+    fs_get_sector_for_write(disk_p, 
+                            inode_p, 
+                            (size_t)alloc_for * disk_p->sector_size);
   // If the sector is allocated then initialize its content
   if(sector != FS_INVALID_SECTOR) {
     DirEntry *entry_p = (DirEntry *)write_lba(disk_p, sector);
@@ -1385,6 +1392,9 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p) {
  *
  * This function sets the buffer as dirty. The caller could directly write into
  * it.
+ *
+ * If sector allocation fails, this function returns NULL. Otherwise returns the
+ * pointer from the buffer.
  */
 DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
   buffer_pin(disk_p, inode_p);
@@ -1392,13 +1402,23 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
   // Find the sector. Note that size of the directory is always a
   // multiple of sectors
   size_t dir_size = fs_get_file_size(inode_p);
-  assert(dir_size % disk_p->sector_size == 0);
-  sector_t last_sector = (sector_t)(dir_size / disk_p->sector_size);
-  // If it is 0 then the dir is empty, so we do not minus 1. Otherwise
-  // we always subtract one to get the real size
-  if(last_sector != 0) {
-    last_sector--;
+  // If the dir size is 0 then we allocate the first sector to it
+  if(dir_size == 0) {
+    // Allocate first sector
+    sector_t new_sector = fs_alloc_sector_for_dir(disk_p, inode_p, 0);
+    // EARLY RETURN
+    if(new_sector == FS_INVALID_SECTOR) {
+      buffer_unpin(disk_p, inode_p);
+      return NULL;
+    }
+
+    fs_set_file_size(inode_p, disk_p->sector_size);
+    dir_size = disk_p->sector_size;
   }
+  assert(dir_size != 0);
+  assert(dir_size % disk_p->sector_size == 0);
+  sector_t last_sector = (sector_t)(dir_size / disk_p->sector_size) - 1;
+  assert(last_sector != (sector_t)-1);
 
   // Tentatively read it. If we do need to modify the sector we just
   // set dirty later
@@ -1416,9 +1436,24 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
     }
   }
 
-  // If the 
+  // If still could not find entry, then allocate one
   if(ret == NULL) {
+    // Allocate the next sector
+    sector_t new_sector = \
+      fs_alloc_sector_for_dir(disk_p, inode_p, last_sector + 1);
+    // EARLY RETURN
+    if(new_sector == FS_INVALID_SECTOR) {
+      buffer_unpin(disk_p, inode_p);
+      return NULL;
+    }
 
+    // Update the sector size
+    dir_size += disk_p->sector_size;
+    fs_set_file_size(inode_p, dir_size);
+    // This is the first entry, and it must be not used
+    // Also this buffer is set to dirty when we load it
+    DirEntry *entry_p = (DirEntry *)read_lba_for_write(disk_p, sector);
+    ret = entry_p;
   }
 
   buffer_unpin(disk_p, inode_p);
