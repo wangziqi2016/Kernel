@@ -2019,13 +2019,38 @@ void test_get_sector(Storage *disk_p) {
     disk_sector_map[sector - context.free_start_sector] = 1;
   }
 
-  // Also fill the bl
-  // Every sector in the file should be occupied
-  for(sector_count_t i = 0;i < context.free_sector_count;i++) {
-    info("%u", i);
-    assert(file_sector_map[i] == 1);
-  }
+  assert(fs_is_file_large(inode_p) == 1);
   assert(fs_is_file_extra_large(inode_p) == 1);
+
+  buffer_pin(disk_p, inode_p);
+  // Iterate to find indirection sectors and also set it
+  for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
+    sector_t sector = inode_p->addr[i];
+    // All must be set
+    assert(sector != FS_INVALID_SECTOR);
+    sector -= context.free_start_sector;
+    assert(disk_sector_map[sector] == 0);
+    disk_sector_map[sector] = 1;
+  }
+
+  // Set the last double-indirection sector
+  sector_t *data_p = \
+    (sector_t *)read_lba(disk_p, inode_p->addr[FS_ADDR_ARRAY_SIZE - 1]);
+  for(sector_count_t i = 0;i < context.id_per_indir_sector;i++) {
+    // The last sector is not full
+    if(data_p[i] == FS_INVALID_SECTOR) {
+      break;
+    }
+    sector_t sector = data_p[i] - context.free_start_sector;
+    assert(disk_sector_map[sector] == 0);
+    disk_sector_map[sector] = 1;
+  }
+  buffer_unpin(disk_p, inode_p);
+
+  // Validate the disk map to make sure that the entire disk is full
+  for(sector_count_t i = 0;i < context.free_sector_count;i++) {
+    assert(disk_sector_map[i] == 1);
+  }
 
   //buffer_unpin(disk_p, inode_p);
   buffer_flush_all(disk_p);
