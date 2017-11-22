@@ -324,6 +324,23 @@ Buffer *buffer_find_using_data(Storage *disk_p, const void *data_p) {
 }
 
 /*
+ * buffer_set_dirty() - This function sets the buffer to dirty using its data
+ *                      area pointer
+ */
+void buffer_set_dirty(Storage *disk_p, const void *data_p) {
+  Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
+  if(buffer_p == NULL) {
+    fatal_error("Data pointer out of buffer's reach (set dirty)");
+  } else if(buffer_p->in_use == 0) {
+    fatal_error("Could not set an unused buffer as dirty");
+  }
+
+  buffer_p->dirty = 1;
+
+  return;
+}
+
+/*
  * buffer_pin() - This function accepts a buffer's data pointer and pins 
  *                the buffer
  *
@@ -1329,10 +1346,31 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
 }
 
 /*
- * fs_add_dir
+ * fs_add_dir_entry() - This function adds a new dir entry for finds an unused 
+ *                      entry in the given inode
+ *
+ * This function will pin the inode, and unpins it before return. In order for
+ * the dir entry to remain valid, the caller should be responsible not to
+ * invalidate it
  */
-int fs_add_dir_entry() {
+DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
+  buffer_pin(disk_p, inode_p);
+  DirEntry *ret;
+  // Find the sector. Note that size of the directory is always a
+  // multiple of sectors
+  size_t dir_size = fs_get_file_size(inode_p);
+  assert(dir_size % disk_p->sector_size == 0);
+  sector_t last_sector = (sector_t)(dir_size / disk_p->sector_size);
+  // If it is 0 then the dir is empty, so we do not minus 1. Otherwise
+  // we always subtract one to get the real size
+  if(last_sector != 0) {
+    last_sector--;
+  }
 
+  DirEntry *entry_p = (DirEntry *)read_lba();
+
+  buffer_unpin(disk_p, inode_p);
+  return ret;
 }
 
 /*
