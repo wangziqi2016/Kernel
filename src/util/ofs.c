@@ -1368,9 +1368,9 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
   assert(buffer_is_pinned(disk_p, inode_p) == 1);
   // Allocate for the linear sector specifid in the argument
   sector_t sector = \
-    fs_get_sector_for_write(disk_p, 
-                            inode_p, 
-                            (size_t)alloc_for * disk_p->sector_size);
+    fs_get_file_sector_for_write(disk_p, 
+                                 inode_p, 
+                                 (size_t)alloc_for * disk_p->sector_size);
   // If the sector is allocated then initialize its content
   if(sector != FS_INVALID_SECTOR) {
     DirEntry *entry_p = (DirEntry *)write_lba(disk_p, sector);
@@ -1452,7 +1452,7 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
     fs_set_file_size(inode_p, dir_size);
     // This is the first entry, and it must be not used
     // Also this buffer is set to dirty when we load it
-    DirEntry *entry_p = (DirEntry *)read_lba_for_write(disk_p, sector);
+    DirEntry *entry_p = (DirEntry *)read_lba_for_write(disk_p, new_sector);
     ret = entry_p;
   }
 
