@@ -11,7 +11,15 @@
 #include <time.h>
 #include <stdlib.h>
 
+// If word length is 4 then we use 32 bit inode and sector
+#define WORD_LEN 2
+
+#if WORD_LEN == 4
+#define DEFAULT_SECTOR_SIZE 4096
+#else
 #define DEFAULT_SECTOR_SIZE 512
+#endif
+
 // If we simulate IO delay, then this is the # of ms
 // each IO operation will have
 #define IO_OVERHEAD_MS 2
@@ -630,12 +638,27 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 // FS Layer
 /////////////////////////////////////////////////////////////////////
 
-// Sector type
+#if WORD_LEN == 4
+typedef uint32_t sector_t;
+typedef sector_t sector_count_t;
+// Inode ID type
+typedef uint32_t inode_id_t;
+typedef inode_id_t inode_count_t;
+
+typedef uint32_t word_t;
+typedef uint16_t halfword_t;
+#else
 typedef uint16_t sector_t;
 typedef sector_t sector_count_t;
 // Inode ID type
 typedef uint16_t inode_id_t;
 typedef inode_id_t inode_count_t;
+
+typedef uint16_t word_t;
+typedef uint8_t halfword_t;
+#endif
+// Sector type
+
 
 // This is the length of the free array
 #define FS_FREE_ARRAY_MAX 100
@@ -677,31 +700,33 @@ typedef struct {
   // array
   inode_count_t ninode;
   inode_id_t    inode[FS_FREE_ARRAY_MAX];
-  char flock;
-  char ilock;
-  char fmod;
-  uint16_t time[2];
+  // These are used as flags
+  halfword_t flock;
+  halfword_t ilock;
+  halfword_t fmod;
+  word_t time[2];
 } __attribute__((packed)) SuperBlock;
 
 #define FS_ADDR_ARRAY_SIZE 8
 
 // This defines the inode structure
 typedef struct {
-  uint16_t flags;
+  word_t flags;
   // Number of hardlinks to the file
-  uint8_t nlinks;
+  halfword_t nlinks;
   // User ID and group ID
-  uint8_t uid;
-  uint8_t gid;
-  // High byte of 24 bit size field
-  uint8_t size0;
-  // Low word of 24 bit size field
-  uint16_t size1;
+  halfword_t uid;
+  halfword_t gid;
+  // High bits of the size field
+  // Note that this may not be used
+  halfword_t size0;
+  // Low bits of the size field
+  word_t size1;
   sector_t addr[FS_ADDR_ARRAY_SIZE];
   // Access time
-  uint16_t actime[2];
+  word_t actime[2];
   // Modification time
-  uint16_t modtime[2];
+  word_t modtime[2];
 } __attribute__((packed)) Inode;
 
 #define DIR_ENTRY_NAME_MAX 14
@@ -1735,6 +1760,10 @@ void test_pin_buffer(Storage *disk_p) {
 void test_fs_init(Storage *disk_p) {
   info("=\n=Testing fs initialization...\n=");
 
+  info("Inode size: %lu", sizeof(Inode));
+  info("SuperBlock size: %lu", sizeof(SuperBlock));
+  info("Entry size: %lu", sizeof(DirEntry));
+
   buffer_flush_all(disk_p);
   assert(buffer_count_pinned() == 0UL);
 
@@ -2107,7 +2136,9 @@ void (*tests[])(Storage *) = {
   test_fs_init,
   test_alloc_sector,
   test_alloc_inode,
+#if WORD_LEN != 4
   test_get_sector,
+#endif
   test_init_root,
   // This is the last stage
   free_mem_storage,
@@ -2119,6 +2150,8 @@ int main() {
   for(int i = 0;i < sizeof(tests) / sizeof(tests[0]);i++) {
     tests[i](disk_p);
   }
+
+  info("Finished running all test cases (word size: %lu)", WORD_LEN);
 
   return 0;
 }
