@@ -729,7 +729,11 @@ typedef struct {
   word_t modtime[2];
 } __attribute__((packed)) Inode;
 
+#if WORD_LEN != 4
 #define DIR_ENTRY_NAME_MAX 14
+#else
+#define DIR_ENTRY_NAME_MAX 28
+#endif
 
 // This defines the directory structure
 typedef struct {
@@ -935,7 +939,8 @@ size_t fs_init_free_list(Storage *disk_p, size_t free_start, size_t free_end) {
 size_t fs_get_file_size(const Inode *inode_p) {
   // Note that we must first convert it to size_t and then shift
   // Otherwise we will just get 0
-  return ((size_t)inode_p->size0 << 16) + (size_t)inode_p->size1;
+  return ((size_t)inode_p->size0 << (sizeof(word_t) * 8)) + \
+         (size_t)inode_p->size1;
 }
 
 /*
@@ -943,16 +948,16 @@ size_t fs_get_file_size(const Inode *inode_p) {
  *                      an inode
  */
 void fs_set_file_size(Inode *inode_p, size_t sz) {
-  inode_p->size1 = (uint16_t)sz;
+  inode_p->size1 = (word_t)sz;
   // Note that we need to shift first and then convert
-  inode_p->size0 = (uint8_t)(sz >> 16);
+  inode_p->size0 = (halfword_t)(sz >> (8 * sizeof(word_t)));
   return;
 }
 
 /*
  * fs_set_file_type() - This function sets the type of the file
  */
-void fs_set_file_type(Inode *inode_p, uint16_t type) {
+void fs_set_file_type(Inode *inode_p, word_t type) {
   // The type must be 0b00, 0b01, 0b10 or 0b11
   assert(type == FS_INODE_TYPE_BLOCK ||
          type == FS_INODE_TYPE_CHAR ||
@@ -972,7 +977,7 @@ void fs_set_file_type(Inode *inode_p, uint16_t type) {
  *   FS_INODE_TYPE_BLOCK, FS_INODE_TYPE_CHAR, FS_INODE_TYPE_FILE, 
  *   FS_INODE_TYPE_DIR
  */
-uint16_t fs_get_file_type(const Inode *inode_p) {
+word_t fs_get_file_type(const Inode *inode_p) {
   return inode_p->flags & FS_INODE_TYPE_MASK;
 }
 
