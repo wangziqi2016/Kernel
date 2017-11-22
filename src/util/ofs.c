@@ -12,9 +12,9 @@
 #include <stdlib.h>
 
 // If word length is 4 then we use 32 bit inode and sector
-#define WORD_LEN 2
+#define WORD_SIZE 2
 
-#if WORD_LEN == 4
+#if WORD_SIZE == 4
 #define DEFAULT_SECTOR_SIZE 4096
 #else
 #define DEFAULT_SECTOR_SIZE 512
@@ -638,7 +638,7 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 // FS Layer
 /////////////////////////////////////////////////////////////////////
 
-#if WORD_LEN == 4
+#if WORD_SIZE == 4
 typedef uint32_t sector_t;
 typedef sector_t sector_count_t;
 // Inode ID type
@@ -729,7 +729,7 @@ typedef struct {
   word_t modtime[2];
 } __attribute__((packed)) Inode;
 
-#if WORD_LEN != 4
+#if WORD_SIZE != 4
 #define DIR_ENTRY_NAME_MAX 14
 #else
 #define DIR_ENTRY_NAME_MAX 28
@@ -2141,7 +2141,7 @@ void (*tests[])(Storage *) = {
   test_fs_init,
   test_alloc_sector,
   test_alloc_inode,
-#if WORD_LEN != 4
+#if WORD_SIZE != 4
   test_get_sector,
 #endif
   test_init_root,
@@ -2156,7 +2156,7 @@ int main() {
     tests[i](disk_p);
   }
 
-  info("Finished running all test cases (word size: %lu)", WORD_LEN);
+  info("Finished running all test cases (word size: %lu)", WORD_SIZE);
 
   return 0;
 }
