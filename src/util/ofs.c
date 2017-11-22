@@ -1355,6 +1355,27 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
 }
 
 /*
+ * fs_alloc_sector_for_dir() - This function allocates a sector for holding
+ *                             directory entries
+ *
+ * We fill the sector with unused entries.
+ *
+ * If allocation fails we return invalid sector
+ */
+sector_t fs_alloc_sector_for_dir(Storage *disk_p) {
+  sector_t sector = fs_alloc_sector(disk_p);
+  // If the sector is allocated then initialize its content
+  if(sector != FS_INVALID_SECTOR) {
+    DirEntry *entry_p = (DirEntry *)write_lba(disk_p, sector);
+    for(int i = 0;i < context.dir_per_sector;i++) {
+      entry_p[i].inode = FS_INVALID_INODE;
+    }
+  }
+
+  return sector;
+}
+
+/*
  * fs_add_dir_entry() - This function adds a new dir entry for finds an unused 
  *                      entry in the given inode
  *
@@ -1395,6 +1416,7 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
     }
   }
 
+  // If the 
   if(ret == NULL) {
 
   }
