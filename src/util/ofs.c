@@ -1174,6 +1174,9 @@ sector_t fs_convert_to_large(Storage *disk_p, Inode *inode_p) {
  * sector. Otherwise the sector is not initialized
  *
  * Note that the pointer must be in the buffer area because we will pin it
+ *
+ * Also, the sector_p buffer could be loaded using read-only mode. We will set
+ * it as dirty if we truly write into it other than simply reading its value.
  */
 sector_t fs_addr_read_or_alloc(Storage *disk_p, sector_t *sector_p, int type) {
   assert(type == FS_INDIR_SECTOR || type == FS_DATA_SECTOR);
@@ -1184,6 +1187,10 @@ sector_t fs_addr_read_or_alloc(Storage *disk_p, sector_t *sector_p, int type) {
     // This is valid even when the allocation fails, because we did not
     // change the value by doing this when it fails.
     *sector_p = sector;
+    // If allocation succeeds we set the buffer as dirty
+    if(sector != FS_INVALID_SECTOR) {
+      buffer_set_dirty(disk_p, sector_p);
+    }
     // If allocation succeeds and indir is 1 we also initialize it
     if(type == FS_INDIR_SECTOR && sector != FS_INVALID_SECTOR) {
       // Blind write
@@ -1237,7 +1244,7 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
       // we just write the sector
       // Should pin it because we called alloc sector
       sector_t *data_p = \
-        (sector_t *)read_lba_for_write(disk_p, indir_sector);
+        (sector_t *)read_lba(disk_p, indir_sector);
       buffer_pin(disk_p, data_p);
 
       // Then read or alloc a data sector for the first indir sector
@@ -1267,7 +1274,8 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
       // extra large
       assert(fs_is_file_extra_large(inode_p) == 1);
       sector_t *first_indir_p = \
-        (sector_t *)read_lba_for_write(disk_p, first_indir_sector);
+        (sector_t *)read_lba(disk_p, first_indir_sector);
+      // It will be unpinned at the very end
       buffer_pin(disk_p, first_indir_p);
       sector_t second_indir_sector = \
         fs_addr_read_or_alloc(disk_p,
@@ -1275,7 +1283,7 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
                               FS_INDIR_SECTOR);
       if(second_indir_sector != FS_INVALID_SECTOR) {
         sector_t *second_indir_p = \
-          (sector_t *)read_lba_for_write(disk_p, second_indir_sector);
+          (sector_t *)read_lba(disk_p, second_indir_sector);
         buffer_pin(disk_p, second_indir_p);
         // If the allocation fails then ret will naturally be invalid sector
         ret = fs_addr_read_or_alloc(disk_p,
@@ -1285,6 +1293,7 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
       } else {
         ret = FS_INVALID_SECTOR;
       }
+      // Release the first indir sector
       buffer_unpin(disk_p, first_indir_p);
     } else {
       ret = FS_INVALID_SECTOR;
@@ -1367,8 +1376,8 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
     last_sector--;
   }
 
-  DirEntry *entry_p = (DirEntry *)read_lba();
-
+  //DirEntry *entry_p = (DirEntry *)read_lba();
+  ret = NULL;
   buffer_unpin(disk_p, inode_p);
   return ret;
 }
@@ -2116,6 +2125,12 @@ void test_get_sector(Storage *disk_p) {
   assert(fs_is_file_extra_large(inode_p) == 1);
 
   info("Checking whether indirection sectors are allocated...");
+  // We first evict all buffers to expose problems if any
+  // and then re-read the inode
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+  inode_p = fs_load_inode_sector(disk_p, inode, 0);
+
   buffer_pin(disk_p, inode_p);
   // Iterate to find indirection sectors and also set it
   for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
