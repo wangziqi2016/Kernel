@@ -1360,11 +1360,14 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
  *
  * This function will pin the inode, and unpins it before return. In order for
  * the dir entry to remain valid, the caller should be responsible not to
- * invalidate it
+ * invalidate it.
+ *
+ * This function sets the buffer as dirty. The caller could directly write into
+ * it.
  */
 DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
   buffer_pin(disk_p, inode_p);
-  DirEntry *ret;
+  DirEntry *ret = NULL;
   // Find the sector. Note that size of the directory is always a
   // multiple of sectors
   size_t dir_size = fs_get_file_size(inode_p);
@@ -1376,8 +1379,26 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
     last_sector--;
   }
 
-  //DirEntry *entry_p = (DirEntry *)read_lba();
-  ret = NULL;
+  // Tentatively read it. If we do need to modify the sector we just
+  // set dirty later
+  // We scan all sectors from the last sector
+  for(sector_t sector = last_sector;sector != (sector_t)-1;sector--) {
+    DirEntry *entry_p = (DirEntry *)read_lba(disk_p, sector);
+    // Check every dir entry
+    for(int i = 0;i < context.dir_per_sector;i++) {
+      if(entry_p[i].inode == FS_INVALID_INODE) {
+        // This is the entry we are looking for
+        ret = entry_p + i;
+        // Set buffer as dirty because we intend to write it back
+        buffer_set_dirty(disk_p, ret);
+      }
+    }
+  }
+
+  if(ret == NULL) {
+
+  }
+
   buffer_unpin(disk_p, inode_p);
   return ret;
 }
