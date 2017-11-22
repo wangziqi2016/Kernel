@@ -645,6 +645,8 @@ typedef sector_t sector_count_t;
 typedef uint32_t inode_id_t;
 typedef inode_id_t inode_count_t;
 
+typedef uint32_t dir_count_t;
+
 typedef uint32_t word_t;
 typedef uint16_t halfword_t;
 #else
@@ -653,6 +655,8 @@ typedef sector_t sector_count_t;
 // Inode ID type
 typedef uint16_t inode_id_t;
 typedef inode_id_t inode_count_t;
+
+typedef uint16_t dir_count_t;
 
 typedef uint16_t word_t;
 typedef uint8_t halfword_t;
@@ -763,6 +767,8 @@ typedef struct {
   sector_count_t id_per_indir_sector;
   // The start sector for extra large blocks
   sector_t extra_large_start_sector;
+  dir_count_t dir_per_sector;
+  
 } Context;
 
 // This is the content of the fs
@@ -829,6 +835,9 @@ void fs_load_context(Storage *disk_p) {
   context.id_per_indir_sector = disk_p->sector_size / sizeof(sector_t);
   context.extra_large_start_sector = \
     context.id_per_indir_sector * (FS_ADDR_ARRAY_SIZE - 1);
+  
+  // This is the number of directory entries per sector
+  context.dir_per_sector = disk_p->sector_size / sizeof(DirEntry);
 
   return;
 }
@@ -1317,6 +1326,13 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
   
   buffer_unpin(disk_p, inode_p);
   return ret;
+}
+
+/*
+ * fs_add_dir
+ */
+int fs_add_dir_entry() {
+
 }
 
 /*
