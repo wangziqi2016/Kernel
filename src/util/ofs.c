@@ -1474,10 +1474,14 @@ void fs_init_root(Storage *disk_p) {
 
   Inode *inode_p = fs_load_inode_sector(disk_p, FS_ROOT_INODE, 1);
   inode_p->flags |= FS_INODE_IN_USE;
-
   // Size of a directory is the number of sectors it occupies
-  fs_set_file_size(inode_p, disk_p->sector_size);
   fs_set_file_type(inode_p, FS_INODE_TYPE_DIR);
+
+  DirEntry *entry_p_dot = fs_add_dir_entry(disk_p, inode_p);
+  DirEntry *entry_p_dot_dot = fs_add_dir_entry(disk_p, inode_p);
+  if(entry_p_dot == NULL || entry_p_dot_dot == NULL) {
+    fatal_error("Failed to allocate initial entries for root");
+  }
 
   info("Finished initializing root directory");
 
