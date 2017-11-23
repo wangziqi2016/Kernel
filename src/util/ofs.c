@@ -1455,7 +1455,7 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
     DirEntry *entry_p = (DirEntry *)read_lba_for_write(disk_p, new_sector);
     ret = entry_p;
   }
-
+ 
   buffer_unpin(disk_p, inode_p);
   return ret;
 }
