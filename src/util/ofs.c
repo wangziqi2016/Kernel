@@ -655,7 +655,18 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 // FS Layer
 /////////////////////////////////////////////////////////////////////
 
-
+// User error definition
+#define FS_SUCCESS           0
+// File name too long
+#define FS_ERR_NAME_TOO_LONG 1
+// Invalid character in file name
+#define FS_ERR_ILLEGAL_CHAR  2
+// Invalid file name (characters are valid)
+#define FS_ERR_ILLEGAL_NAME  3
+// Run out of sectors
+#define FS_ERR_NO_SPACE      4
+// Run out of inodes
+#define FS_ERR_NO_INODE      5
 
 #if WORD_SIZE == 4
 typedef uint32_t sector_t;
