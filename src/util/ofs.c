@@ -1581,10 +1581,16 @@ int fs_set_dir_name(Storage *disk_p,
 /*
  * fs_print_dir_name() - This function prints the name of a given directory
  *
- * We print the name without any modification. Just the 
+ * We print the name without any modification. Just the name will be printed.
+ * This function takes a pointer for printing to an FP. The fp could be
+ * either stderr or stdout
  */
-void fs_print_dir_name() {
-
+void fs_print_dir_name(DirEntry *entry_p, FILE *fp) {
+  const char *p = entry_p->name;
+  while(*p != '\0') {
+    fputc(*p, fp);
+    p++;
+  }
 }
 
 /*
@@ -2411,6 +2417,12 @@ void test_init_root(Storage *disk_p) {
   return;
 }
 
+void test_set_dir_name(Storage *disk_p) {
+  info("=\n=Testing init the root directory...\n=");
+  
+  return;
+}
+
 // This is a list of function call backs that we use to test
 void (*tests[])(Storage *) = {
   test_lba_rw,
@@ -2423,6 +2435,7 @@ void (*tests[])(Storage *) = {
   test_get_sector,
 #endif
   test_init_root,
+  test_set_dir_name,
   // This is the last stage
   free_mem_storage,
 };
