@@ -655,7 +655,8 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 // FS Layer
 /////////////////////////////////////////////////////////////////////
 
-// User error definition
+// User error definitions
+
 #define FS_SUCCESS           0
 // File name too long
 #define FS_ERR_NAME_TOO_LONG 1
@@ -1471,6 +1472,28 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
  
   buffer_unpin(disk_p, inode_p);
   return ret;
+}
+
+/*
+ * fs_is_valid_char() - Returns 1 if the char is valid for file name
+ *
+ * Valid chars are:
+ *   1. Alphabet
+ *   2. Numeric digits
+ *   3. Underline, dash and dot
+ */
+int fs_is_valid_char(char ch) {
+  if(ch >= 'A' && ch <= 'Z') {
+    return 1;
+  } else if(ch >= 'a' && ch <= 'z') {
+    return 1;
+  } else if(ch >= '0' && ch <= '9') {
+    return 1;
+  } else if(ch == '.' || ch == '-' || ch == '_') {
+    return 1;
+  }
+
+  return 0;
 }
 
 /*
