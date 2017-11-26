@@ -1564,6 +1564,8 @@ int fs_set_dir_name(Storage *disk_p,
     if(*p != ' ') {
       all_space = 0;
     }
+
+    p++;
   }
 
   // Manually disable it if we allow names such as . and ..
