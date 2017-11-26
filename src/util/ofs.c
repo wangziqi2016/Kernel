@@ -1526,13 +1526,17 @@ int fs_is_valid_char(char ch) {
  *      3.1 Names that only has '.' character
  *      3.2 Names that only has space character
  *
- * If we need to allow names that only have dot, then the allow_dot should 
+ * If we need to allow names that only have dot, then the allow_all_dot should 
  * be set to 1. This feature is only used for initializing a directory
  *
  * This function will set the entry as dirty.
  */
-int fs_set_dir_name(Storage *disk_p, DirEntry *entry_p, const char *name, ) {
-  if(strlen(name) > FS_DIR_ENTRY_NAME_MAX) {
+int fs_set_dir_name(Storage *disk_p, 
+                    DirEntry *entry_p, 
+                    const char *name, 
+                    int allow_all_dot) {
+  int len = strlen(name);
+  if(len > FS_DIR_ENTRY_NAME_MAX) {
     return FS_ERR_NAME_TOO_LONG;
   }
 
@@ -1549,11 +1553,38 @@ int fs_set_dir_name(Storage *disk_p, DirEntry *entry_p, const char *name, ) {
   // Are set to 0 if we see anything other than a dot/space
   int all_dots = 1;
   int all_space = 1;
-  
+  while(*p != '\0') {
+    if(*p != '.') {
+      all_dots = 0; 
+    }
+
+    if(*p != ' ') {
+      all_space = 0;
+    }
+  }
+
+  // If any of these two are assigned 1
+  if(all_dots == 1 || all_space == 1) {
+    return FS_ERR_ILLEGAL_NAME;
+  }
 
   // Make the change available if we need to change the name
   buffer_set_dirty(disk_p, entry_p);
+  // Set padding first (it's actually faster)
+  memset(entry_p->name + len, 0x00, FS_DIR_ENTRY_NAME_MAX);
+  // We do not use strcpy because we do not copy the trailing 0
+  memcpy(entry_p->name, name, len);
+
   return 0;
+}
+
+/*
+ * fs_print_dir_name() - This function prints the name of a given directory
+ *
+ * We print the name without any modification. Just the 
+ */
+void fs_print_dir_name() {
+
 }
 
 /*
