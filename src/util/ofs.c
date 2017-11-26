@@ -1441,7 +1441,7 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
   // multiple of sectors
   size_t dir_size = fs_get_file_size(inode_p);
   // If the dir size is 0 then we allocate the first sector to it
-  if(dir_size == 0) {
+  if(dir_size == 0UL) {
     // Allocate first sector
     sector_t new_sector = fs_alloc_sector_for_dir(disk_p, inode_p, 0);
     // EARLY RETURN
@@ -1455,14 +1455,18 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
   }
   assert(dir_size != 0);
   assert(dir_size % disk_p->sector_size == 0);
-  sector_t last_sector = (sector_t)(dir_size / disk_p->sector_size) - 1;
+  const sector_t last_sector = (sector_t)(dir_size / disk_p->sector_size) - 1;
   assert(last_sector != (sector_t)-1);
 
   // Tentatively read it. If we do need to modify the sector we just
   // set dirty later
   // We scan all sectors from the last sector
   for(sector_t sector = last_sector;sector != (sector_t)-1;sector--) {
-    DirEntry *entry_p = (DirEntry *)read_lba(disk_p, sector);
+    sector_t actual_sector = \
+      fs_get_file_sector(disk_p, inode_p, sector * disk_p->sector_size);
+    // We do not allow holes in the directory
+    assert(actual_sector != FS_INVALID_SECTOR);
+    DirEntry *entry_p = (DirEntry *)read_lba(disk_p, actual_sector);
     // Check every dir entry
     for(int i = 0;i < context.dir_per_sector;i++) {
       if(entry_p[i].inode == FS_INVALID_INODE) {
@@ -1470,7 +1474,12 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
         ret = entry_p + i;
         // Set buffer as dirty because we intend to write it back
         buffer_set_dirty(disk_p, ret);
+        break;
       }
+    }
+
+    if(ret != NULL) {
+      break;
     }
   }
 
@@ -1485,15 +1494,16 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
       return NULL;
     }
 
-    // Update the sector size
+    // Update the sector size. We will write this back later
     dir_size += disk_p->sector_size;
+    // Update the dir size
     fs_set_file_size(inode_p, dir_size);
     // This is the first entry, and it must be not used
     // Also this buffer is set to dirty when we load it
     DirEntry *entry_p = (DirEntry *)read_lba_for_write(disk_p, new_sector);
     ret = entry_p;
   }
- 
+
   buffer_unpin(disk_p, inode_p);
   return ret;
 }
@@ -1591,7 +1601,7 @@ int fs_set_dir_name(Storage *disk_p,
   // Make the change available if we need to change the name
   buffer_set_dirty(disk_p, entry_p);
   // Set padding first (it's actually faster)
-  memset(entry_p->name + len, 0x00, FS_DIR_ENTRY_NAME_MAX);
+  memset(entry_p->name, 0x00, FS_DIR_ENTRY_NAME_MAX);
   // We do not use strcpy because we do not copy the trailing 0
   memcpy(entry_p->name, name, len);
 
@@ -1631,6 +1641,10 @@ void fs_init_root(Storage *disk_p) {
   inode_p->flags |= FS_INODE_IN_USE;
   // Size of a directory is the number of sectors it occupies
   fs_set_file_type(inode_p, FS_INODE_TYPE_DIR);
+
+  // Note that reference from . and .. does not contribute to this
+  assert(inode_p->nlinks = 1);
+  assert(fs_get_file_size(inode_p) == 0UL);
 
   DirEntry *entry_p_dot = fs_add_dir_entry(disk_p, inode_p);
   DirEntry *entry_p_dot_dot = fs_add_dir_entry(disk_p, inode_p);
