@@ -655,6 +655,8 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 // FS Layer
 /////////////////////////////////////////////////////////////////////
 
+
+
 #if WORD_SIZE == 4
 typedef uint32_t sector_t;
 typedef sector_t sector_count_t;
@@ -728,7 +730,7 @@ typedef struct {
   word_t time[2];
 } __attribute__((packed)) SuperBlock;
 
-#define FS_ADDR_ARRAY_SIZE 8
+#define FS_ADDR_ARRAY_MAX 8
 
 // This defines the inode structure
 typedef struct {
@@ -743,7 +745,7 @@ typedef struct {
   halfword_t size0;
   // Low bits of the size field
   word_t size1;
-  sector_t addr[FS_ADDR_ARRAY_SIZE];
+  sector_t addr[FS_ADDR_ARRAY_MAX];
   // Access time
   word_t actime[2];
   // Modification time
@@ -751,9 +753,9 @@ typedef struct {
 } __attribute__((packed)) Inode;
 
 #if WORD_SIZE != 4
-#define DIR_ENTRY_NAME_MAX 14
+#define FS_DIR_ENTRY_NAME_MAX 14
 #else
-#define DIR_ENTRY_NAME_MAX 28
+#define FS_DIR_ENTRY_NAME_MAX 28
 #endif
 
 // This defines the directory structure
@@ -763,7 +765,7 @@ typedef struct {
   inode_id_t inode;
   // Note that file names are not required to terminate with 0x0
   // but this field is null-padded
-  char name[DIR_ENTRY_NAME_MAX];
+  char name[FS_DIR_ENTRY_NAME_MAX];
 } DirEntry;
 
 // This is the in-memory representation of the file system metadata
@@ -851,7 +853,7 @@ void fs_load_context(Storage *disk_p) {
   // These two are used for computing the sector ID of a given offset
   context.id_per_indir_sector = disk_p->sector_size / sizeof(sector_t);
   context.extra_large_start_sector = \
-    context.id_per_indir_sector * (FS_ADDR_ARRAY_SIZE - 1);
+    context.id_per_indir_sector * (FS_ADDR_ARRAY_MAX - 1);
   
   // This is the number of directory entries per sector
   context.dir_per_sector = disk_p->sector_size / sizeof(DirEntry);
@@ -863,7 +865,7 @@ void fs_load_context(Storage *disk_p) {
  * fs_reset_addr() - This function resets the addr array of a given inode
  */
 void fs_reset_addr(Inode *inode_p) {
-  for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
+  for(int i = 0;i < FS_ADDR_ARRAY_MAX;i++) {
     inode_p->addr[i] = FS_INVALID_SECTOR;
   }
 
@@ -1032,7 +1034,7 @@ void fs_set_file_large(Inode *inode_p) {
  */
 int fs_is_file_extra_large(const Inode *inode_p) {
   return !!(fs_is_file_large(inode_p) && \
-            inode_p->addr[FS_ADDR_ARRAY_SIZE - 1] != FS_INVALID_SECTOR);
+            inode_p->addr[FS_ADDR_ARRAY_MAX - 1] != FS_INVALID_SECTOR);
 }
  
 /*
@@ -1061,7 +1063,7 @@ sector_t fs_get_file_sector(Storage *disk_p,
   sector_t ret;
   // If the file is small, then the sector ID must be less than 8
   if(fs_is_file_large(inode_p) == 0) {
-    assert(sector < FS_ADDR_ARRAY_SIZE);
+    assert(sector < FS_ADDR_ARRAY_MAX);
     // This could be invalid sector
     ret = inode_p->addr[sector];
   } else {
@@ -1071,7 +1073,7 @@ sector_t fs_get_file_sector(Storage *disk_p,
     
     // Then if the file is large file, and the index is not the last one
     // then we know we can always use the indirection sector
-    if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
+    if(indir_index < (FS_ADDR_ARRAY_MAX - 1)) {
       sector_t indir_sector = inode_p->addr[indir_index];
       // If the sector does not exist, then we assume the range it covers 
       // contains all zero, and just return invalid
@@ -1091,7 +1093,7 @@ sector_t fs_get_file_sector(Storage *disk_p,
       // This branch handles extra large file
       // This is the address of the first indirection sector
       const sector_t first_indir_sector = \
-        inode_p->addr[FS_ADDR_ARRAY_SIZE - 1];
+        inode_p->addr[FS_ADDR_ARRAY_MAX - 1];
       // Starts with 0 in the extra large area
       sector -= context.extra_large_start_sector;
       // Just treat it as another array of indir sector
@@ -1220,14 +1222,14 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
                                                  Inode *inode_p, 
                                                  sector_t sector) {
   assert(buffer_is_pinned(disk_p, inode_p) == 1);
-  assert(sector >= FS_ADDR_ARRAY_SIZE);
+  assert(sector >= FS_ADDR_ARRAY_MAX);
   assert(fs_is_file_large(inode_p) == 1);
   sector_t ret;
   // These two are the index and offset of/within the first indirection level
   sector_t indir_index = sector / context.id_per_indir_sector;
   sector_t indir_offset = sector % context.id_per_indir_sector;
   // If the index is still in large file range but not extra large file range
-  if(indir_index < (FS_ADDR_ARRAY_SIZE - 1)) {
+  if(indir_index < (FS_ADDR_ARRAY_MAX - 1)) {
     // Read or alloc the first indir sector
     sector_t indir_sector = \
       fs_addr_read_or_alloc(disk_p,
@@ -1267,7 +1269,7 @@ sector_t fs_get_file_sector_for_write_large_file(Storage *disk_p,
     // Read or allocate it
     sector_t first_indir_sector = \
       fs_addr_read_or_alloc(disk_p,
-                            &inode_p->addr[FS_ADDR_ARRAY_SIZE - 1], 
+                            &inode_p->addr[FS_ADDR_ARRAY_MAX - 1], 
                             FS_INDIR_SECTOR);
     if(first_indir_sector != FS_INVALID_SECTOR) {
       // If we have set the last sector in addr. array then the file is also
@@ -1331,7 +1333,7 @@ sector_t fs_get_file_sector_for_write(Storage *disk_p,
   assert(((size_t)sector * disk_p->sector_size) == offset);
   if(fs_is_file_large(inode_p) == 0) {
     // If it is not large, then check the sector offset
-    if(sector >= FS_ADDR_ARRAY_SIZE) {
+    if(sector >= FS_ADDR_ARRAY_MAX) {
       // This does not logically change the file
       sector_t indir_sector = fs_convert_to_large(disk_p, inode_p);
       if(indir_sector == FS_INVALID_SECTOR) {
@@ -1460,21 +1462,27 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
   return ret;
 }
 
-#define FS_NAME_TOO_LONG 1
-#define FS_ILLEGAL_CHAR  2
-#define FS_ILLEGAL_NAME  3
-
 /*
  * fs_set_dir_name() - This function sets the directory name
  *
  * This function proceeds as follows:
  *   1. If the length of the name exceeds the maximum length then return 
- *      FS_NAME_TOO_LONG
- *   2. If there is any forbidden char, then we return FS_ILLEGAL_CHAR
- *   3. If the name itself is illegal, then we return FS_ILLEGAL_NAME
+ *      FS_ERR_NAME_TOO_LONG
+ *      1.1 Defined by FS_DIR_ENTRY_NAME_MAX, not including any '\0' padding
+ *      1.2 We do not use '\0' to terminate the file name either
+ *   2. If there is any forbidden char, then we return FS_ERR_ILLEGAL_CHAR
+ *      2.1 alphanumeric, underline, dash are allowed
+ *      2.2 All other characters are not allowed
+ *   3. If the name itself is illegal, then we return FS_ERR_ILLEGAL_NAME
+ *      3.1 Names that only has '.' character
+ *      3.2 Names that only has space or tab character
  */
 int fs_set_dir_name(const char *name) {
+  if(strlen(name) > FS_DIR_ENTRY_NAME_MAX) {
+    return FS_ERR_NAME_TOO_LONG;
+  }
 
+  return 0;
 }
 
 /*
@@ -2184,7 +2192,7 @@ void test_get_sector(Storage *disk_p) {
   // This is the maximum number of sectors we could support in one file
   const size_t sector_count_for_test = \
     context.id_per_indir_sector * \
-      (FS_ADDR_ARRAY_SIZE - 1 + context.id_per_indir_sector);
+      (FS_ADDR_ARRAY_MAX - 1 + context.id_per_indir_sector);
   info("# of sector ID per indirection sector: %u", 
        (uint32_t)context.id_per_indir_sector); 
   info("Allocating %u sectors for a single file...", 
@@ -2232,7 +2240,7 @@ void test_get_sector(Storage *disk_p) {
 
   buffer_pin(disk_p, inode_p);
   // Iterate to find indirection sectors and also set it
-  for(int i = 0;i < FS_ADDR_ARRAY_SIZE;i++) {
+  for(int i = 0;i < FS_ADDR_ARRAY_MAX;i++) {
     sector_t sector = inode_p->addr[i];
     // All must be set
     assert(sector != FS_INVALID_SECTOR);
@@ -2243,7 +2251,7 @@ void test_get_sector(Storage *disk_p) {
 
   // Set the last double-indirection sector
   sector_t *data_p = \
-    (sector_t *)read_lba(disk_p, inode_p->addr[FS_ADDR_ARRAY_SIZE - 1]);
+    (sector_t *)read_lba(disk_p, inode_p->addr[FS_ADDR_ARRAY_MAX - 1]);
   for(sector_count_t i = 0;i < context.id_per_indir_sector;i++) {
     // The last sector is not full
     if(data_p[i] == FS_INVALID_SECTOR) {
