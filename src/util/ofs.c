@@ -1425,6 +1425,9 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
  * pointer from the buffer.
  */
 DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
+  // Make sure we are operating on inode that represents dir
+  assert(fs_get_file_type(inode_p) == FS_INODE_TYPE_DIR);
+
   buffer_pin(disk_p, inode_p);
   DirEntry *ret = NULL;
   // Find the sector. Note that size of the directory is always a
@@ -1585,7 +1588,7 @@ int fs_set_dir_name(Storage *disk_p,
   // We do not use strcpy because we do not copy the trailing 0
   memcpy(entry_p->name, name, len);
 
-  return 0;
+  return FS_SUCCESS;
 }
 
 /*
@@ -1628,9 +1631,15 @@ void fs_init_root(Storage *disk_p) {
     fatal_error("Failed to allocate initial entries for root");
   }
 
+  int dir_name_ret;
   // Set the name of these two entries
-  fs_set_dir_name(disk_p, entry_p_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
-  fs_set_dir_name(disk_p, entry_p_dot_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
+  dir_name_ret = \
+    fs_set_dir_name(disk_p, entry_p_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
+  assert(dir_name_ret == FS_SUCCESS);
+  dir_name_ret = \
+    fs_set_dir_name(disk_p, entry_p_dot_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
+  assert(dir_name_ret == FS_SUCCESS);
+
   // Set the inode. Both point to the current directory
   entry_p_dot->inode = entry_p_dot_dot->inode = FS_ROOT_INODE;
 
@@ -1935,22 +1944,6 @@ void fs_free_inode(Storage *disk_p, inode_id_t inode) {
 
   buffer_unpin(disk_p, sb_p);
   return;
-}
-
-/*
- * fs_get_free_dir_entry() - This function creates and returns a free dir entry
- *                           in a given directory inode
- *
- * It does not following:
- *   1. Get the last sector of the entry, and check whether there is any
- *      free entry
- *   2. If not, then scan from the first sector to see if there is any
- *      free or deleted entry
- *   3. If not, then allocate a new sector, and initialize all enrties to
- *      free, and return the first entry in the sector
- */
-void fs_get_free_dir_entry() {
-
 }
 
 /////////////////////////////////////////////////////////////////////
