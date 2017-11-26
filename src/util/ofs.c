@@ -1481,6 +1481,7 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
  *   1. Alphabet
  *   2. Numeric digits
  *   3. Underline, dash and dot
+ *   4. Space character
  */
 int fs_is_valid_char(char ch) {
   if(ch >= 'A' && ch <= 'Z') {
@@ -1489,7 +1490,7 @@ int fs_is_valid_char(char ch) {
     return 1;
   } else if(ch >= '0' && ch <= '9') {
     return 1;
-  } else if(ch == '.' || ch == '-' || ch == '_') {
+  } else if(ch == '.' || ch == '-' || ch == '_' || ch == ' ') {
     return 1;
   }
 
@@ -1505,17 +1506,39 @@ int fs_is_valid_char(char ch) {
  *      1.1 Defined by FS_DIR_ENTRY_NAME_MAX, not including any '\0' padding
  *      1.2 We do not use '\0' to terminate the file name either
  *   2. If there is any forbidden char, then we return FS_ERR_ILLEGAL_CHAR
- *      2.1 alphanumeric, underline, dash are allowed
+ *      2.1 alphanumeric, underline, dash, and space are allowed
  *      2.2 All other characters are not allowed
  *   3. If the name itself is illegal, then we return FS_ERR_ILLEGAL_NAME
  *      3.1 Names that only has '.' character
- *      3.2 Names that only has space or tab character
+ *      3.2 Names that only has space character
+ *
+ * If we need to allow names that only have dot, then the allow_dot should 
+ * be set to 1. This feature is only used for initializing a directory
+ *
+ * This function will set the entry as dirty.
  */
-int fs_set_dir_name(const char *name) {
+int fs_set_dir_name(Storage *disk_p, DirEntry *entry_p, const char *name, ) {
   if(strlen(name) > FS_DIR_ENTRY_NAME_MAX) {
     return FS_ERR_NAME_TOO_LONG;
   }
 
+  const char *p = name;
+  // As long as any of the character is invalid, the entire name is invalid
+  while(*p != '\0') {
+    if(fs_is_valid_char(*p) == 0) {
+      return FS_ERR_ILLEGAL_CHAR;
+    }
+    p++;
+  }
+
+  p = name;
+  // Are set to 0 if we see anything other than a dot/space
+  int all_dots = 1;
+  int all_space = 1;
+  
+
+  // Make the change available if we need to change the name
+  buffer_set_dirty(disk_p, entry_p);
   return 0;
 }
 
