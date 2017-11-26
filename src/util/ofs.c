@@ -1626,7 +1626,11 @@ void fs_init_root(Storage *disk_p) {
     fatal_error("Failed to allocate initial entries for root");
   }
 
-  fs_set_dir_name(disk_p, entry_p_dot, ".", 1);
+  // Set the name of these two entries
+  fs_set_dir_name(disk_p, entry_p_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
+  fs_set_dir_name(disk_p, entry_p_dot_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
+  // Set the inode. Both point to the current directory
+  entry_p_dot->inode = entry_p_dot_dot->inode = FS_ROOT_INODE;
 
   info("Finished initializing root directory");
 
