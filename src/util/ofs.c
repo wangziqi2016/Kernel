@@ -1511,6 +1511,9 @@ int fs_is_valid_char(char ch) {
   return 0;
 }
 
+#define FS_SET_DIR_NAME_DISALLOW_DOT 0
+#define FS_SET_DIR_NAME_ALLOW_DOT    1
+
 /*
  * fs_set_dir_name() - This function sets the directory name
  *
@@ -1563,6 +1566,11 @@ int fs_set_dir_name(Storage *disk_p,
     }
   }
 
+  // Manually disable it if we allow names such as . and ..
+  if(allow_all_dot == FS_SET_DIR_NAME_ALLOW_DOT) {
+    all_dots = 0;
+  }
+
   // If any of these two are assigned 1
   if(all_dots == 1 || all_space == 1) {
     return FS_ERR_ILLEGAL_NAME;
@@ -1591,6 +1599,8 @@ void fs_print_dir_name(DirEntry *entry_p, FILE *fp) {
     fputc(*p, fp);
     p++;
   }
+
+  return;
 }
 
 /*
@@ -1615,6 +1625,8 @@ void fs_init_root(Storage *disk_p) {
   if(entry_p_dot == NULL || entry_p_dot_dot == NULL) {
     fatal_error("Failed to allocate initial entries for root");
   }
+
+  fs_set_dir_name(disk_p, entry_p_dot, ".", 1);
 
   info("Finished initializing root directory");
 
