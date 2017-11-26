@@ -341,6 +341,20 @@ void buffer_set_dirty(Storage *disk_p, const void *data_p) {
 }
 
 /*
+ * buffer_is_dirty() - Returns 1 if the buffer the pointer point to is dirty
+ */
+int buffer_is_dirty(Storage *disk_p, const void *data_p) {
+  Buffer *buffer_p = buffer_find_using_data(disk_p, data_p);
+  if(buffer_p == NULL) {
+    fatal_error("Data pointer out of buffer's reach (is_dirty)");
+  } else if(buffer_p->in_use == 0) {
+    fatal_error("Could not check an unused buffer as dirty");
+  }
+
+  return !!(buffer_p->dirty != 0);
+}
+
+/*
  * buffer_pin() - This function accepts a buffer's data pointer and pins 
  *                the buffer
  *
