@@ -1460,6 +1460,23 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
   return ret;
 }
 
+#define FS_NAME_TOO_LONG 1
+#define FS_ILLEGAL_CHAR  2
+#define FS_ILLEGAL_NAME  3
+
+/*
+ * fs_set_dir_name() - This function sets the directory name
+ *
+ * This function proceeds as follows:
+ *   1. If the length of the name exceeds the maximum length then return 
+ *      FS_NAME_TOO_LONG
+ *   2. If there is any forbidden char, then we return FS_ILLEGAL_CHAR
+ *   3. If the name itself is illegal, then we return FS_ILLEGAL_NAME
+ */
+int fs_set_dir_name(const char *name) {
+
+}
+
 /*
  * fs_init_root() - This function initializes the root directory
  *
