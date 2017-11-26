@@ -1878,7 +1878,10 @@ SuperBlock *fill_inode_free_array(Storage *disk_p, SuperBlock *sb_p) {
  * fs_alloc_inode() - This function allocates an unused inode
  *
  * We first search the super block, and if the super block does not have
- * any cached inode, we need to scan the entire inode map and find one
+ * any cached inode, we need to scan the entire inode map and find one.
+ *
+ * This function will not set the type, size and time of the inode. But it
+ * will always set the nlinks field to 1
  *
  * This function returns the inode number. (-1) means allocation failure
  */
@@ -1908,8 +1911,10 @@ inode_id_t fs_alloc_inode(Storage *disk_p) {
     memset(inode_p, 0x0, sizeof(Inode));
     // Mark it as in-use
     inode_p->flags |= FS_INODE_IN_USE;
+    // This is the only field we initialize
+    inode_p->nlinks = 1;
   }
-  
+
   buffer_unpin(disk_p, sb_p);
   return ret;
 }
@@ -2428,9 +2433,36 @@ void test_init_root(Storage *disk_p) {
   return;
 }
 
-void test_set_dir_name(Storage *disk_p) {
+void test_add_dir_entry(Storage *disk_p) {
   info("=\n=Testing init the root directory...\n=");
   
+  // We will write into this inode's addr array for allocating
+  // sectors
+  Inode *inode_p = fs_load_inode_sector(disk_p, FS_ROOT_INODE, 1);
+  const int total_entry = 200;
+  info("Allocating %d entries to the root directory...", total_entry);
+  for(int i = 0;i < 200;i++) {
+    DirEntry *entry_p = fs_add_dir_entry(disk_p, inode_p);
+    assert(entry_p != NULL);
+    entry_p->inode = FS_ROOT_INODE;
+    char name_buffer[128];
+    sprintf(name_buffer, "File %d", i);
+    int ret = fs_set_dir_entry_name(disk_p, 
+                                    entry_p, 
+                                    name_buffer, 
+                                    FS_SET_DIR_NAME_DISALLOW_DOT);
+    assert(ret == FS_SUCCESS);  
+  }
+  info("  Done");
+
+  buffer_flush_all(disk_p);
+  inode_p = fs_load_inode_sector(disk_p, FS_ROOT_NODE, 0);
+  size_t expected_size = \
+    disk_p->sector_size * 
+    (size_t)((total_entry / context.dir_per_sector) + 
+    (size_t)((total_entry % context.dir_per_sector == 0) ? 0 : 1));
+  assert(fs_get_file_size(inode_p) == expected_size);
+
   return;
 }
 
@@ -2446,7 +2478,7 @@ void (*tests[])(Storage *) = {
   test_get_sector,
 #endif
   test_init_root,
-  test_set_dir_name,
+  test_add_dir_entry,
   // This is the last stage
   free_mem_storage,
 };
