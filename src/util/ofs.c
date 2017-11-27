@@ -1420,6 +1420,21 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
 }
 
 /*
+ * fs_free_dir_sector() - This function frees a directory's sector
+ *
+ * We did not check whether the sector is all empty. The caller should
+ * respect this.
+ *
+ * This function assumes that the inode has been pinned in the buffer
+ *
+ * The sector passed in the function is the linear sector for the directory.
+ * We should use the addr, array to resolve it to the global sector
+ */
+void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, sector_t to_free) {
+  
+}
+
+/*
  * fs_free_dir_entry() - This function removes a dir entry from a directory's
  *                       inode
  *
