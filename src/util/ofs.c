@@ -1080,6 +1080,10 @@ int fs_is_file_extra_large(const Inode *inode_p) {
  * may be inside another indirection sector. If there are interleaved
  * sector operations, the caller should pin the returned value
  *
+ * If the caller modifies the entry through the pointer, the pointer's buffer
+ * must be marked as dirty, because the pointer may not point to the inode's
+ * buffer
+ *
  * Other properties are specified in fs_get_file_sector()
  */
 sector_t *fs_get_file_sector_p(Storage *disk_p, 
@@ -1458,14 +1462,22 @@ void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, void *free_sector_p) {
   // Just decrease by sector size and the offset now points to the 
   // last sector
   const size_t last_offset = fs_get_file_size(inode_p) - disk_p->sector_size;
-  const sector_t last_sector = fs_get_file_sector(disk_p, inode_p, last_offset);
+  // The returned value may be inside an indirection sector, so we should
+  // change it before we read any sector
+  sector_t * const last_sector_slot_p = \
+    fs_get_file_sector_p(disk_p, inode_p, last_offset);
+  // Dereference to get the sector value
+  const sector_t last_sector = *last_sector_slot_p;
+  // Then remove it from the slot
+  *last_sector_slot_p = FS_INVALID_SECTOR;
+  // Make it dirty. Can be in either inode or indir. sector
+  buffer_set_dirty(disk_p, last_sector_slot_p);
   assert(last_sector != FS_INVALID_SECTOR);
   void *data_p = read_lba(disk_p, last_sector);
   memcpy(free_sector_p, data_p, disk_p->sector_count);
   // Reduce the directory size by sector size
   fs_set_file_size(inode_p, fs_get_file_size(inode_p) - disk_p->sector_size);
   fs_free_sector(disk_p, last_sector);
-  // TODO: FREE THE SECTOR IN ADDR. ARRAY
   buffer_unpin(disk_p, free_sector_p);
   return;
 }
