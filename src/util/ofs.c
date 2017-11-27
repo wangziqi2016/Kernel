@@ -671,17 +671,18 @@ uint8_t *write_lba(Storage *disk_p, uint64_t lba) {
 
 // User error definitions
 
-#define FS_SUCCESS           0
+#define FS_SUCCESS            0
 // File name too long
-#define FS_ERR_NAME_TOO_LONG 1
+#define FS_ERR_NAME_TOO_LONG  1
 // Invalid character in file name
-#define FS_ERR_ILLEGAL_CHAR  2
+#define FS_ERR_ILLEGAL_CHAR   2
 // Invalid file name (characters are valid)
-#define FS_ERR_ILLEGAL_NAME  3
+#define FS_ERR_ILLEGAL_NAME   3
 // Run out of sectors
-#define FS_ERR_NO_SPACE      4
+#define FS_ERR_NO_SPACE       4
 // Run out of inodes
-#define FS_ERR_NO_INODE      5
+#define FS_ERR_NO_INODE       5
+#define FS_ERR_NAME_NOT_FOUND 6
 
 #if WORD_SIZE == 4
 typedef uint32_t sector_t;
@@ -1415,6 +1416,43 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
   }
 
   return sector;
+}
+
+/*
+ * fs_free_dir_entry() - This function removes a dir entry from a directory's
+ *                       inode
+ *
+ * This function proceeds as follows:
+ *   1. If the name length is greather than the maximum allowed name length
+ *      then we directly return FS_ERR_NAME_NOT_FOUND
+ *   2. If the name is '.' or '..' then we return FS_ERR_ILLEGAL_NAME
+ *   3. If the name is not found in the directory, then we return
+ *      FS_ERR_NAME_NOT_FOUND
+ */
+int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
+  int len = strlen(name);
+  if(len > FS_DIR_ENTRY_NAME_MAX) {
+    return FS_ERR_NAME_NOT_FOUND;
+  }
+
+  // We could not delete . or ..
+  if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+    return FS_ERR_ILLEGAL_NAME;
+  }
+
+  size_t dir_size = fs_get_file_size(inode_p);
+  assert(dir_size != 0);
+  assert(dir_size % disk_p->sector_count == 0);
+  const sector_t sector_count = dir_size / disk_p->sector_size;
+  for(sector_t i = 0;i < sector_count;i++) {
+    // Find the i-th sector in the directory
+    sector_t sector = \
+      fs_get_file_sector(disk_p, inode_p, i * disk_p->sector_size);
+    // There is no hole in the directory
+    assert(sector != FS_INVALID_SECTOR);
+    DirEntry *entry_p = (DirEntry *)read_lba(disk_p, sector);
+    
+  }
 }
 
 /*
