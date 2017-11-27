@@ -1477,7 +1477,7 @@ void fs_free_dir_sector(Storage *disk_p,
   // Only copy for the last sector
   if(is_last_sector == 0) {
     void *data_p = read_lba(disk_p, last_sector);
-    memcpy(free_sector_p, data_p, disk_p->sector_count);
+    memcpy(free_sector_p, data_p, disk_p->sector_size);
     buffer_set_dirty(disk_p, free_sector_p);
   }
   // Reduce the directory size by sector size
@@ -1520,7 +1520,7 @@ int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
 
   const size_t dir_size = fs_get_file_size(inode_p);
   assert(dir_size != 0);
-  assert(dir_size % disk_p->sector_count == 0);
+  assert(dir_size % disk_p->sector_size == 0);
   const sector_t sector_count = dir_size / disk_p->sector_size;
   // By default we return this
   // We will change this if an entry is found below
