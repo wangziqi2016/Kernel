@@ -1453,12 +1453,13 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
  *
  * This function assumes that the inode has been pinned in the buffer
  */
-void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, void *free_sector_p) {
+void fs_free_dir_sector(Storage *disk_p, 
+                        Inode *inode_p, 
+                        void *free_sector_p, 
+                        int is_last_sector) {
   assert(buffer_is_pinned(disk_p, inode_p));
   // Must pin as we read other sectors, and also must set to dirty
   buffer_pin(disk_p, free_sector_p);
-  buffer_set_dirty(disk_p, free_sector_p);
-
   // Just decrease by sector size and the offset now points to the 
   // last sector
   const size_t last_offset = fs_get_file_size(inode_p) - disk_p->sector_size;
@@ -1473,8 +1474,12 @@ void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, void *free_sector_p) {
   // Make it dirty. Can be in either inode or indir. sector
   buffer_set_dirty(disk_p, last_sector_slot_p);
   assert(last_sector != FS_INVALID_SECTOR);
-  void *data_p = read_lba(disk_p, last_sector);
-  memcpy(free_sector_p, data_p, disk_p->sector_count);
+  // Only copy for the last sector
+  if(is_last_sector == 0) {
+    void *data_p = read_lba(disk_p, last_sector);
+    memcpy(free_sector_p, data_p, disk_p->sector_count);
+    buffer_set_dirty(disk_p, free_sector_p);
+  }
   // Reduce the directory size by sector size
   fs_set_file_size(inode_p, fs_get_file_size(inode_p) - disk_p->sector_size);
   fs_free_sector(disk_p, last_sector);
@@ -1550,12 +1555,18 @@ int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
     if(invalid_count == context.dir_per_sector) {
       // The first sector can never be invalid
       assert(i != 0);
+      int is_last_sector = 0;
+      if(i == (sector_count - 1)) {
+        is_last_sector = 1;
+      } else {
+        // Because we need to re-iterate through the sector
+        // as it is replaced by the last sector
+        // For last sector do not need to do this
+        i--;
+      }
       // Free the sector by copying the last sector to
       // the i-th sector, and frees the last sector
-      fs_free_dir_sector(disk_p, inode_p, entry_p);
-      // Because we need to re-iterate through the sector
-      // as it is replaced by the last sector
-      i--;
+      fs_free_dir_sector(disk_p, inode_p, entry_p, is_last_sector);
     }
 
     // If we have found the name then do not bother going forward
