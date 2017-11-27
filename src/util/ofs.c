@@ -1428,7 +1428,7 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
  * This function assumes that the inode has been pinned in the buffer
  */
 void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, void *free_sector_p) {
-  assert(buffer_is_pinned(inode_p));
+  assert(buffer_is_pinned(disk_p, inode_p));
   // Must pin as we read other sectors, and also must set to dirty
   buffer_pin(disk_p, free_sector_p);
   buffer_set_dirty(disk_p, free_sector_p);
@@ -1444,7 +1444,7 @@ void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, void *free_sector_p) {
   fs_set_file_size(inode_p, fs_get_file_size(inode_p) - disk_p->sector_size);
   fs_free_sector(disk_p, last_sector);
   // TODO: FREE THE SECTOR IN ADDR. ARRAY
-  buffer_unpin(free_sector_p);
+  buffer_unpin(disk_p, free_sector_p);
   return;
 }
 
