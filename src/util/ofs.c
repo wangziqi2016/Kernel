@@ -1428,8 +1428,17 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
  *   2. If the name is '.' or '..' then we return FS_ERR_ILLEGAL_NAME
  *   3. If the name is not found in the directory, then we return
  *      FS_ERR_NAME_NOT_FOUND
+ *
+ * Note that this function only removes a directory entry, and does not check
+ * its type (e.g. whether it is a non-empty directory) or does not free sectors
+ * of the dir entry.
+ *
+ * This function pins the inode in the buffer.
  */
 int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
+  buffer_pin(inode_p);
+  // If length exceeds the maximum file name length then we know we will
+  // not have a match
   int len = strlen(name);
   if(len > FS_DIR_ENTRY_NAME_MAX) {
     return FS_ERR_NAME_NOT_FOUND;
@@ -1444,6 +1453,9 @@ int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
   assert(dir_size != 0);
   assert(dir_size % disk_p->sector_count == 0);
   const sector_t sector_count = dir_size / disk_p->sector_size;
+  // By default we return this
+  // We will change this if an entry is found below
+  int ret = FS_ERR_NAME_NOT_FOUND;
   for(sector_t i = 0;i < sector_count;i++) {
     // Find the i-th sector in the directory
     sector_t sector = \
@@ -1451,8 +1463,30 @@ int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
     // There is no hole in the directory
     assert(sector != FS_INVALID_SECTOR);
     DirEntry *entry_p = (DirEntry *)read_lba(disk_p, sector);
-    
+    // Count how many invalid sectors are there
+    int invalid_count = 0;
+    for(int j = 0;j < context.dir_per_sector;j++) {
+      if(entry_p[j].inode != FS_INVALID_INODE) {
+        // Use memcmp because we do not want to compare the terminating 0
+        if(ret != FS_SUCCESS && memcmp(name, entry_p[j].name, len) == 0) {
+          ret = FS_SUCCESS;
+          entry_p[j].inode = FS_INVALID_INODE;
+          // Because we just deleted an entry
+          invalid_count++;
+        }
+      } else {
+        invalid_count++;
+      }
+    }
+
+    //if()
+    // If
+    if(ret == FS_SUCCESS) {
+      
+    }
   }
+
+  buffer_unpin(inode_p);
 }
 
 /*
