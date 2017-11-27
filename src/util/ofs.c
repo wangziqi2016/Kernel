@@ -1426,12 +1426,26 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
  * respect this.
  *
  * This function assumes that the inode has been pinned in the buffer
- *
- * The sector passed in the function is the linear sector for the directory.
- * We should use the addr, array to resolve it to the global sector
  */
-void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, sector_t to_free) {
-  
+void fs_free_dir_sector(Storage *disk_p, Inode *inode_p, void *free_sector_p) {
+  assert(buffer_is_pinned(inode_p));
+  // Must pin as we read other sectors, and also must set to dirty
+  buffer_pin(disk_p, free_sector_p);
+  buffer_set_dirty(disk_p, free_sector_p);
+
+  // Just decrease by sector size and the offset now points to the 
+  // last sector
+  const size_t last_offset = fs_get_file_size(inode_p) - disk_p->sector_size;
+  const sector_t last_sector = fs_get_file_sector(disk_p, inode_p, last_offset);
+  assert(last_sector != FS_INVALID_SECTOR);
+  void *data_p = read_lba(disk_p, last_sector);
+  memcpy(free_sector_p, data_p, disk_p->sector_count);
+  // Reduce the directory size by sector size
+  fs_set_file_size(inode_p, fs_get_file_size(inode_p) - disk_p->sector_size);
+  fs_free_sector(disk_p, last_sector);
+  // TODO: FREE THE SECTOR IN ADDR. ARRAY
+  buffer_unpin(free_sector_p);
+  return;
 }
 
 /*
@@ -1502,26 +1516,9 @@ int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
     if(invalid_count == context.dir_per_sector) {
       // The first sector can never be invalid
       assert(i != 0);
-      buffer_pin(disk_p, entry_p);
-      // This may not be set if we did not perform delete above
-      buffer_set_dirty(disk_p, entry_p);
-      // This is the last sector in the directory structure
-      sector_t last_sector = \
-        fs_get_file_sector(disk_p, 
-                           inode_p, 
-                           (sector_count - 1) * disk_p->sector_size);
-      assert(last_sector != FS_INVALID_SECTOR);
-      void *last_sector_p = read_lba(disk_p, last_sector);
-      // Copy the last sector into the current sector
-      memcpy(entry_p, last_sector_p, disk_p->sector_size);
-      buffer_unpin(disk_p, entry_p);
-      // Give back the last sector of the directory
-      fs_free_sector(disk_p, last_sector);
-      // Change the size of the dir
-      fs_set_file_size(inode_p, dir_size - disk_p->sector_size);
-      // TODO: FREE THE LAST SECTOR FROM THE ADDR. ARRAY ALSO
-      //
-
+      // Free the sector by copying the last sector to
+      // the i-th sector, and frees the last sector
+      fs_free_dir_sector(disk_p, inode_p, entry_p);
       // Because we need to re-iterate through the sector
       // as it is replaced by the last sector
       i--;
