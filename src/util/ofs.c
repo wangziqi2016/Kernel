@@ -1071,23 +1071,20 @@ int fs_is_file_extra_large(const Inode *inode_p) {
   return !!(fs_is_file_large(inode_p) && \
             inode_p->addr[FS_ADDR_ARRAY_MAX - 1] != FS_INVALID_SECTOR);
 }
- 
+
 /*
- * fs_get_file_sector() - This function returns the sector ID given an offset in
- *                        the file
+ * fs_get_file_sector_p() - This function returns the pointer to the sector
+ *                          in the inode's addr. array
  *
- * This function returns invalid sector ID if the offset falls in a region
- * that no data has been written. By default this should map to all-zero sector
+ * Returns NULL if the sector does not exist. Note that the returned value 
+ * may be inside another indirection sector. If there are interleaved
+ * sector operations, the caller should pin the returned value
  *
- * This function is for read. It does not allocate any sector or change the 
- * layout of the inode's addr list.
- *
- * This function pins the inode passed in, such that its buffer remains valid
- * after return
+ * Other properties are specified in fs_get_file_sector()
  */
-sector_t fs_get_file_sector(Storage *disk_p, 
-                            const Inode *inode_p, 
-                            size_t offset) {
+sector_t *fs_get_file_sector_p(Storage *disk_p, 
+                               Inode *inode_p, 
+                               size_t offset) {
   buffer_pin(disk_p, inode_p);
 
   // This is the linear ID in the file. Note that we can only address 16 bit
@@ -1095,12 +1092,12 @@ sector_t fs_get_file_sector(Storage *disk_p,
   sector_t sector = (sector_t)(offset / disk_p->sector_size);
   // Make sure we did not overflow sector_t
   assert(((size_t)sector * disk_p->sector_size) == offset);
-  sector_t ret;
+  sector_t *ret;
   // If the file is small, then the sector ID must be less than 8
   if(fs_is_file_large(inode_p) == 0) {
     assert(sector < FS_ADDR_ARRAY_MAX);
     // This could be invalid sector
-    ret = inode_p->addr[sector];
+    ret = &inode_p->addr[sector];
   } else {
     // Number of IDs inside an indirection sector
     sector_t indir_index = sector / context.id_per_indir_sector;
@@ -1113,16 +1110,16 @@ sector_t fs_get_file_sector(Storage *disk_p,
       // If the sector does not exist, then we assume the range it covers 
       // contains all zero, and just return invalid
       if(indir_sector == FS_INVALID_SECTOR) {
-        ret = FS_INVALID_SECTOR;
+        ret = NULL;
       } else {
         sector_t *data_p = (sector_t *)read_lba(disk_p, indir_sector);
-        ret = data_p[indir_offset]; 
+        ret = &data_p[indir_offset]; 
       }
     } else if(fs_is_file_extra_large(inode_p) == 0) {
       // If the offset implies that the file should be extra large
       // but actually the file is not extra large, we return invalid
       // sector because there is no way to find the correct sector
-      ret = FS_INVALID_SECTOR;
+      ret = NULL;
     } else {
       assert(sector >= context.extra_large_start_sector);
       // This branch handles extra large file
@@ -1139,16 +1136,41 @@ sector_t fs_get_file_sector(Storage *disk_p,
       sector_t *data_p = (sector_t *)read_lba(disk_p, first_indir_sector);
       sector_t second_indir_sector = data_p[indir_index];
       if(second_indir_sector == FS_INVALID_SECTOR) {
-        ret = FS_INVALID_SECTOR;
+        ret = NULL;
       } else {
         sector_t *data_p = (sector_t *)read_lba(disk_p, second_indir_sector);
-        ret = data_p[indir_offset];
+        ret = &data_p[indir_offset];
       }
     }
   }
 
   buffer_unpin(disk_p, inode_p);
   return ret;
+}
+
+/*
+ * fs_get_file_sector() - This function returns the sector ID given an offset in
+ *                        the file
+ *
+ * This function returns invalid sector ID if the offset falls in a region
+ * that no data has been written. By default this should map to all-zero sector
+ *
+ * This function is for read. It does not allocate any sector or change the 
+ * layout of the inode's addr list.
+ *
+ * This function pins the inode passed in, such that its buffer remains valid
+ * after return
+ */
+sector_t fs_get_file_sector(Storage *disk_p,
+                            Inode *inode_p,
+                            size_t offset) {
+  // Just dereference the pointer
+  sector_t *sector = fs_get_file_sector_p(disk_p, inode_p, offset);
+  if(sector == NULL) {
+    return FS_INVALID_SECTOR;
+  } else {
+    return *sector;
+  }
 }
 
 /*
