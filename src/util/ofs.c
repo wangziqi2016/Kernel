@@ -2629,13 +2629,14 @@ void test_add_dir_entry(Storage *disk_p) {
   // sectors
   Inode *inode_p = fs_load_inode_sector(disk_p, FS_ROOT_INODE, 1);
   const int total_entry = 200;
+  const char *fmt = "File %d";
   info("Allocating %d entries to the root directory...", total_entry);
   for(int i = 0;i < 200;i++) {
     DirEntry *entry_p = fs_add_dir_entry(disk_p, inode_p);
     assert(entry_p != NULL);
     entry_p->inode = FS_ROOT_INODE;
     char name_buffer[128];
-    sprintf(name_buffer, "File %d", i);
+    sprintf(name_buffer, fmt, i);
     int ret = fs_set_dir_name(disk_p, 
                               entry_p, 
                               name_buffer, 
@@ -2657,6 +2658,28 @@ void test_add_dir_entry(Storage *disk_p) {
   info("  Number of entries per sector: %lu", context.dir_per_sector);
   info("%u %u", inode_p->size1, inode_p->size0);
   assert(fs_get_file_size(inode_p) == expected_size);
+
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+
+  info("Removing all entries");
+  inode_p = fs_load_inode_sector(disk_p, FS_ROOT_INODE, 0);
+  // Then test removing
+  for(int i = 0;i < 200;i++) {
+    char name_buffer[128];
+    sprintf(name_buffer, fmt, i);
+    int ret = fs_free_dir_entry(disk_p, inode_p, name_buffer);
+    if(ret != FS_SUCCESS) {
+      info("Error: ret = %d", ret);
+      assert(ret == FS_SUCCESS);
+    }
+  }
+  info("  Done");
+  info("Directory size after deletion: %lu", fs_get_file_size(inode_p));
+
+  // This is the size of the directory
+  size_t dir_size = fs_get_file_size(inode_p);
+  assert(dir_size == disk_p->sector_size);
 
   buffer_flush_all(disk_p);
   assert(buffer_count_pinned() == 0UL);
