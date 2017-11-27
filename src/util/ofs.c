@@ -855,6 +855,7 @@ Context context;
 
 sector_t fs_alloc_sector(Storage *disk_p);
 Inode *fs_load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag);
+void fs_free_sector(Storage *disk_p, sector_t sector);
 
 /*
  * fs_load_context() - This function loads the context object using the super block
@@ -1436,7 +1437,7 @@ sector_t fs_alloc_sector_for_dir(Storage *disk_p,
  * This function pins the inode in the buffer.
  */
 int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
-  buffer_pin(inode_p);
+  buffer_pin(disk_p, inode_p);
   // If length exceeds the maximum file name length then we know we will
   // not have a match
   int len = strlen(name);
@@ -1449,7 +1450,7 @@ int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
     return FS_ERR_ILLEGAL_NAME;
   }
 
-  size_t dir_size = fs_get_file_size(inode_p);
+  const size_t dir_size = fs_get_file_size(inode_p);
   assert(dir_size != 0);
   assert(dir_size % disk_p->sector_count == 0);
   const sector_t sector_count = dir_size / disk_p->sector_size;
@@ -1473,20 +1474,52 @@ int fs_free_dir_entry(Storage *disk_p, Inode *inode_p, const char *name) {
           entry_p[j].inode = FS_INVALID_INODE;
           // Because we just deleted an entry
           invalid_count++;
+          buffer_set_dirty(disk_p, entry_p);
         }
       } else {
         invalid_count++;
       }
     }
 
-    //if()
-    // If
+    // If the invalid count equals the number of directories per sector
+    // then the current sector is empty. We just copy the last sector to
+    // this location, and frees the last sector
+    if(invalid_count == context.dir_per_sector) {
+      // The first sector can never be invalid
+      assert(i != 0);
+      buffer_pin(disk_p, entry_p);
+      // This may not be set if we did not perform delete above
+      buffer_set_dirty(disk_p, entry_p);
+      // This is the last sector in the directory structure
+      sector_t last_sector = \
+        fs_get_file_sector(disk_p, 
+                           inode_p, 
+                           (sector_count - 1) * disk_p->sector_size);
+      assert(last_sector != FS_INVALID_SECTOR);
+      void *last_sector_p = read_lba(disk_p, last_sector);
+      // Copy the last sector into the current sector
+      memcpy(entry_p, last_sector_p, disk_p->sector_size);
+      buffer_unpin(disk_p, entry_p);
+      // Give back the last sector of the directory
+      fs_free_sector(disk_p, last_sector);
+      // Change the size of the dir
+      fs_set_file_size(inode_p, dir_size - disk_p->sector_size);
+      // TODO: FREE THE LAST SECTOR FROM THE ADDR. ARRAY ALSO
+      //
+
+      // Because we need to re-iterate through the sector
+      // as it is replaced by the last sector
+      i--;
+    }
+
+    // If we have found the name then do not bother going forward
     if(ret == FS_SUCCESS) {
-      
+      break;
     }
   }
 
-  buffer_unpin(inode_p);
+  buffer_unpin(disk_p, inode_p);
+  return ret;
 }
 
 /*
