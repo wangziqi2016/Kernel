@@ -1485,7 +1485,7 @@ void fs_free_dir_sector(Storage *disk_p,
   fs_free_sector(disk_p, last_sector);
   buffer_unpin(disk_p, free_sector_p);
   return;
-}
+} 
 
 /*
  * fs_free_dir_entry() - This function removes a dir entry from a directory's
