@@ -816,7 +816,7 @@ typedef struct {
   // Linear sector
   sector_t current_sector;
   // Index in the current sector
-  dir_count_t current_dir;
+  dir_count_t current_index;
 } Dir;
 
 // This is the in-memory representation of the file system metadata
@@ -1694,8 +1694,15 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
  * Note that we only stores the inode number in the iterator. This allows us
  * to iterate while the buffer is unpinned.
  */
-Dir fs_open_dir(inode_id_t inode) {
+Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
   Dir dir;
+  dir.inode = inode;
+  Inode *inode_p = fs_load_inode_sector(disk_p, inode);
+  assert(inode_p != NULL);
+  // Number of sectors in the directory
+  dir.sector_count = (sector_count_t)fs_get_file_size(inode_p) / context.sector_size;
+  dir.current_sector = 0;
+  dir.current_index = 0;
 
   return dir;
 }
