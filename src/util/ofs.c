@@ -807,12 +807,13 @@ typedef struct {
 // the memory
 // Otherwise the inode might be flushed
 typedef struct {
-  Inode *inode_p;
+  inode_id_t inode;
   // Number of sectors in the directory
   // This value is not updated even if the directory is being iterated
   // If in the meantime a directory modification happens, then there might
   // be anomalies
   sector_count_t sector_count;
+  // Linear sector
   sector_t current_sector;
   // Index in the current sector
   dir_count_t current_dir;
@@ -1684,6 +1685,19 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
 
   buffer_unpin(disk_p, inode_p);
   return ret;
+}
+
+/*
+ * fs_open_dir() - This function returns a structure that supports iterating on
+ *                 the directory's content
+ *
+ * Note that we only stores the inode number in the iterator. This allows us
+ * to iterate while the buffer is unpinned.
+ */
+Dir fs_open_dir(inode_id_t inode) {
+  Dir dir;
+
+  return dir;
 }
 
 /*
