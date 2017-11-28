@@ -802,6 +802,22 @@ typedef struct {
   char name[FS_DIR_ENTRY_NAME_MAX];
 } DirEntry;
 
+// This represents the directory iterator
+// When performing the iteration, the inode buffer must be pinned in
+// the memory
+// Otherwise the inode might be flushed
+typedef struct {
+  Inode *inode_p;
+  // Number of sectors in the directory
+  // This value is not updated even if the directory is being iterated
+  // If in the meantime a directory modification happens, then there might
+  // be anomalies
+  sector_count_t sector_count;
+  sector_t current_sector;
+  // Index in the current sector
+  dir_count_t current_dir;
+} Dir;
+
 // This is the in-memory representation of the file system metadata
 // We load the super block and initialize this object
 // Once initialized it is never changed for the same fs
