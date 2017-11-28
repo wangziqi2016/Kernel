@@ -1693,6 +1693,9 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
  *
  * Note that we only stores the inode number in the iterator. This allows us
  * to iterate while the buffer is unpinned.
+ *
+ * The dir does not need to be closed. Once finished the caller could just
+ * discard the dir structure
  */
 Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
   Dir dir;
@@ -1705,6 +1708,23 @@ Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
   dir.current_index = 0;
 
   return dir;
+}
+
+/*
+ * fs_next_dir() - This function returns the next directory entry for the 
+ *                 current iterator
+ *
+ * If there is no next dir then we return the NULL pointer. Otherwise the 
+ * const pointer is returned, and we increment the iterator structure
+ *
+ * The returned value is not pinned. The caller should pin it if necessary
+ */
+const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
+  Inode *inode_p = fs_load_inode_sector(disk_p, dir_p->inode);
+  assert(inode_p != NULL);
+  size_t next_offset = dir_p->current_sector * disk_p->sector_size;
+  // Then translate the linear sector to global sector
+  sector_t sector = fs_get_file_sector(disk_p, inode_p, next_offset);
 }
 
 /*
