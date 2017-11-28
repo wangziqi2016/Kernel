@@ -1704,10 +1704,12 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
 Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
   Dir dir;
   dir.inode = inode;
-  Inode *inode_p = fs_load_inode_sector(disk_p, inode);
+  Inode *inode_p = \
+    fs_load_inode_sector(disk_p, inode, FS_LOAD_INODE_SECTOR_READ_ONLY);
   assert(inode_p != NULL);
   // Number of sectors in the directory
-  dir.sector_count = (sector_count_t)fs_get_file_size(inode_p) / context.sector_size;
+  dir.sector_count = \
+    (sector_count_t)fs_get_file_size(inode_p) / disk_p->sector_size;
   dir.current_sector = 0;
   dir.current_index = 0;
 
@@ -1724,11 +1726,32 @@ Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
  * The returned value is not pinned. The caller should pin it if necessary
  */
 const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
-  Inode *inode_p = fs_load_inode_sector(disk_p, dir_p->inode, 0);
+  Inode *inode_p = \
+    fs_load_inode_sector(disk_p, dir_p->inode, FS_LOAD_INODE_SECTOR_READ_ONLY);
   assert(inode_p != NULL);
+  // This is the linear offset
   size_t next_offset = dir_p->current_sector * disk_p->sector_size;
-  // Then translate the linear sector to global sector
-  sector_t sector = fs_get_file_sector(disk_p, inode_p, next_offset);
+  // This is the offset inside the sector
+  dir_count_t current_index = dir_p->current_index;
+  while(1) {
+    // Then translate the linear sector to global sector
+    sector_t sector = fs_get_file_sector(disk_p, inode_p, next_offset);
+    DirEntry *entry_p = read_lba(disk_p, sector);
+    // Save the old value
+    dir_count_t current_index = dir_p->current_index;
+    // Then increment
+    dir_p->current_index++;
+    if(dir_p->current_index == context.dir_per_sector) {
+      dir_p->current_index = 0;
+      dir_p->current_sector++;
+      // If we have reached the last sector, then we just return
+      if(dir_p->current_sector == dir_p->sector_count) {
+        return NULL;
+      }
+    }
+  }
+
+  return entry_p + dir_count;
 }
 
 /*
@@ -1860,7 +1883,8 @@ void fs_init_root(Storage *disk_p) {
     fatal_error("Failed to allocate sector for root directory");
   }
 
-  Inode *inode_p = fs_load_inode_sector(disk_p, FS_ROOT_INODE, 1);
+  Inode *inode_p = \
+    fs_load_inode_sector(disk_p, FS_ROOT_INODE, FS_LOAD_INODE_SECTOR_WRITE);
   inode_p->flags |= FS_INODE_IN_USE;
   // Size of a directory is the number of sectors it occupies
   fs_set_file_type(inode_p, FS_INODE_TYPE_DIR);
@@ -2149,7 +2173,8 @@ inode_id_t fs_alloc_inode(Storage *disk_p) {
     ret = sb_p->inode[sb_p->ninode];
     // Load the sector that holds the inode, and make it dirty because we 
     // are writing into this inode
-    Inode *inode_p = fs_load_inode_sector(disk_p, ret, 1);
+    Inode *inode_p = \
+      fs_load_inode_sector(disk_p, ret, FS_LOAD_INODE_SECTOR_WRITE);
     assert((inode_p->flags & FS_INODE_IN_USE) == 0);
     // Clear its previous content
     memset(inode_p, 0x0, sizeof(Inode));
@@ -2185,7 +2210,8 @@ void fs_free_inode(Storage *disk_p, inode_id_t inode) {
   }
 
   // Load the sector containing this inode, and set it as dirty
-  Inode *inode_p = fs_load_inode_sector(disk_p, inode, 1);
+  Inode *inode_p = \
+    fs_load_inode_sector(disk_p, inode, FS_LOAD_INODE_SECTOR_WRITE);
   // Make sure it is an allocated inode
   assert(inode_p->flags & FS_INODE_IN_USE);
   // Mask off the inodes
