@@ -870,6 +870,10 @@ Context context;
 #define FS_INODE_OTHER_WRITE 0x0002
 #define FS_INODE_OTHER_EXEC  0x0001
 
+// These two flags controls whether we write when loading the inode's sector
+#define FS_LOAD_INODE_SECTOR_READ_ONLY 0
+#define FS_LOAD_INODE_SECTOR_WRITE     1
+
 sector_t fs_alloc_sector(Storage *disk_p);
 Inode *fs_load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag);
 void fs_free_sector(Storage *disk_p, sector_t sector);
@@ -1720,7 +1724,7 @@ Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
  * The returned value is not pinned. The caller should pin it if necessary
  */
 const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
-  Inode *inode_p = fs_load_inode_sector(disk_p, dir_p->inode);
+  Inode *inode_p = fs_load_inode_sector(disk_p, dir_p->inode, 0);
   assert(inode_p != NULL);
   size_t next_offset = dir_p->current_sector * disk_p->sector_size;
   // Then translate the linear sector to global sector
