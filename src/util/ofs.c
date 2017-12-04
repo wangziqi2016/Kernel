@@ -2774,10 +2774,10 @@ void test_add_dir_entry(Storage *disk_p) {
     sprintf(name_buffer, fmt, i);
     int len = strlen(name_buffer);
     // Get the current dir and next dir
-    DirEntry *entry_p = fs_next_dir(disk_p, &dir);
+    const DirEntry *entry_p = fs_next_dir(disk_p, &dir);
     if(memcmp(entry_p->name, name_buffer, len) != 0) {
-      info("FAIL: Expect %s actual %s", name_buffer, entry_p->name);
-      assert(false);
+      info("FAIL: Expect \"%s\" actual \"%s\"", name_buffer, entry_p->name);
+      assert(0);
     }
   }
 
