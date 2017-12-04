@@ -877,6 +877,7 @@ Context context;
 sector_t fs_alloc_sector(Storage *disk_p);
 Inode *fs_load_inode_sector(Storage *disk_p, inode_id_t inode, int write_flag);
 void fs_free_sector(Storage *disk_p, sector_t sector);
+int fs_print_dir_name(DirEntry *entry_p, FILE *fp);
 
 /*
  * fs_load_context() - This function loads the context object using the super block
@@ -1743,6 +1744,8 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
   // Then start searching at current index in current sector
   while(1) {
     info("index = %u", dir_p->current_index);
+    fs_print_dir_name(entry_p, stderr);
+    putchar('\n');
     // The current index must be a valid one
     assert(dir_p->current_index != context.dir_per_sector);
     // If the current one is valid and if it is reserved names then return it
@@ -1819,7 +1822,8 @@ int fs_is_valid_char(char ch) {
  * If we need to allow names that only have dot, then the allow_all_dot should 
  * be set to 1. This feature is only used for initializing a directory
  *
- * This function will set the entry as dirty.
+ * This function will set the entry as dirty. This function does not check for
+ * duplicated names
  */
 int fs_set_dir_name(Storage *disk_p, 
                     DirEntry *entry_p, 
@@ -1921,8 +1925,14 @@ void fs_init_root(Storage *disk_p) {
   assert(fs_get_file_size(inode_p) == 0UL);
 
   DirEntry *entry_p_dot = fs_add_dir_entry(disk_p, inode_p);
+  if(entry_p_dot == NULL) {
+    fatal_error("Failed to allocate initial entries for root");
+  }
+  entry_p_dot->inode = FS_ROOT_INODE;
+
   DirEntry *entry_p_dot_dot = fs_add_dir_entry(disk_p, inode_p);
-  if(entry_p_dot == NULL || entry_p_dot_dot == NULL) {
+  entry_p_dot_dot->inode = FS_ROOT_INODE;
+  if(entry_p_dot_dot == NULL) {
     fatal_error("Failed to allocate initial entries for root");
   }
 
@@ -1932,11 +1942,8 @@ void fs_init_root(Storage *disk_p) {
     fs_set_dir_name(disk_p, entry_p_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
   assert(dir_name_ret == FS_SUCCESS);
   dir_name_ret = \
-    fs_set_dir_name(disk_p, entry_p_dot_dot, ".", FS_SET_DIR_NAME_ALLOW_DOT);
+    fs_set_dir_name(disk_p, entry_p_dot_dot, "..", FS_SET_DIR_NAME_ALLOW_DOT);
   assert(dir_name_ret == FS_SUCCESS);
-
-  // Set the inode. Both point to the current directory
-  entry_p_dot->inode = entry_p_dot_dot->inode = FS_ROOT_INODE;
 
   info("Finished initializing root directory");
 
