@@ -1748,9 +1748,10 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
     if(entry_p[dir_p->current_index].inode != FS_INVALID_INODE && 
        memcmp(entry_p->name, ".", 1) != 0 && 
        memcmp(entry_p->name, "..", 2) != 0) {
-      return entry_p + dir_p->current_index;
+      return entry_p + dir_p->current_index++;
     } else {
       dir_p->current_index++;
+      entry_p++;
       // If the index overflows then go to the next sector
       if(dir_p->current_index == context.dir_per_sector) {
         dir_p->current_index = 0;
