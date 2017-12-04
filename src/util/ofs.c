@@ -1700,13 +1700,19 @@ DirEntry *fs_add_dir_entry(Storage *disk_p, Inode *inode_p) {
  *
  * The dir does not need to be closed. Once finished the caller could just
  * discard the dir structure
+ *
+ * If the inode is not a directory this function will report error. The caller
+ * should check this error condition
  */
 Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
   Dir dir;
   dir.inode = inode;
+  // Read the inode's sector for its file size
   Inode *inode_p = \
     fs_load_inode_sector(disk_p, inode, FS_LOAD_INODE_SECTOR_READ_ONLY);
   assert(inode_p != NULL);
+  // Must be an inode
+  assert(fs_get_file_type(inode_p) == FS_INODE_TYPE_DIR);
   // Number of sectors in the directory
   dir.sector_count = \
     (sector_count_t)fs_get_file_size(inode_p) / disk_p->sector_size;
@@ -2756,6 +2762,24 @@ void test_add_dir_entry(Storage *disk_p) {
   info("  Number of entries per sector: %lu", context.dir_per_sector);
   info("%u %u", inode_p->size1, inode_p->size0);
   assert(fs_get_file_size(inode_p) == expected_size);
+
+  buffer_flush_all(disk_p);
+  assert(buffer_count_pinned() == 0UL);
+
+  info("Read all entries");
+  // Open the directory and get back an opaque handler
+  Dir dir = fs_open_dir(disk_p, FS_ROOT_INODE);
+  for(int i = 0;i < 200;i++) {
+    char name_buffer[128];
+    sprintf(name_buffer, fmt, i);
+    int len = strlen(name_buffer);
+    // Get the current dir and next dir
+    DirEntry *entry_p = fs_next_dir(disk_p, &dir);
+    if(memcmp(entry_p->name, name_buffer, len) != 0) {
+      info("FAIL: Expect %s actual %s", name_buffer, entry_p->name);
+      assert(false);
+    }
+  }
 
   buffer_flush_all(disk_p);
   assert(buffer_count_pinned() == 0UL);
