@@ -1742,6 +1742,7 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
   DirEntry *entry_p = (DirEntry *)read_lba(disk_p, sector);
   // Then start searching at current index in current sector
   while(1) {
+    info("index = %u", dir_p->current_index);
     // The current index must be a valid one
     assert(dir_p->current_index != context.dir_per_sector);
     // If the current one is valid and if it is reserved names then return it
@@ -1880,15 +1881,21 @@ int fs_set_dir_name(Storage *disk_p,
  * We print the name without any modification. Just the name will be printed.
  * This function takes a pointer for printing to an FP. The fp could be
  * either stderr or stdout
+ *
+ * The length of the name will be returned
  */
-void fs_print_dir_name(DirEntry *entry_p, FILE *fp) {
+int fs_print_dir_name(DirEntry *entry_p, FILE *fp) {
   const char *p = entry_p->name;
-  while(*p != '\0') {
+  int count = 0;
+  // The first makes sure that we did not overflow the field
+  // The second makes sure we did not overflow the name
+  while(count < FS_DIR_ENTRY_NAME_MAX && *p != '\0') {
     fputc(*p, fp);
     p++;
+    count++;
   }
 
-  return;
+  return count;
 }
 
 /*
