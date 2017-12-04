@@ -37,7 +37,7 @@ the peek\_line.py tool to scan each file and remember their starting line and co
 source and locate each file's offset. Run "make peek\_line LINE=ddd" where "ddd" is the line number in combined
 loader source file. 
 
-Dependency
+Dependency 
 =========
 
 **nasm**: The assembler we use to translate the bootloader into a binary file
