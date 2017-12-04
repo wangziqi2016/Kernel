@@ -1724,6 +1724,18 @@ Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
 }
 
 /*
+ * fs_dir_next_entry() - This function advances the given dir object
+ *                       and loads the next sector if we have reached
+ *                       the end of the current sector
+ *
+ * It takes the current entry pointer, and will return the next entry by
+ * incrementing this pointer if we have not finished the current sector
+ */
+void fs_dir_next_entry(Storage *disk_p, Dir *dir_p, DirEntry *entry_p) {
+
+}
+
+/*
  * fs_next_dir() - This function returns the next directory entry for the 
  *                 current iterator
  *
@@ -1736,46 +1748,54 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
   Inode *inode_p = \
     fs_load_inode_sector(disk_p, dir_p->inode, FS_LOAD_INODE_SECTOR_READ_ONLY);
   assert(inode_p != NULL);
+
+  // If we are not already at the end of the sector
+  if(dir_p->current_index == context.dir_per_sector) {
+    dir_p->current_index = 0;
+    dir_p->current_sector++;
+    if(dir_p->current_sector == dir_p->sector_count) {
+      return NULL;
+    }
+  }
+
   // This is the linear offset inside the directory
   size_t next_offset = dir_p->current_sector * disk_p->sector_size;
   // Then translate the linear sector to global sector
   sector_t sector = fs_get_file_sector(disk_p, inode_p, next_offset);
-  DirEntry *entry_p = (DirEntry *)read_lba(disk_p, sector);
+  DirEntry *entry_p = \
+    (DirEntry *)read_lba(disk_p, sector) + dir_p->current_index;
   // Then start searching at current index in current sector
   while(1) {
-    info("index = %u", dir_p->current_index);
-    fs_print_dir_name(entry_p, stderr);
-    putchar('\n');
-    // The current index must be a valid one
-    assert(dir_p->current_index != context.dir_per_sector);
     // If the current one is valid and if it is reserved names then return it
-    if(entry_p[dir_p->current_index].inode != FS_INVALID_INODE && 
+    if(dir_p->current_index != context.dir_per_sector &&
+       entry_p[dir_p->current_index].inode != FS_INVALID_INODE && 
        memcmp(entry_p->name, ".", 1) != 0 && 
        memcmp(entry_p->name, "..", 2) != 0) {
-      return entry_p + dir_p->current_index++;
-    } else {
       dir_p->current_index++;
-      entry_p++;
-      // If the index overflows then go to the next sector
-      if(dir_p->current_index == context.dir_per_sector) {
-        dir_p->current_index = 0;
-        dir_p->current_sector++;
-        // If sector overflows then that's all
-        if(dir_p->current_sector == dir_p->sector_count) {
-          return NULL;
-        } else {
-          // Otherwise load the next sector
-          next_offset += disk_p->sector_size;
-          sector = fs_get_file_sector(disk_p, inode_p, next_offset);
-          entry_p = (DirEntry *)read_lba(disk_p, sector);
-        }
+      break;
+    }
+
+    dir_p->current_index++;
+    entry_p++;
+
+    // If the index overflows then go to the next sector
+    if(dir_p->current_index == context.dir_per_sector) {
+      dir_p->current_index = 0;
+      dir_p->current_sector++;
+      // If sector overflows then that's all
+      if(dir_p->current_sector == dir_p->sector_count) {
+        entry_p = NULL;
+        break;
+      } else {
+        // Otherwise load the next sector
+        next_offset += disk_p->sector_size;
+        sector = fs_get_file_sector(disk_p, inode_p, next_offset);
+        entry_p = (DirEntry *)read_lba(disk_p, sector);
       }
     }
   }
 
-  // We never return here
-  assert(0);
-  return NULL;
+  return entry_p;
 }
 
 /*
@@ -2755,6 +2775,7 @@ void test_add_dir_entry(Storage *disk_p) {
   for(int i = 0;i < 200;i++) {
     DirEntry *entry_p = fs_add_dir_entry(disk_p, inode_p);
     assert(entry_p != NULL);
+    // Make it occupied otherwise we will allocate this one on the next round
     entry_p->inode = FS_ROOT_INODE;
     char name_buffer[128];
     sprintf(name_buffer, fmt, i);
