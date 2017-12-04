@@ -1736,24 +1736,33 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
   DirEntry *entry_p = read_lba(disk_p, sector);
   // Then start searching at current index in current sector
   while(1) {
-    // If we have exhausted the current sector, then try the next sector
-    // or exit
-    if(dir_p->current_index == context.dir_per_sector) {
-      dir_p->current_index = 0;
-      dir_p->current_sector++;
-      // If we have reached the last sector, then we just return
-      if(dir_p->current_sector == dir_p->sector_count) {
-        return NULL;
-      } else {
-
-      }
+    // The current index must be a valid one
+    assert(dir_p->current_index != context.dir_per_sector);
+    // If the current one is valid then return it
+    if(entry_p[dir_p->current_index].inode != FS_INVALID_INODE) {
+      return entry_p + dir_p->current_index;
     } else {
-      // Then check whether the current entry is used or not
-      
+      dir_p->current_index++;
+      // If the index overflows then go to the next sector
+      if(dir_p->current_index == context.dir_per_sector) {
+        dir_p->current_index = 0;
+        dir_p->current_sector++;
+        // If sector overflows then that's all
+        if(dir_p->current_sector == dir_p->sector_count) {
+          return NULL;
+        } else {
+          // Otherwise load the next sector
+          next_offset += disk_p->sector_size;
+          sector = fs_get_file_sector(disk_p, inode_p, next_offset);
+          entry_p = read_lba(disk_p, sector);
+        }
+      }
     }
   }
 
-  return entry_p + dir_count;
+  // We never return here
+  assert(0);
+  return NULL;
 }
 
 /*
