@@ -1729,25 +1729,27 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
   Inode *inode_p = \
     fs_load_inode_sector(disk_p, dir_p->inode, FS_LOAD_INODE_SECTOR_READ_ONLY);
   assert(inode_p != NULL);
-  // This is the linear offset
+  // This is the linear offset inside the directory
   size_t next_offset = dir_p->current_sector * disk_p->sector_size;
-  // This is the offset inside the sector
-  dir_count_t current_index = dir_p->current_index;
+  // Then translate the linear sector to global sector
+  sector_t sector = fs_get_file_sector(disk_p, inode_p, next_offset);
+  DirEntry *entry_p = read_lba(disk_p, sector);
+  // Then start searching at current index in current sector
   while(1) {
-    // Then translate the linear sector to global sector
-    sector_t sector = fs_get_file_sector(disk_p, inode_p, next_offset);
-    DirEntry *entry_p = read_lba(disk_p, sector);
-    // Save the old value
-    dir_count_t current_index = dir_p->current_index;
-    // Then increment
-    dir_p->current_index++;
+    // If we have exhausted the current sector, then try the next sector
+    // or exit
     if(dir_p->current_index == context.dir_per_sector) {
       dir_p->current_index = 0;
       dir_p->current_sector++;
       // If we have reached the last sector, then we just return
       if(dir_p->current_sector == dir_p->sector_count) {
         return NULL;
+      } else {
+
       }
+    } else {
+      // Then check whether the current entry is used or not
+      
     }
   }
 
