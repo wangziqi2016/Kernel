@@ -1744,8 +1744,10 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
   while(1) {
     // The current index must be a valid one
     assert(dir_p->current_index != context.dir_per_sector);
-    // If the current one is valid then return it
-    if(entry_p[dir_p->current_index].inode != FS_INVALID_INODE) {
+    // If the current one is valid and if it is reserved names then return it
+    if(entry_p[dir_p->current_index].inode != FS_INVALID_INODE && 
+       memcmp(entry_p->name, ".", 1) != 0 && 
+       memcmp(entry_p->name, "..", 2) != 0) {
       return entry_p + dir_p->current_index;
     } else {
       dir_p->current_index++;
@@ -2760,7 +2762,6 @@ void test_add_dir_entry(Storage *disk_p) {
        expected_size / disk_p->sector_size,
        fs_get_file_size(inode_p));
   info("  Number of entries per sector: %lu", context.dir_per_sector);
-  info("%u %u", inode_p->size1, inode_p->size0);
   assert(fs_get_file_size(inode_p) == expected_size);
 
   buffer_flush_all(disk_p);
@@ -2769,6 +2770,9 @@ void test_add_dir_entry(Storage *disk_p) {
   info("Read all entries");
   // Open the directory and get back an opaque handler
   Dir dir = fs_open_dir(disk_p, FS_ROOT_INODE);
+  // Allocate a map to record the state of each file
+  //char *dir_map = malloc(sizeof(char) * 200);
+  //memset(dir_map, 0x00, sizeof(char) * 200);
   for(int i = 0;i < 200;i++) {
     char name_buffer[128];
     sprintf(name_buffer, fmt, i);
@@ -2776,7 +2780,10 @@ void test_add_dir_entry(Storage *disk_p) {
     // Get the current dir and next dir
     const DirEntry *entry_p = fs_next_dir(disk_p, &dir);
     if(memcmp(entry_p->name, name_buffer, len) != 0) {
-      info("FAIL: Expect \"%s\" actual \"%s\"", name_buffer, entry_p->name);
+      info("FAIL: i = %d; Expect \"%s\" actual \"%s\"", 
+           i, 
+           name_buffer, 
+           entry_p->name);
       assert(0);
     }
   }
