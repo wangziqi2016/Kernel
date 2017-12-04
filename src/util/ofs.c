@@ -1733,7 +1733,7 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
   size_t next_offset = dir_p->current_sector * disk_p->sector_size;
   // Then translate the linear sector to global sector
   sector_t sector = fs_get_file_sector(disk_p, inode_p, next_offset);
-  DirEntry *entry_p = read_lba(disk_p, sector);
+  DirEntry *entry_p = (DirEntry *)read_lba(disk_p, sector);
   // Then start searching at current index in current sector
   while(1) {
     // The current index must be a valid one
@@ -1754,7 +1754,7 @@ const DirEntry *fs_next_dir(Storage *disk_p, Dir *dir_p) {
           // Otherwise load the next sector
           next_offset += disk_p->sector_size;
           sector = fs_get_file_sector(disk_p, inode_p, next_offset);
-          entry_p = read_lba(disk_p, sector);
+          entry_p = (DirEntry *)read_lba(disk_p, sector);
         }
       }
     }
