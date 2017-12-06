@@ -1734,7 +1734,7 @@ Dir fs_open_dir(Storage *disk_p, inode_id_t inode) {
 void fs_dir_next_entry(Storage *disk_p, Dir *dir_p, DirEntry *entry_p) {
 
 }
-
+ 
 /*
  * fs_next_dir() - This function returns the next directory entry for the 
  *                 current iterator
