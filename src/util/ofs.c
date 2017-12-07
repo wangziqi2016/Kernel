@@ -33,7 +33,7 @@ void fatal_error(const char *fmt, ...) {
   va_start(args, fmt);
   vfprintf(stderr, fmt, args);
   putchar('\n');
-  exit(1);
+  exit(1); 
 }
 
 /*
