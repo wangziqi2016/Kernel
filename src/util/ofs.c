@@ -36,7 +36,7 @@ void fatal_error(const char *fmt, ...) {
   exit(1); 
 }
 
-/*
+/* 
  * info() - Prints info message
  */
 void info(const char *fmt, ...) {
