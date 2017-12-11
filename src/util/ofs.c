@@ -10,7 +10,7 @@
 #include <assert.h>
 #include <time.h>
 #include <stdlib.h>
-
+  
 // If word length is 4 then we use 32 bit inode and sector
 #define WORD_SIZE 2
 
