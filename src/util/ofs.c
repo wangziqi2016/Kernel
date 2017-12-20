@@ -1,7 +1,7 @@
 /*
  * ofs.c - A file for simulating the UNIX SYSTEM V Old File System
  */
- 
+    
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
