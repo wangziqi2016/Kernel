@@ -1,4 +1,4 @@
-/*
+/*  
  * ofs.c - A file for simulating the UNIX SYSTEM V Old File System
  */
     
