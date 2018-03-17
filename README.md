@@ -47,7 +47,3 @@ Dependency
 **QEMU**: An alternative to Bochs
 
 **Python**: To run some of the utility tools
-
-<script language="javascript">
-alert("hello world!");  
-</script>
