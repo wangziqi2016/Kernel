@@ -16,7 +16,8 @@ quick testing. The qemu command line argument can be found in: https://www.manki
 we instruct qemu to load a compiled 1.44MB standard floppy disk file. The disk file is located under ``bin`` directory
 and is named ``bootdisk.img``. More details of the internal format of the disk image will be disclosed below.
 
-In order to test, type ``make qemu`` under the root and the qemu window should pop up.
+In order to test, type ``make qemu`` under the root and the qemu window should pop up. Use ``make run`` to run bochs which
+is our secondary way of testing.
 
 In order to convert a global line number (as a result of combining module files before assmebly, see below) to the line 
 number in the corresponding file before concatenation, use command ``LINE=[line # in global file] make peekfile``, and 
