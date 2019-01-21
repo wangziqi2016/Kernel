@@ -29,14 +29,12 @@ _loader_start:
 ;      should ensure that the condition holds true
 ;
 
-SYS_DS equ    8000h       ; System code, data and bss
-SYS_SS equ    9000h       ; System stack
-LARGE_BSS_SEG equ 0ffffh  ; Large bss (A20)
+SYS_DS equ        8000h       ; System code, data and bss
+SYS_SS equ        9000h       ; System stack
+LARGE_BSS_SEG equ 0ffffh      ; Large bss (A20)
 
 section .text
-  ; Because we load the image from floppy disk including sector 0, 
-  ; so this file actually starts at 512 byte offset
-	org	0200h
+	org	0200h ; Because we load the image from floppy disk including sector 0. $$ will evaluates to 0x200
 
   cli
   ; DS = system segment address
@@ -57,8 +55,7 @@ section .text
   ;call bsod_fatal
 
   call printf_test
-  call disk_test
-  
+  ;call disk_test
   
 getline_loop:
   push ds
