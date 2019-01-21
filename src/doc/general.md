@@ -65,3 +65,11 @@ unless necessary (e.g. in ``loader_mem.asm`` when performing memory copy). If a 
 restore the DS value before calling a child function, such that the child function can assume that DS always points 
 to the system segment. SS register should never be changed under all circumstances except in ISR. The usage of FS and GS
 are not defined, and they are only recommended to be used for local purposes. 
+
+## Calling Convention
+
+Without special noting, functions are called in C language convention: Arguments are pushed onto the stack right-to-left.
+Byte arguments (e.g. disk letter) should be converted to 16 bit words. 32 bit dwords should be pushed little-endian (i.e.
+higher 16 bits first, then lower 16 bits). Segment-offset pairs should observe the convention that segment is pushed 
+first and then the offset. 
+
