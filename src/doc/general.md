@@ -106,4 +106,12 @@ disk buffers. The system use segment 0xFFFF and offset 0x0010 to address the fir
 0xFFFF to address the last byte of the chunk (0x1FFEF). Note that due to the address generation mechanism of 8086, we cannot 
 address the full 64KB range, because the maximum possible address is 0x1FFEF.
 
+Static system data that cannot be released will be allocated during system initialization. The binary does not reserve 
+space for these static data. Instead, at module initialization time, the BSS allocation function must be called to 
+reserve space from the end of the system data area. The BSS grows downwards like stack segment. BSS allocation would fail
+if the allocation will cause the loader to be overwritten (since they are on the same segment). The advantage of allocating
+static BSS data from the system segment is that these variables can be referred to using the system DS. For infrequently
+used data, they can be allocated in the A20 BSS segment using another routine. Before accessing this segment, a segment
+register must be loaded with LARGE_BSS_SEG. 
+
 The definition of system segments can be found in the beginning of ``loader.asm``.
