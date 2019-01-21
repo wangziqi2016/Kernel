@@ -87,4 +87,13 @@ Under real mode, the kernel could only access the lower 640KB memory, from 0x000
 of the kernel as follows. The stack segment is located at the highest end of the 640KB address space. The stack segment register
 is initialized to 0x9000, and stack pointer is 0xFFF0. The stack top is therefore 0x9FFFF0 and grows downwards until the 
 full 64KB segment is used up (which should be a fatal system error, but due to the lack of permission check, this will just
-be silently ignored).
+be silently ignored). In practice, we expect that 64KB stack segment is more than sufficient to support most of the tasks,
+so stack segment should remain the same all the time.
+
+The system loader will be booted into a high address just under the stack at 0x9000. During bootstrap, the floppy disk image 
+will be copied to address 9000:0000h, including the bootloader itself. The entry point of the loader is therefore 9000:0200h.
+The system DS is on the same segment as the loader, i.e. DS is initialized to 0x9000 and will not be changed frequently.
+
+
+
+The definition of system segments can be found in the beginning of ``loader.asm``.
