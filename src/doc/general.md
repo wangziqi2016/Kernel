@@ -114,4 +114,8 @@ static BSS data from the system segment is that these variables can be referred 
 used data, they can be allocated in the A20 BSS segment using another routine. Before accessing this segment, a segment
 register must be loaded with LARGE_BSS_SEG. 
 
-The definition of system segments can be found in the beginning of ``loader.asm``.
+The size of the code section (including the bootloader sector) is statically generated and stored at the very end of the 
+loader's code section. THe BSS memory allocator may need this number to determine if certain allocations can be satisfied.
+
+The definition of system segments can be found in the beginning of ``loader.asm``. The statically generated loader size
+in bytes and number of sectors can be found in ``sect_endmark.asm``.
