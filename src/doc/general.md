@@ -80,3 +80,11 @@ of near functions are accessed via the ``BP`` register using ``[BP + 4]``, ``[BP
 must not be changed because they are the old BP and the return address, respectively. For far functions,  argument list should
 begin at ``[BP + 6]``. For ISR, there is no argument list, but there are three words (6 bytes) on the stack that must not 
 be modified.
+
+## Global Memory Map
+
+Under real mode, the kernel could only access the lower 640KB memory, from 0x00000 to 0xA0000. We describe the memory map 
+of the kernel as follows. The stack segment is located at the highest end of the 640KB address space. The stack segment register
+is initialized to 0x9000, and stack pointer is 0xFFF0. The stack top is therefore 0x9FFFF0 and grows downwards until the 
+full 64KB segment is used up (which should be a fatal system error, but due to the lack of permission check, this will just
+be silently ignored).
