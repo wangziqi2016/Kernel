@@ -16,10 +16,16 @@ quick testing. The qemu command line argument can be found in: https://www.manki
 we instruct qemu to load a compiled 1.44MB standard floppy disk file. The disk file is located under ``bin`` directory
 and is named ``bootdisk.img``. More details of the internal format of the disk image will be disclosed below.
 
+In order to test, type ``make qemu`` under the root and the qemu window should pop up.
+
 ## Module Assembly and Linking Process
 
 The kernal consists of separate modules, each of which has its own assembly source file. Modules are concatenated
 using ``cat`` utility before they are translated by the assembler, to provide global visibility of symbols. As a result, 
 there is no linking phase. The combined file is named ``_loader_modules.tmp`` under ``bootsect`` directory. 
 
-To avoid file contents getting mixed up after the concatenation, each module source file must end with a new line character.
+Since no conventional linking process is involved, module files must be coded in a way that allows the assembler and utility 
+to recognize the original file after concatenation. We achieve this by adding special marks at the beginning and the end of the 
+file. First, to avoid file contents getting mixed up after the concatenation, each module source file must end with one or more new 
+line character. Second, to allow the utility to convert a line number in the conbined file to the number in individual files, 
+at the physical first line of each file, there must be a label of form ``_[module file name without .asm suffix]_start:``.
