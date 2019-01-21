@@ -295,15 +295,18 @@ memset:
 mem_get_sys_bss:
   cli
   cmp ax, [mem_sys_bss]
-  ja .bss_overflow      ; If the number of bytes exceeds whet was left then print error
+  ja .bss_overflow      ; Cannot wrap back
   mov cx, ax
   mov ax, [mem_sys_bss] ; AX = Old value; CX = Requested size
   sub [mem_sys_bss], cx ; Move the pointer
   sub ax, cx
   inc ax                ; Ret = old - size + 1
+  cmp ax, [endmark_total_byte] ; If AX is below the size of the code segment then it is overflow
+  jb .bss_overflow      ; If the number of bytes exceeds what was left then print error
   clc                   ; Return no error
   jmp .return
 .bss_overflow:
+  add [mem_sys_bss], cx ; Restore the previous value
   xor ax, ax
   dec ax
   stc
