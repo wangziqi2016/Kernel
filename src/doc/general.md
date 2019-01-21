@@ -18,6 +18,10 @@ and is named ``bootdisk.img``. More details of the internal format of the disk i
 
 In order to test, type ``make qemu`` under the root and the qemu window should pop up.
 
+In order to convert a global line number (as a result of combining module files before assmebly, see below) to the line 
+number in the corresponding file before concatenation, use command ``LINE=[line # in global file] make peekfile``, and 
+the output contains both the individual file name and the local line number.
+
 ## Module Assembly and Linking Process
 
 The kernal consists of separate modules, each of which has its own assembly source file. Modules are concatenated
