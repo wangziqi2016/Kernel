@@ -73,3 +73,6 @@ Byte arguments (e.g. disk letter) should be converted to 16 bit words. 32 bit dw
 higher 16 bits first, then lower 16 bits). Segment-offset pairs should observe the convention that segment is pushed 
 first and then the offset. 
 
+Reasonably large functions should use stack frames to simplify argument and local variable access. If the function is 
+small and simple, or is just a wrapper, stack frames may be omitted, and arguments may be passed using registers. In this
+case the function must define clearly its expected argument list in the declaration header.
