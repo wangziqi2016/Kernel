@@ -30,7 +30,7 @@ _loader_start:
 ;
 
 SYS_DS equ 1000h
-SYS_SS equ 0h
+SYS_SS equ 9000h
 
 section .text
   ; This file is loaded into BX=0200h as the second sector 

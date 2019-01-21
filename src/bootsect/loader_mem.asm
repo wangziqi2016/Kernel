@@ -353,7 +353,7 @@ mem_int12h_err_str: db "INT12H error", 0ah, 00h
 
 ; This defines the system high end between 0 and 1MB range
 ; 0xA0000 is a reasonable guess, but we will use INT15H to decide
-; the actual value on mem initialization
+; the actual value on mem initialization (280h = 640d, unit is KB)
 mem_high_end:   dw 0280h
 ; This is the static data in-segment offset. When we allocate memory
 ; for this routine, we decrement this counter
