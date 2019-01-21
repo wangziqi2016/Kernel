@@ -35,8 +35,10 @@ file. First, to avoid file contents getting mixed up after the concatenation, ea
 line character. Second, to allow the utility to convert a line number in the conbined file to the number in individual files, 
 at the physical first line of each file, there must be a label of form ``_[module file name without .asm suffix]_start:``.
 
-The assembly process is described as follows. There are three stages. In the first stage, all module files with a naming
+The loader assembly process is described as follows. There are three stages. In the first stage, all module files with a naming
 pattern ``loader_*`` are concatenated together into a file ``_loader_modules.tmp``. In the second stage, the combined loader
 module is concatenated with ``loader.asm`` which is the loader entry point (must begin from the first byte of the module file)
 and ``sect_endmark.asm`` which defines an end-of-loader mark (similar to 0x55AA but is at the end of the entire loader). 
-This stage generates an intermediate file ``_loader.tmp``. In the third stage, 
+This stage generates an intermediate file ``_loader.tmp``. In the third stage, the file ``_loader.tmp`` is translated by the 
+nasm assembler. The assembler outputs two files: ``loader.bin``, the binary loader file with the entry point being at 
+offset 0, and ``loader.map`` which describes the offset of symbols and segments in the binary.
