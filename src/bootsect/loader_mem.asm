@@ -299,7 +299,7 @@ mem_get_sys_bss:
   mov cx, [mem_sys_bss] ; CX = Old value; AX = Requested size
   sub [mem_sys_bss], ax ; Move the pointer
   xchg cx, ax           ; AX = Old value; CX = Requested size
-  sub cx, ax            
+  sub ax, cx
   inc ax                ; Ret = old - size + 1
   clc                   ; Return no error
   jmp .return
