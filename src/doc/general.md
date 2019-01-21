@@ -93,7 +93,13 @@ so stack segment should remain the same all the time.
 The system loader will be booted into a high address just under the stack at 0x9000. During bootstrap, the floppy disk image 
 will be copied to address 9000:0000h, including the bootloader itself. The entry point of the loader is therefore 9000:0200h.
 The system DS is on the same segment as the loader, i.e. DS is initialized to 0x9000 and will not be changed frequently.
+All variables defined in the loader module will use an implicit offset of 0x200 plus their relative offsets in the loader
+binary.
 
-
+If A20 is enabled successfully (which should always be the case, because otherwise the system will not boot), the system
+can address an extra segment of size 64KB - 16B. This chunk of memory is reserved by the kernel for large allocation, e.g.
+disk buffers. The system use segment 0xFFFF and offset 0x0010 to address the first byte of the chunk (0x10000), and offset
+0xFFFF to address the last byte of the chunk (0x1FFEF). Note that due to the address generation mechanism of 8086, we cannot 
+address the full 64KB range, because the maximum possible address is 0x1FFEF.
 
 The definition of system segments can be found in the beginning of ``loader.asm``.

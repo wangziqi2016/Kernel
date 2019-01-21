@@ -314,7 +314,7 @@ mem_get_sys_bss:
   retn
 
   ; This function allocates a requested chunk from the large BSS section
-  ; Large BSS is at the high end of memory with A20 opened, i.e. FFFF:0000
+  ; Large BSS is at the high end of memory with A20 opened, i.e. FFFF:0010
   ; to FFFF:FFFF. The semantics of this function is very similar to 
   ; mem_get_sys_bss.
   ;   AX = number of bytes to allocate. We check for wrap-back
