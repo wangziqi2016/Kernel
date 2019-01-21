@@ -75,4 +75,8 @@ first and then the offset.
 
 Reasonably large functions should use stack frames to simplify argument and local variable access. If the function is 
 small and simple, or is just a wrapper, stack frames may be omitted, and arguments may be passed using registers. In this
-case the function must define clearly its expected argument list in the declaration header.
+case the function must define clearly its expected argument list in the declaration header. The first, second, ... , arguments 
+of near functions are accessed via the ``BP`` register using ``[BP + 4]``, ``[BP + 6]``, .... ``[BP + 0]`` and ``[BP + 2]`` 
+must not be changed because they are the old BP and the return address, respectively. For far functions,  argument list should
+begin at ``[BP + 6]``. For ISR, there is no argument list, but there are three words (6 bytes) on the stack that must not 
+be modified.
