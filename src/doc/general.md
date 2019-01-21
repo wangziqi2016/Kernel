@@ -50,5 +50,18 @@ bootloader and the loader module is then combined into the boot file ``bootdisk.
 The ``bootdisk.bin`` is then padded with zero until its size reaches 1.44MB, which is the size of a standard floppy disk file.
 The utility we use for the padding is under ``util`` directory, and is called ``binpad``. 
 
-## Global Calling Convention
+## Register Usage Convention
 
+Without special noting, all source code must follow a global register usage and argument passing convention. Interrupt 
+Service Routines and other hardware oriented routines are not included. 
+
+In the child function, register AX, CX, and DX are allowed to be changed without saving and restoring. Register BX, SI, 
+DI, SP, BP must be saved.
+
+Segment registers DS and ES are generally not preserved. Interrupt service routines should not assume DS or ES pointing 
+to the system segment. If ISR needs to access a system segment, it should always save the original value first, and 
+then populate the register with ``SYS_DS``. It is, however, recommended that normal functions not changing the DS register
+unless necessary (e.g. in ``loader_mem.asm`` when performing memory copy). If a function reloads DS register, it should 
+restore the DS value before calling a child function, such that the child function can assume that DS always points 
+to the system segment. SS register should never be changed under all circumstances except in ISR. The usage of FS and GS
+are not defined, and they are only recommended to be used for local purposes. 
