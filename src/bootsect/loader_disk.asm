@@ -4,11 +4,12 @@ _loader_disk_start:
 ;
 
 ; The maximum number of hardware devices we could support
-DISK_MAX_DEVICE  equ 8
+DISK_MAX_DEVICE   equ 8
 ; The max number of times we retry for read/write failure
-DISK_MAX_RETRY   equ 3
+DISK_MAX_RETRY    equ 3
 ; The byte size of a sector of the disk
-DISK_SECTOR_SIZE equ 512d
+DISK_SECTOR_SIZE  equ 512d
+DISK_FIRST_HDD_ID equ 80h ; The device ID of first HDD
 
 ; Error code for disk operations
 DISK_ERR_WRONG_LETTER   equ 1
@@ -221,72 +222,45 @@ disk_probe:
 .STATUS_CHECK_FLOPPY equ 0
 .STATUS_CHECK_HDD    equ 1
   xor ax, ax
-  ; Current status is set to 0
-  mov [bp + .CURRENT_STATUS], ax
+  mov [bp + .CURRENT_STATUS], ax       ; Current status is set to 0
   mov ah, 'A'
-  ; We start from 0x00 (disk num) and 'A' (letter assignment)
-  mov [bp + .CURRENT_DISK_NUMBER], ax
+  mov [bp + .CURRENT_DISK_NUMBER], ax  ; We start from 0x00 (disk num) and 'A' (letter assignment)
 .body:
-  ; ES:DI = 0:0 as required by INT13H
   xor ax, ax
   mov es, ax
-  mov di, ax
-  ; BIOS INT 13h/AH=08H to detect disk param
-  mov ah, 08h
-  mov dl, [bp + .CURRENT_DISK_NUMBER]
-  ; It does not preserve any register value
-  int 13h
-  ; Can either because we finished enumarating floppy disks,
-  ; harddisks, or a real error - jump to the routine to check
-  jc .error_13h
-  ; If the (current disk num & 0x7F) >= DH
-  ; then we know the INT returned success but there is no disk actually
-  mov al, [bp + .CURRENT_DISK_NUMBER]
-  and al, 7fh
-  cmp dl, al
+  mov di, ax                           ; ES:DI = 0:0 as required by INT13H
+  mov ah, 08h                          ; BIOS INT 13h/AH=08H to detect disk param
+  mov dl, [bp + .CURRENT_DISK_NUMBER]  ; DL is BIOS drive number, 7th bit set if HDD
+  int 13h                              ; It does not preserve any register value
+  jc .error_13h                        ; Either disk number non-exist or real error
+  mov al, [bp + .CURRENT_DISK_NUMBER]  ; Note that it is possible that this routine returns success even if the 
+  and al, 7fh                          ;   number is invalid. In this case we compare DL (# of drives returned) with
+  cmp dl, al                           ;   the ID of drives to see if it is the case
   jle .error_13h
-  ; Save these three to protect them
-  push cx
-  push dx
-  mov ax, disk_param.size
-  ; Allocate a system static data chunk
-  ; if fail (CF = 1) just print error message
+  push cx                              ; Save CX, DX before function call
+  push dx                              
+  mov ax, disk_param.size              ; Reserve one slot for the detected drive (AX is allocation size)
   call mem_get_sys_bss
-  jc .error_unrecoverable
-  ; Save this everytime
-  mov [disk_mapping], ax
-  ; AL = device type; BX = starting offset
-  xchg ax, bx
-  ; Save disk type
-  mov [bx + disk_param.type], al
   pop dx
   pop cx
-  ; Save head num
-  mov [bx + disk_param.head], dh
-  ; AX = CL[7:6]CH[7:0]
-  mov al, ch
+  jc .error_unrecoverable              ; Fail if CF = 1
+  mov [disk_mapping], ax               ; Save this everytime since the system segment grows downwards
+  xchg ax, bx                          ; AL = drive type; BX = starting offset (INT13H/08H returns drive type in BL)
+  mov [bx + disk_param.type], al       ; Save disk type
+  mov [bx + disk_param.head], dh       ; Save number of heads (returned by INT13H/08H)
+  mov al, ch                           ; Move CL[7:6]CH[7:0] into AX and save as number of tracks; CL has higher 2 bits
   mov ah, cl
   shr ah, 6
-  ; Save number of tracks
-  mov [bx + disk_param.track], ax
+  mov [bx + disk_param.track], ax      ; AH = CL >> 6 and AL = CH
   and cl, 03fh
-  ; Save number of sectors
-  mov [bx + disk_param.sector], cl
-  ; Finally save the disk num and letter assignment
-  ; Note that since number and letter has the same layout, we 
-  ; just move them using one mov inst
-  mov ax, [bp + .CURRENT_DISK_NUMBER]
-  mov [bx + disk_param.number], ax
-  ; Register will be destroyed in this routine
-  call .print_found
-  ; Increment the current letter and device number
-  inc byte [bp + .CURRENT_DISK_NUMBER]
+  mov [bx + disk_param.sector], cl     ; Save number of sectors as (CL & 0x3F), i.e. mask off high two bits
+  mov ax, [bp + .CURRENT_DISK_NUMBER]  ; Low byte number high byte letter
+  mov [bx + disk_param.number], ax     ; Save the above info into the table
+  call .print_found                    ; Register will be destroyed in this routine
+  inc byte [bp + .CURRENT_DISK_NUMBER] ; Increment the current letter and device number
   inc byte [bp + .CURRENT_DISK_LETTER]
-  ; Also increament the number of mappings
-  inc word [disk_mapping_num]
-  ; Compare whether we have exceeded the value. If we do
-  ; then report error
-  cmp word [disk_mapping_num], DISK_MAX_DEVICE
+  inc word [disk_mapping_num]          ; Also increment the number of mappings
+  cmp word [disk_mapping_num], DISK_MAX_DEVICE ; Report error if too many drives
   ja .error_too_many_disks
   jmp .body
 .return:
@@ -296,9 +270,7 @@ disk_probe:
   pop di
   pop es
   retn
-  ; Just prints what was found
-  ; Do not save any register
-.print_found:
+.print_found:   ; Print the drive just found using printf
   mov ax, [bx + disk_param.sector]
   push ax
   mov ax, [bx + disk_param.head]
@@ -313,16 +285,12 @@ disk_probe:
   call video_printf_near
   add sp, 12
   retn
-  ; Just change the disk number and then try again
-.finish_checking_floppy:
-  mov al, 80h
-  mov [bp + .CURRENT_DISK_NUMBER], al
-  ; Also change the status
-  mov ax, .STATUS_CHECK_HDD
-  mov [bp + .CURRENT_STATUS], ax
+.finish_checking_floppy: 
+  mov [bp + .CURRENT_DISK_NUMBER], 80h
+  mov [bp + .CURRENT_STATUS], .STATUS_CHECK_HDD ; Also change the status such that on next INT13H fail we return
   jmp .body
-.error_13h:
-  mov ax, [bp + .CURRENT_STATUS]
+.error_13h:                       ; This can be a real error or just because we finished the current drive type
+  mov ax, [bp + .CURRENT_STATUS]  ; If we are checking floppy and see this then switch to enumerate HDD
   cmp ax, .STATUS_CHECK_FLOPPY
   je .finish_checking_floppy
   cmp ax, .STATUS_CHECK_HDD
