@@ -71,7 +71,8 @@ are not defined, and they are only recommended to be used for local purposes.
 Without special noting, functions are called in C language convention: Arguments are pushed onto the stack right-to-left.
 Byte arguments (e.g. disk letter) should be converted to 16 bit words. 32 bit dwords should be pushed little-endian (i.e.
 higher 16 bits first, then lower 16 bits). Segment-offset pairs should observe the convention that segment is pushed 
-first and then the offset. 
+first and then the offset. The caller is responsible for clearing up the arguments after function returns. This allows
+printf() to be implemented in a more robust manner (could return safely even if arguments and the format sting mismatch).
 
 Reasonably large functions should use stack frames to simplify argument and local variable access. If the function is 
 small and simple, or is just a wrapper, stack frames may be omitted, and arguments may be passed using registers. In this
@@ -80,6 +81,9 @@ of near functions are accessed via the ``BP`` register using ``[BP + 4]``, ``[BP
 must not be changed because they are the old BP and the return address, respectively. For far functions,  argument list should
 begin at ``[BP + 6]``. For ISR, there is no argument list, but there are three words (6 bytes) on the stack that must not 
 be modified.
+
+Function returns a value in AX if it is 16 bits, or DX:AX if 32 bits. On failure condition, CF should be set, and the 
+content of AX should be either undefined, or an error code that allows the calling function to recover from the failure.
 
 ## Global Memory Map
 
