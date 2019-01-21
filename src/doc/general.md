@@ -42,3 +42,13 @@ and ``sect_endmark.asm`` which defines an end-of-loader mark (similar to 0x55AA 
 This stage generates an intermediate file ``_loader.tmp``. In the third stage, the file ``_loader.tmp`` is translated by the 
 nasm assembler. The assembler outputs two files: ``loader.bin``, the binary loader file with the entry point being at 
 offset 0, and ``loader.map`` which describes the offset of symbols and segments in the binary.
+
+In order to generate the final disk image file, we still need a bootloader. The bootloader source is named ``bootsect.asm``
+and stored under ``src/bootsect``. The bootloader is assembled into ``bootsect.bin`` under the same directory. The binary 
+bootloader and the loader module is then combined into the boot file ``bootdisk.bin`` using ``cat``.
+
+The ``bootdisk.bin`` is then padded with zero until its size reaches 1.44MB, which is the size of a standard floppy disk file.
+The utility we use for the padding is under ``util`` directory, and is called ``binpad``. 
+
+## Global Calling Convention
+
