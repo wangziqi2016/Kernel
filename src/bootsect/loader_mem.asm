@@ -296,9 +296,9 @@ mem_get_sys_bss:
   cli
   cmp ax, [mem_sys_bss]
   ja .bss_overflow      ; If the number of bytes exceeds whet was left then print error
-  mov cx, [mem_sys_bss] ; CX = Old value; AX = Requested size
-  sub [mem_sys_bss], ax ; Move the pointer
-  xchg cx, ax           ; AX = Old value; CX = Requested size
+  mov cx, ax
+  mov ax, [mem_sys_bss] ; AX = Old value; CX = Requested size
+  sub [mem_sys_bss], cx ; Move the pointer
   sub ax, cx
   inc ax                ; Ret = old - size + 1
   clc                   ; Return no error
