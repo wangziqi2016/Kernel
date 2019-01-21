@@ -286,7 +286,7 @@ memset:
   retn
 
   ; This function allocates some memory for uninitialized static data
-  ; at the end of the system data segment
+  ; at the end of the system data segment. Size = 0 will return the last returned value
   ; No overflow checking except for wrap-back
   ;   AX = number of bytes to allocate
   ; Return：
@@ -294,16 +294,14 @@ memset:
   ;   CF is set if fails also
 mem_get_sys_bss:
   cli
-  ; If the number of bytes exceeds whet was left then print error
   cmp ax, [mem_sys_bss]
-  ja .bss_overflow
-  ; CX = requested byte
-  ; AX = BSS pointer before and after subtraction
-  mov cx, ax
-  mov ax, [mem_sys_bss]
-  sub ax, cx
-  mov [mem_sys_bss], ax
-  clc
+  ja .bss_overflow      ; If the number of bytes exceeds whet was left then print error
+  mov cx, [mem_sys_bss] ; CX = Old value; AX = Requested size
+  sub [mem_sys_bss], ax ; Move the pointer
+  xchg cx, ax           ; AX = Old value; CX = Requested size
+  sub cx, ax            
+  inc ax                ; Ret = old - size + 1
+  clc                   ; Return no error
   jmp .return
 .bss_overflow:
   xor ax, ax
@@ -359,7 +357,7 @@ mem_high_end:   dw 0280h
 ; for this routine, we decrement this counter
 ; Note that this area is located at the end of the system data segment
 ; and never frees (holds static system data)
-mem_sys_bss:    dw 0fffeh
+mem_sys_bss:    dw 0ffffh
 ; This is the same as system BSS except that it uses the last segment 
 ; (A20 enabled).
 ; Note that we need to start allocating from 0x10, which is the first byte 
