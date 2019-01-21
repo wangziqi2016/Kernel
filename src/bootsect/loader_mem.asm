@@ -31,17 +31,12 @@ mem_init:
   mov ax, mem_a20_opened_str
   call video_putstr_near
 .detect_high_addr:
-  ; Store the value in memory
-  call mem_detect_conventional
-  mov ax, mem_high_end_str
-  call video_putstr_near
-  mov ax, [mem_high_end]
-  push ax
-  call video_putuint16
-  pop ax
-  ; New line
-  mov ax, 070ah
-  call putchar
+  call mem_detect_conventional ; Store the value in [mem_high_end]
+  push endmark_code_size       ; Loader size in bytes
+  push word [mem_high_end]     ; Conventional memory size
+  push mem_high_end_str        ; Format string accepting %d %d
+  call video_printf_near       ; Print [mem_high_end]
+  add sp, 6
 .after_a20:
   retn
 
@@ -346,11 +341,11 @@ mem_get_large_bss:
   sti
   retn
 
-mem_a20_closed_str: db "A20 gate is by default closed.", 0ah, 00h
-mem_a20_opened_str: db "A20 gate is now activated.", 0ah, 00h
-mem_a20_failed_str: db "Cannot activate A20 gate. Die.", 0ah, 00h
-mem_high_end_str:   db "Conventional memory size (KiB): ", 00h
-mem_int12h_err_str: db "INT12H error", 0ah, 00h
+mem_a20_closed_str:  db "A20 gate is by default closed.", 0ah, 00h
+mem_a20_opened_str:  db "A20 gate is now activated.", 0ah, 00h
+mem_a20_failed_str:  db "Cannot activate A20 gate. Die.", 0ah, 00h
+mem_high_end_str:    db "Conventional memory size (KiB): %d, Loader size: %d", 0ah, 00h
+mem_int12h_err_str:  db "INT12H error", 0ah, 00h
 
 ; This defines the system high end between 0 and 1MB range
 ; 0xA0000 is a reasonable guess, but we will use INT15H to decide
