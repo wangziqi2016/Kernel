@@ -29,8 +29,9 @@ _loader_start:
 ;      should ensure that the condition holds true
 ;
 
-SYS_DS equ 8000h
-SYS_SS equ 9000h
+SYS_DS equ    8000h       ; System code, data and bss
+SYS_SS equ    9000h       ; System stack
+LARGE_BSS_SEG equ 0ffffh  ; Large bss (A20)
 
 section .text
   ; Because we load the image from floppy disk including sector 0, 
