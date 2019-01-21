@@ -17,24 +17,17 @@ DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
 DISK_ERR_INVALID_BUFFER equ 4
 
-; This defines the structure of the disk parameter table
-struc disk_param
-  ; The BIOS assigned number for the device
-  .number: resb 1
-  ; The letter we use to represent the device
-  ; which requires a translation
-  ; This letter - 'A' is the index of this element in the table
-  .letter: resb 1
-  .type:   resb 1
-  .head:   resb 1
-  .sector: resb 1
+
+struc disk_param  ; This defines the structure of the disk parameter table
+  .number: resb 1 ; The BIOS assigned number for the device
+  .letter: resb 1 ; The letter we use to represent the device, starting from 'A'; Also used as index
+  .type:   resb 1 
+  .head:   resb 1 ; Maximum # of head; Note that the actual number of heads should + 1
+  .sector: resb 1 ; Maximum # of sectors; Note that it is the actual number of sectors
   .unused: resb 1
-  .track:  resw 1
-  ; These two are derived from the above parameters
-  ; Capacity is in terms of sectors
-  .capacity:            resd 1
-  ; This is used to compute CHS
-  .sector_per_cylinder: resw 1
+  .track:  resw 1 ; Maximum # of tracks; Note that the actual number of tracks should + 1
+  .capacity:            resd 1 ; Number of sectors; Derived from previous parameters
+  .sector_per_cylinder: resw 1 ; This is used to compute CHS given LBA
   .size:
 endstruc
 
@@ -286,22 +279,19 @@ disk_probe:
   add sp, 12
   retn
 .finish_checking_floppy: 
-  mov [bp + .CURRENT_DISK_NUMBER], 80h
-  mov [bp + .CURRENT_STATUS], .STATUS_CHECK_HDD ; Also change the status such that on next INT13H fail we return
+  mov byte [bp + .CURRENT_DISK_NUMBER], DISK_FIRST_HDD_ID ; Begin enumerating HDDs
+  mov word [bp + .CURRENT_STATUS], .STATUS_CHECK_HDD      ; Also change the status such that on next INT13H fail we return
   jmp .body
 .error_13h:                       ; This can be a real error or just because we finished the current drive type
-  mov ax, [bp + .CURRENT_STATUS]  ; If we are checking floppy and see this then switch to enumerate HDD
-  cmp ax, .STATUS_CHECK_FLOPPY
-  je .finish_checking_floppy
-  cmp ax, .STATUS_CHECK_HDD
-  jmp .return
+  cmp word [bp + .CURRENT_STATUS], .STATUS_CHECK_FLOPPY ; If we are checking floppy and see this then switch to enumerate HDD
+  je .finish_checking_floppy                       
+  jmp .return                                      ; Otherwise return because we finished enumerating all disks
 .error_unrecoverable:
   push ax
   push ds
   push disk_init_error_str
   call bsod_fatal
-.error_too_many_disks:
-  ; Print the max # of disks and then return
+.error_too_many_disks: ; Print the max # of disks and then die
   push word DISK_MAX_DEVICE
   push ds
   push disk_too_many_disk_str
