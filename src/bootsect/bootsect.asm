@@ -11,7 +11,7 @@ section .text
   BUFFER_LEN_PER_LINE equ 00a0h
   ; We start loading the sector at 0x10000, i.e. the second
   ; 64 KB segment. The boot sector is in the first 64 KB
-  LOAD_SEG equ 1000h
+  LOAD_SEG equ 8000h
   ; Each sector is 512 byte
   SECTOR_SIZE equ 0200h
 
@@ -37,9 +37,8 @@ start:
 	call print_msg
 
 start_load:
-  ; ES points to 0x10000 segment
+  ; Initialize ES:BX to prepare for loading LOAD_SEG:0000
   push word LOAD_SEG
-  ; Read into 1000:0000
   pop es
   xor bx, bx
   mov cx, [num_sector_to_read]
@@ -69,8 +68,7 @@ test_num_sector:
   cmp ax, 0aa55h
   jne print_verify_sector_error
 
-  ; Jump to the code we just loaded
-  ; Note: Segment is on high address
+  ; Jump to the code we just loaded: LOAD_SEG:SECTOR_SIZE (because the bootsector is also loaded)
   push word LOAD_SEG
 	push word SECTOR_SIZE
   retf

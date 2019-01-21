@@ -29,11 +29,12 @@ _loader_start:
 ;      should ensure that the condition holds true
 ;
 
-SYS_DS equ 1000h
+SYS_DS equ 8000h
 SYS_SS equ 9000h
 
 section .text
-  ; This file is loaded into BX=0200h as the second sector 
+  ; Because we load the image from floppy disk including sector 0, 
+  ; so this file actually starts at 512 byte offset
 	org	0200h
 
   cli
