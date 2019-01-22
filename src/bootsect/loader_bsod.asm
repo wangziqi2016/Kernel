@@ -10,9 +10,12 @@ BSOD_VIDEO_ATTR equ VIDEO_ATTR_FG_RED | VIDEO_ATTR_FG_HIGHLIGHT | VIDEO_ATTR_BG_
 ; If this flag is on we do not clear the screen
 %define debug_no_clear
 
-  ; This function never returns - so it can be either called, or directly 
-  ; jumped onto. It receives video_printf() like parameters, and prints 
-  ; the error on the screen
+; This function never returns - so it can be either called, or directly 
+; jumped onto. It receives video_printf() like parameters, and prints 
+; the error on the screen
+;   [BP + 4] - Offset of error string
+;   [BP + 6] - Segment of error string
+;   [BP + 8], ..., - Argument list of printf
 bsod_fatal:
   push bp
   mov bp, sp
