@@ -78,7 +78,7 @@ disk_op_test:
 disk_buffer_test:
   push si
   call disk_print_buffer
-  mov si, 1
+  mov si, 18
 .load_1:
   test si, si
   jz .finish_load_1
