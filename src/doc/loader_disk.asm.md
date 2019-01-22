@@ -86,3 +86,4 @@ expose the fact that disk sectors are buffered to the application, such that the
 of deciding which entries should be invalidated. The buffer pool is also fully decoupled from the file system implementation:
 No matter how the FS maintains its sectors (e.g. using clusters), the buffer pool always loads and invalidates entries on
 sector granularity.
+

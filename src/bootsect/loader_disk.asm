@@ -300,6 +300,9 @@ disk_getchs:
 disk_insert_buffer:
   push bp
   mov bp, sp
+.empty_slot equ -2
+  xor ax, ax
+  push ax                       ; [BP + empty_slot], if 0 then there is no empty slot (0 is not valid offset in this case)
   push es
   push bx
   mov ax, MEM_LARGE_BSS_SEG
@@ -308,9 +311,12 @@ disk_insert_buffer:
   xor ax, ax                    ; AX = current index
 .body:
   cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
-  je .evict                     ; If no empty or matching entry is found then evict
+  je .try_empty                 ; If no matching entry is found then first try to claim empty then evict
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
-  jz .found_empty               ; This is the easy case - there is a valid entry
+  jnz .check_existing           ; If it is valid entry then check parameters
+  mov [bp + .empty_slot], bx    ; Write down empty slot in local var for later use
+  jmp .continue                 ; And then try next entry
+.check_existing:
   mov cx, [bp + 4]              ; CX = disk letter
   cmp cl, [es:bx + disk_buffer_entry.letter]
   jne .continue                 ; Skip if letter does not match
@@ -331,7 +337,11 @@ disk_insert_buffer:
   inc ax
   add bx, disk_buffer_entry.size
   jmp .body
-.found_empty:
+.try_empty:                     ; Get here if all entries are checked and no matching is found 
+  mov bx, [bp + .empty_slot]    ; BX = Either empty slot or 0x0000
+  test bx, bx
+  jz .evict                     ; If BX is not valid, then evict an entry (no empty slot)
+.found_empty:                   ; Otherwise, fall through to use the empty slot
   or word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID ; Make the entry valid by setting the bit
   push es                                     ; 4th argument - Segment of data pointer
   lea ax, [bx + disk_buffer_entry.data]       ; Generate the address within the entry
