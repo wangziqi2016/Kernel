@@ -339,8 +339,8 @@ disk_lookup_buffer:
 ;   [BP + 4] - Device letter
 ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
 ; Return:
-;   AX points to the entry's begin address, and the entry is already filled with LBA and letter. CF is clear
-;   CF is set if entry with the same LBA and letter already exists
+;   AX points to the entry's begin address, and the entry is already filled with LBA and letter
+;   CF is not defined
 disk_insert_buffer:
   push bp
   mov bp, sp
@@ -364,7 +364,6 @@ disk_insert_buffer:
   mov cx, [es:bx + disk_buffer_entry.lba + 2]
   cmp cx, [BP + 8]
   jne .continue                 ; Skip if higher bytes do not match
-  stc                           ; If found, SET CF to indicate ENTRY ALREADY EXISTS
   mov ax, bx
   jmp .return                   ; Return value in AX which is the pointer to the entry
 .continue:
@@ -385,12 +384,11 @@ disk_insert_buffer:
   mov ax, [bp + 8]
   mov [es:bx + disk_buffer_entry.lba + 2], ax                          ; Copy higher 16 bits of LBA
   or word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID ; Make the entry valid by setting the bit
-  clc                           ; Clear CF to indicate this is a fresh entry
   mov ax, bx                    ; Return the newly inserted entry
   jmp .return
 .try_evict:
-  stc
-  jmp .return
+  call disk_evict_buffer        ; This function assumes ES:BX points to the entry to be evicted
+  jmp .found_empty              ; Now we have an empty entry on ES:BX
 
 ; Evicts a disk buffer entry. This function also writes back data if the entry is dirty
 ; The returned buffer pointer in BX has both valid and dirty bits off
