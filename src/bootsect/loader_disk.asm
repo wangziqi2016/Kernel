@@ -398,9 +398,27 @@ disk_insert_buffer:
 ;   ES - The large BSS segment
 ; Return:
 ;   BX - The address of the buffer entry
+;   AX may get destroyed
 disk_evict_buffer:
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
   jz .after_evict                ; If non-dirty just clear the bits and return non-changed
+  push word MEM_LARGE_BSS_SEG                   ; Segment of data pointer
+  push bx                                       ; Offset (current BX) of data pointer
+  mov ax, [es:bx + disk_buffer_entry.lba + 2]
+  push ax                                       ; High 16 bits of LBA
+  mov ax, [es:bx + disk_buffer_entry.lba]
+  push ax                                       ; Low 16 bits of LBA
+  mov ax, [es:bx + disk_buffer_entry.letter]
+  push ax                                       ; Disk letter
+  push word DISK_OP_WRITE                       ; Opcode for disk LBA operation
+  call disk_op_lba
+  add sp, 12
+  jc .error_evict_fail                          ; If error just BSOD
+.after_evict:
+  xor ax, ax
+  mov [es:bx + disk_buffer_entry.status], ax
+  ret
+.error_evict_fail:
   
 
   ; This function reads or writes LBA of a given disk
@@ -497,7 +515,7 @@ disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y Cap %U", 0ah
 disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
-disk_evict_fail_str:       db "Evict fail", 0ah, 00h
+
 disk_read_fail_str:        db "Read fail (%u)", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
@@ -507,6 +525,8 @@ disk_invalid_ptr_to_index: db "Invalid buffer pointer", 0ah, 00h
 disk_buffer_print_format:  db "%u,%y ", 00h
 ; Note that we deliberately do not put new line here
 disk_buffer_print_empty:   db "(Empty)", 00h
+
+disk_evict_fail_str:       db "Evict fail", 0ah, 00h
 
 disk_mapping:     dw 0 ; Offset in the system BSS segment to the start of the disk param table
 disk_mapping_num: dw 0 ; Number of elements in the disk mapping table
