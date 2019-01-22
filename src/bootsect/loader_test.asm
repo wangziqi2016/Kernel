@@ -10,14 +10,6 @@ disk_test:
 
 disk_param_test:
   push word 'A'
-  call disk_get_size
-  pop cx
-  jc .disk_size_error
-  push dx
-  push ax
-  call video_putuint32
-  add sp, 4
-  push word 'A'
   call disk_get_param
   mov bx, ax
   pop ax
