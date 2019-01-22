@@ -303,12 +303,12 @@ disk_lookup_buffer:
   mov es, ax
   mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
   xor ax, ax                    ; AX = current index
-  mov cx, [bp + 4]              ; CX = disk letter
 .body:
   cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
   je .return_notfound           ; Set CF and return
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   jz .continue                  ; Skip if not valid
+  mov cx, [bp + 4]              ; CX = disk letter
   cmp cl, [es:bx + disk_buffer_entry.letter]
   jne .continue                 ; Skip if letter does not match
   mov cx, [es:bx + disk_buffer_entry.lba]
@@ -350,12 +350,12 @@ disk_insert_buffer:
   mov es, ax
   mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
   xor ax, ax                    ; AX = current index
-  mov cx, [bp + 4]              ; CX = disk letter
 .body:
   cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
   je .evict                     ; If no empty or matching entry is found then evict
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   jz .found_empty               ; This is the easy case - there is a valid entry
+  mov cx, [bp + 4]              ; CX = disk letter
   cmp cl, [es:bx + disk_buffer_entry.letter]
   jne .continue                 ; Skip if letter does not match
   mov cx, [es:bx + disk_buffer_entry.lba]
@@ -364,18 +364,17 @@ disk_insert_buffer:
   mov cx, [es:bx + disk_buffer_entry.lba + 2]
   cmp cx, [BP + 8]
   jne .continue                 ; Skip if higher bytes do not match
-  mov ax, bx
-  jmp .return                   ; Return value in AX which is the pointer to the entry
-.continue:
-  inc ax
-  add bx, disk_buffer_entry.size
-  jmp .body
 .return:
+  mov ax, bx
   pop bx
   pop es
   mov sp, bp
   pop bp
   ret
+.continue:
+  inc ax
+  add bx, disk_buffer_entry.size
+  jmp .body
 .found_empty:
   mov ax, [bp + 4]
   mov [es:bx + disk_buffer_entry.letter], ax                           ; Copy the letter
@@ -384,15 +383,15 @@ disk_insert_buffer:
   mov ax, [bp + 8]
   mov [es:bx + disk_buffer_entry.lba + 2], ax                          ; Copy higher 16 bits of LBA
   or word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID ; Make the entry valid by setting the bit
-  mov ax, bx                      ; Return the newly inserted entry
   jmp .return
 .evict:
   mov ax, [disk_last_evicted]     ; Use the previous eviction index to compute this one (just +1)
   inc ax
-  div byte [disk_buffer_size]     ; AH = remainder
+  div byte [disk_buffer_size]     ; AH = remainder (size must be less than 128, o.w. total would be > 64KB)
   movzx ax, ah                    ; AX = (AX % disk_buffer_size)
   mov [disk_last_evicted], ax     ; Store it for next eviction
-  mul word disk_buffer_entry.size ; DX:AX = offset into the table; We assume DX == 0 because we enforce this in init
+  mov cx, disk_buffer_entry.size
+  mul cx                          ; DX:AX = offset into the table; We assume DX == 0 because we enforce this in init
   add ax, [disk_buffer]           ; Add with base address
   mov bx, ax                      ; BX = Address of entry to evict
   call disk_evict_buffer          ; This function assumes ES:BX points to the entry to be evicted
