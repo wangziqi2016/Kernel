@@ -252,21 +252,20 @@ disk_getparam:
   stc
   jmp .return
 
-
-  ; This function returns the CHS representation given a linear sector ID
-  ; and the drive letter
-  ;   [BP + 4] - Device letter
-  ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
-  ; Return:
-  ;   DH = head
-  ;   DL = device number (i.e. the hardware number)
-  ;   CH = low 8 bits of cylinder
-  ;   CL[6:7] = high 2 bits of cylinder
-  ;   CL[0:5] = sector
-  ; CF is clear when success
-  ; CF is set when error, AX contains one of the following:
-  ;   - DISK_ERR_WRONG_LETTER if letter is wrong
-  ;   - DISK_ERR_INVALID_LBA if LBA is too large
+; This function returns the CHS representation given a linear sector ID
+; and the drive letter
+;   [BP + 4] - Device letter
+;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
+; Return:
+;   DH = head
+;   DL = device number (i.e. the hardware number)
+;   CH = low 8 bits of cylinder
+;   CL[6:7] = high 2 bits of cylinder
+;   CL[0:5] = sector
+; CF is clear when success, AX is undefined
+; CF is set when error, AX contains one of the following:
+;   - DISK_ERR_WRONG_LETTER if letter is wrong
+;   - DISK_ERR_INVALID_LBA if LBA is too large
 disk_getchs:
   push bp
   mov bp, sp

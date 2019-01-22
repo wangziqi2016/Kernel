@@ -16,17 +16,13 @@ disk_param_test:
   push word [bx + disk_param.capacity]
   call video_putuint32
   add sp, 4
-  jmp .return
-.disk_size_error:
-  mov ax, disk_get_size_error_str
-  call video_putstr_near
 .return:
   retn
 
   ; This function tests disk
 disk_chs_test:
   push si
-  mov si, 2879
+  mov si, 2879   ; This is the last valid sector
 .repeat_chs:
   push word 0
   push si
@@ -45,9 +41,9 @@ disk_chs_test:
   push disk_chs_test_str
   call video_printf_near
   add sp, 12
-  ;inc si
-  ;cmp si, 2979
-  ;jbe .repeat_chs
+  dec si
+  cmp si, 2869
+  jae .repeat_chs
   pop si
   retn
 
