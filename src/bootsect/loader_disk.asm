@@ -419,12 +419,14 @@ disk_evict_buffer:
   mov [es:bx + disk_buffer_entry.status], ax
   ret
 .error_evict_fail:
-  
+  push ds
+  push disk_evict_fail_str
+  call bsod_fatal
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
   ; for three times. If all are not successful we just return fail
-  ;   int disk_op_lba(char letter, uint32_t lba, void far *buffer_data);
+  ;   int disk_op_lba(int op, char letter, uint32_t lba, void far *buffer_data);
   ;   [BP + 4] - 8 bit opcode on lower byte (0x02 for read, 0x03 for write); 
   ;              8 bit # of sectors to operate on higher byte (should be 1)
   ;   [BP + 6] - Disk letter
@@ -512,20 +514,9 @@ disk_op_lba:
 
 disk_init_error_str:       db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
 disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y Cap %U", 0ah, 00h
-disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
-
-disk_read_fail_str:        db "Read fail (%u)", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
-disk_rm_from_empty_queue_str:  db "Remove from empty queue", 0ah, 00h
-disk_rm_invalid_buffer_str:    db "Remove invalid buffer", 0ah, 00h
-disk_invalid_ptr_to_index: db "Invalid buffer pointer", 0ah, 00h
-; Index (status)
-disk_buffer_print_format:  db "%u,%y ", 00h
-; Note that we deliberately do not put new line here
-disk_buffer_print_empty:   db "(Empty)", 00h
-
 disk_evict_fail_str:       db "Evict fail", 0ah, 00h
 
 disk_mapping:     dw 0 ; Offset in the system BSS segment to the start of the disk param table
