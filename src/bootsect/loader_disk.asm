@@ -400,12 +400,13 @@ disk_evict_buffer:
 disk_print_buffer:
   push es
   push bx
+  push si
   mov bx, [disk_buffer]
   push word MEM_LARGE_BSS_SEG
   pop es
-  xor ax, ax
+  xor si, si
 .body:
-  cmp ax, [disk_buffer_size]
+  cmp si, [disk_buffer_size]
   je .return
   mov dx, [es:bx + disk_buffer_entry.status]
   push dx
@@ -418,15 +419,17 @@ disk_print_buffer:
   push .str
   call video_printf_near
   add sp, 10
-  inc ax
+  inc si
   add bx, disk_buffer_entry.size
+  jmp .body
 .return:
   mov ax, 000ah
   call putchar
+  pop si
   pop bx
   pop es
   ret
-.str: db "%U %c (%u) ", 00h
+.str: db "%U %c (%u), ", 00h
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
