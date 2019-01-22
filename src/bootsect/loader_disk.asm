@@ -379,17 +379,29 @@ disk_insert_buffer:
   ret
 .found_empty:
   mov ax, [bp + 4]
-  mov [es:bx + disk_buffer_entry.letter], ax
+  mov [es:bx + disk_buffer_entry.letter], ax                           ; Copy the letter
   mov ax, [bp + 6]
-  mov [es:bx + disk_buffer_entry.lba], ax
+  mov [es:bx + disk_buffer_entry.lba], ax                              ; Copy lower 16 bits of LBA
   mov ax, [bp + 8]
-  mov [es:bx + disk_buffer_entry.lba + 2], ax
+  mov [es:bx + disk_buffer_entry.lba + 2], ax                          ; Copy higher 16 bits of LBA
+  or word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID ; Make the entry valid by setting the bit
   clc                           ; Clear CF to indicate this is a fresh entry
-  mov ax, bx                    ; 
+  mov ax, bx                    ; Return the newly inserted entry
   jmp .return
 .try_evict:
   stc
   jmp .return
+
+; Evicts a disk buffer entry. This function also writes back data if the entry is dirty
+; The returned buffer pointer in BX has both valid and dirty bits off
+;   BX - The address of the buffer entry
+;   ES - The large BSS segment
+; Return:
+;   BX - The address of the buffer entry
+disk_evict_buffer:
+  test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
+  jz .after_evict                ; If non-dirty just clear the bits and return non-changed
+  
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
