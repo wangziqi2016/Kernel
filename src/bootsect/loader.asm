@@ -29,6 +29,8 @@ _loader_start:
 ;      should ensure that the condition holds true
 ;
 
+%define while1 .die: jmp .die
+
 SYS_DS equ        8000h       ; System code, data and bss
 SYS_SS equ        9000h       ; System stack
 LARGE_BSS_SEG equ 0ffffh      ; Large bss (A20)
