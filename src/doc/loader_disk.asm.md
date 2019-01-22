@@ -73,4 +73,10 @@ buffer pool is allocated on high memory, i.e. the BSS segment after 1MB boundary
 time the buffer pool is accessed, ES will be loaded with the corresponding segment descriptor. The buffer pool is 
 initialized during the disk initialization time. 
 
-The disk buffer pool maintains only minimal information for the most basic functionality. 
+The disk buffer pool maintains only minimal information for the most basic functionality. For each entry, we maintain
+its LBA, disk letter, current status (dirty/valid), and drive ID. Sectors enter the buffer pool on-demand, i.e. an
+entry is allocated only when a sector is requested. If the allocation cannot be done because all entries are currently
+active, an eviction decision will be made, and one of the entries will be invalidated. The eviction happens in a round-robin
+fashion: It always follows the pattern 0, 1, 2, ..., MAX_ENTRY, 0, 1, ..., etc. If the selected entry is dirty, it will
+be written back to the disk before invalidation.
+
