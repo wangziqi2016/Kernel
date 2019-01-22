@@ -396,6 +396,38 @@ disk_evict_buffer:
   push disk_evict_fail_str
   call bsod_fatal
 
+; This function is for debugging purpose. Prints buffer status, LBA and letter
+disk_print_buffer:
+  push es
+  push bx
+  mov bx, [disk_buffer]
+  push word MEM_LARGE_BSS_SEG
+  pop es
+  xor ax, ax
+.body:
+  cmp ax, [disk_buffer_size]
+  je .return
+  mov dx, [es:bx + disk_buffer_entry.status]
+  push dx
+  mov dx, [es:bx + disk_buffer_entry.letter]
+  push dx
+  mov dx, [es:bx + disk_buffer_entry.lba + 2]
+  push dx
+  mov dx, [es:bx + disk_buffer_entry.lba]
+  push dx
+  push .str
+  call video_printf_near
+  add sp, 10
+  inc ax
+  add bx, disk_buffer_entry.size
+.return:
+  mov ax, 000ah
+  call putchar
+  pop bx
+  pop es
+  ret
+.str: db "%U %c (%u) ", 00h
+
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
   ; for three times. If all are not successful we just return fail
