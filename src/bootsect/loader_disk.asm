@@ -24,6 +24,7 @@ struc disk_param    ; This defines the structure of the disk parameter table
   .head:     resw 1 ; # of heads
   .track:    resw 1 ; # of tracks
   .capacity: resd 1 ; Total # of sectors in linear address space; double word
+  .padding:  resb 2 ; Make it 16 bytes
   .size:
 endstruc
 
@@ -226,6 +227,32 @@ disk_probe:
   push disk_too_many_disk_str
   call bsod_fatal
 
+; This function returns a pointer to the disk param block given a disk letter
+;   AX - The disk letter (low byte)
+; Return: 
+;   AX = Address of the disk_param entry
+; CF is set on failure. AX is undefined. The only reason of failure is invalid disk letter
+disk_getparam:
+  mov ah, al
+  cmp ah, 'A'
+  jb .return_invalid
+  sub ah, 'A'
+  cmp ah, [disk_mapping_num]
+  jae .return_invalid        ; If ah - 'A' >= mapping num it is also invalid
+  mov al, [disk_mapping_num] ; entry index = (mapping num - 1 - (letter - 'A'))
+  sub al, ah
+  dec al
+  mov ah, disk_param.size
+  mul ah                     ; Get the byte offset of the entry
+  add ax, [disk_mapping]     ; Add with the base address
+  clc
+.return:  
+  retn
+.return_invalid:
+  stc
+  jmp .return
+
+
   ; This function returns the CHS representation given a linear sector ID
   ; and the drive letter
   ;   [BP + 4] - Device letter
@@ -246,10 +273,8 @@ disk_getchs:
   push ax                ; One local variable
 .curr_sector equ -2
   push bx
-  mov ax, [bp + 4]
-  push ax
+  mov ax, [bp + 4]       ; AX = Paremeter to the function
   call disk_getparam     ; Get disk parameter first
-  pop cx                 ; Clear stack
   jc .error_wrong_letter
   mov bx, ax             ; BX is the table entry
   mov dx, [bp + 8]       ; Next compare the input LBA and the maximum LBA
@@ -283,8 +308,6 @@ disk_getchs:
 .error_invalid_lba:
   mov ax, DISK_ERR_INVALID_LBA
   jmp .return
-
-
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
@@ -360,10 +383,8 @@ disk_op_lba:
   je .return_fail_int13h_error
   inc word [bp + .RETRY_COUNTER]
   mov ax, [bp + 6]
-  push ax
   call disk_getparam
   mov bx, ax
-  pop ax
   jc .return_fail_wrong_letter
   ; If the number has 7-th bit set then it is a harddisk
   ; and we do not retry, just fail directly
@@ -376,41 +397,6 @@ disk_op_lba:
   int 13h
   jc .return_fail_reset_error
   jmp .retry
-
-  ; This function returns a pointer to the disk param block
-  ; of the given disk letter
-  ;   [BP + 4] - The disk letter (low byte)
-  ; Returns in AX; Returns NULL if letter is invalid
-  ; We also set CF if fail; You can choose one to check
-disk_getparam:
-  push bp
-  mov bp, sp
-  mov al, [bp + 4]
-  cmp al, 'A'
-  jb .return_invalid
-  sub al, 'A'
-  ; If al - 'A' >= mapping num it is also invalid
-  cmp al, [disk_mapping_num]
-  jae .return_invalid
-  mov ah, [disk_mapping_num]
-  xchg ah, al
-  sub al, ah
-  dec al
-  ; Before this AL is the index in the array of disk_param
-  ; and the result of the mul is in AX
-  mov ah, disk_param.size
-  mul ah
-  ; Add with the base address
-  add ax, [disk_mapping]
-  clc
-  jmp .return
-.return_invalid:
-  xor ax, ax
-  stc
-.return:  
-  mov sp, bp
-  pop bp
-  retn
 
 disk_init_error_str:       db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
 disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y Cap %U", 0ah, 00h
