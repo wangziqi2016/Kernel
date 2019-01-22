@@ -15,16 +15,15 @@ DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
 DISK_ERR_INVALID_BUFFER equ 4
 
-struc disk_param  ; This defines the structure of the disk parameter table
-  .number: resb 1 ; The BIOS assigned number for the device
-  .letter: resb 1 ; The letter we use to represent the device, starting from 'A'; Also used as index
-  .type:   resb 1 
-  .unused: resb 1
-  .sector: resw 1 ; Maximum # of sectors; Note that it is the actual number of sectors
-  .head:   resw 1 ; Maximum # of head; Note that the actual number of heads should + 1
-  .track:  resw 1 ; Maximum # of tracks; Note that the actual number of tracks should + 1
-  .capacity:            resd 1 ; Number of sectors; Derived from previous parameters
-  .sector_per_cylinder: resw 1 ; This is used to compute CHS given LBA
+struc disk_param    ; This defines the structure of the disk parameter table
+  .number:   resb 1 ; The BIOS assigned number for the device
+  .letter:   resb 1 ; The letter we use to represent the device, starting from 'A'; Also used as index
+  .type:     resb 1 
+  .unused:   resb 1
+  .sector:   resw 1 ; Maximum # of sectors; Note that it is the actual number of sectors
+  .head:     resw 1 ; Maximum # of head; Note that the actual number of heads should + 1
+  .track:    resw 1 ; Maximum # of tracks; Note that the actual number of tracks should + 1
+  .capacity: resd 1 ; Number of sectors; Derived from previous parameters
   .size:
 endstruc
 
@@ -184,6 +183,12 @@ disk_probe:
   and cl, 03fh
   xor ch, ch                           ; Higher 8 bits are 0
   mov [bx + disk_param.sector], cx     ; Save number of sectors as (CL & 0x3F), i.e. mask off high two bits
+  inc al
+  mul cl                               ; AX = CL * AL (sector * track)
+  inc dx                      
+  mul dx                               ; DX:AX = AX * DX (# sector * # track * # head)
+  mov [bx + disk_param.capacity], ax
+  mov [bx + disk_param.capacity + 2], dx ; Store this as capacity in terms of sectors
   mov ax, [bp + .CURRENT_DISK_NUMBER]  ; Low byte number high byte letter
   mov [bx + disk_param.number], ax     ; Save the above info into the table
   call .print_found                    ; Register will be destroyed in this routine
@@ -201,6 +206,8 @@ disk_probe:
   pop es
   retn
 .print_found:                           ; Print the drive just found using printf
+  push word [bx + disk_param.capacity + 2]
+  push word [bx + disk_param.capacity]  ; 32 bit unsigned little endian
   push word [bx + disk_param.sector]
   push word [bx + disk_param.head]
   push word [bx + disk_param.track]
@@ -210,7 +217,7 @@ disk_probe:
   push ax
   push disk_init_found_str
   call video_printf_near
-  add sp, 12
+  add sp, 16
   retn
 .finish_checking_floppy: 
   mov byte [bp + .CURRENT_DISK_NUMBER], DISK_FIRST_HDD_ID ; Begin enumerating HDDs
@@ -231,50 +238,6 @@ disk_probe:
   push disk_too_many_disk_str
   call bsod_fatal
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Disk Param Computation
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-  ; This function returns the raw byte size of a disk given its
-  ; letter number
-  ; Size is returned in DX:AX as 512 byte sectors since it may exceeds 
-  ; the 16 bit limit
-  ; Under the CHS addressing scheme, the maximum possible sector is 24 bit
-  ;   [BP + 4] - Letter
-  ; Return: Set CF if the letter is invalid
-  ;         Clear CF if success
-disk_get_size:
-  push bp
-  mov bp, sp
-  push bx
-  mov ax, [bp + 4]
-  push ax
-  call disk_get_param
-  mov bx, ax
-  test ax, ax
-  pop ax
-  je .return_fail
-  ; 8 bit
-  mov al, [bx + disk_param.head]
-  inc al
-  ; 6 bit
-  mov ah, [bx + disk_param.sector]
-  ; AX = head * sector
-  mul ah
-  mov cx, [bx + disk_param.track]
-  inc cx
-  ; DX:AX = head * sector * track, in 512 byte sectors
-  mul cx
-  clc
-  jmp .return
-.return_fail:
-  stc
-.return:  
-  pop bx
-  mov sp, bp
-  pop bp
-  retn
-
 ;%define disk_get_chs_debug
 
   ; This function returns the CHS representation given a linear sector ID
@@ -290,70 +253,8 @@ disk_get_size:
   ; CF is clear when success
   ; CF is set when error
 disk_get_chs:
-  push bp
-  mov bp, sp
-  push bx
-  mov ax, [bp + 4]
-  push ax
-  call disk_get_param
-  add sp, 2
-  test ax, ax
-  je .return_fail
-  mov bx, ax
-  ; CX = sector per cylinder
-  mov cx, [bx + disk_param.sector_per_cylinder]
-  mov ax, [bp + 6]
-  mov dx, [bp + 8]
-  div cx
-  ; Now AX = in-cylinder offset
-  ;     DX = cylinder ID,
-  ; after the exchange
-  xchg ax, dx
-  mov cl, [bx + disk_param.sector]
-  div cl
-  ; Now AH = sector offset (starting from 0)
-  ;     AL = head ID
-  ;     DX = cylinder ID
-  inc ah
-%ifdef disk_get_chs_debug
-  ; Protect AX and CX
-  push ax
-  push dx
-  movzx cx, ah
-  push cx
-  movzx cx, al
-  push cx
-  push dx
-  push .test_string
-  call video_printf_near
-  add sp, 8
-  pop dx
-  pop ax
-  jmp .after_debugging
-.test_string: db "CHS = %x %y %y", 0ah, 00h
-%endif
-.after_debugging:
-  ; Make the high 2 bits of CL the bit 8 and 9 of the cylinder number
-  mov cl, dh
-  shl cl, 6
-  ; CH is the low 8 bits of the cylinder
-  mov ch, dl
-  ; Make DH the head
-  mov dh, al
-  ; Make the low 6 bits of CL the sector ID starting from 1
-  or cl, ah
-  ; DL is the device number. For floppy it is from 
-  ; 0x00 and for HDD it is from 0x80
-  mov dl, [bx + disk_param.number]
   clc
-  jmp .return
-.return_fail:
-  stc
-.return:
-  pop bx
-  mov sp, bp
-  pop bp
-  retn
+  ret
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
@@ -482,7 +383,7 @@ disk_get_param:
   retn
 
 disk_init_error_str:       db "Error initializing disk parameters (AX = 0x%x)", 0ah, 00h
-disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y", 0ah, 00h
+disk_init_found_str:       db "%c: #%y Maximum C/H/S (0x): %x/%y/%y Cap %U", 0ah, 00h
 disk_invalid_letter_str:   db "Invalid disk letter: %c (%y)", 0ah, 00h
 disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
