@@ -3,20 +3,17 @@ _loader_disk_start:
 ; loader_disk.asm - This file contains disk driver and I/O routine
 ;
 
-; The maximum number of hardware devices we could support
-DISK_MAX_DEVICE   equ 8
-; The max number of times we retry for read/write failure
-DISK_MAX_RETRY    equ 3
-; The byte size of a sector of the disk
-DISK_SECTOR_SIZE  equ 512d
-DISK_FIRST_HDD_ID equ 80h ; The device ID of first HDD
+
+DISK_MAX_DEVICE   equ 8     ; The maximum number of hardware devices we could support
+DISK_MAX_RETRY    equ 3     ; The max number of times we retry for read/write failure
+DISK_SECTOR_SIZE  equ 512d  ; The byte size of a sector of the disk
+DISK_FIRST_HDD_ID equ 80h   ; The device ID of first HDD
 
 ; Error code for disk operations
 DISK_ERR_WRONG_LETTER   equ 1
 DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
 DISK_ERR_INVALID_BUFFER equ 4
-
 
 struc disk_param  ; This defines the structure of the disk parameter table
   .number: resb 1 ; The BIOS assigned number for the device
@@ -35,18 +32,13 @@ endstruc
 DISK_BUFFER_MAX_ENTRY     equ 16d
 
 ; Constants defined for disk sector buffer
-DISK_BUFFER_STATUS_INUSE  equ 01h
+DISK_BUFFER_STATUS_VALID  equ 01h
 DISK_BUFFER_STATUS_DIRTY  equ 02h
-DISK_BUFFER_STATUS_PINNED equ 04h
 
 ; These two are used as arguments for performing disk r/w
 ; via the common interface
 DISK_OP_READ  equ 0201h
 DISK_OP_WRITE equ 0301h
-
-; This is the pointer value for denoting invalid pointer
-; (used for maintaining the queue)
-DISK_BUFFER_PTR_INV equ 0ffffh
 
 ; This is the structure of buffer entry in the disk buffer cache
 struc disk_buffer_entry
