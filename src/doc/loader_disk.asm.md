@@ -49,3 +49,9 @@ on a consecutive range of memory.
 
 Two variables are used to maintain the disk mapping table: ``disk_mapping`` stores the pointer to the lower address of 
 the table (it is updated every time we find an entry). ``disk_mapping_num`` stores the number of entries in the table.
+
+## Disk Parameters
+
+The following parameters are frequently used during normal disk operation: Disk letter, which is used as the unique 
+identifier of the drive. C/H/S (Cylinder/Head/Sector) which describes the geometry of the disk, and is used to 
+convert linear block address (LBA) to the C/H/S address for a given sector. 
