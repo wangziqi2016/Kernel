@@ -6,6 +6,10 @@ _loader_test_start:
 disk_test:
   call disk_chs_test
   call disk_param_test
+  xor ax, ax
+  call disk_op_test
+  mov ax, [endmark_total_sect]
+  dec ax
   call disk_op_test
   retn
 
@@ -50,23 +54,25 @@ disk_chs_test:
   pop si
   retn
 
+; Load LBA stored in AX
 disk_op_test:
   sub sp, 512
+  mov bp, sp          ; Use BP to address the temp var
   push ss
-  push sp
+  push bp
   push word 0
-  push word 0
+  push ax
   push word 'A'
   push DISK_OP_READ
   call disk_op_lba
-  mov bp, sp
-  mov ax, [bp + 510]
+  push ax             ; Returned status code
+  mov ax, [bp + 510]  ; Where the signature should be
   push ax
   push .str
   call video_printf_near
-  add sp, 528
+  add sp, 530         ; It clears stack for two func calls and the temp var
   ret
-.str: db "Signature: %u", 0ah, 00h
+.str: db "Signature: %x (AX %u)", 0ah, 00h
 
 printf_test:
   push dword 675973885
