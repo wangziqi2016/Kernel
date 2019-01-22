@@ -28,5 +28,9 @@ DH stores the maximum addressable disk heads (note that the number of heads shou
 is the maximum addressable sector number (note that sector number starts at 1, and this value equals sector per track). 
 CH and the higher 2 bits of CL together form the maximum addressable track number (note that the number of tracks should be +1
 of this value). The 2 bits in CL are on the higher position of track number. Besides, DL is the number of drives in the 
-current category. We use DL to double check the 
+current category. The value DL is not clear. It seems that DL always contains the drive number, at least on qemu BIOS.
+
+### Enumeration Process
+
+The disk enumeration begins with drive number 0x00. We call INT13H/08H repeatedly
 
