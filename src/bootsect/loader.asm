@@ -55,7 +55,7 @@ section .text
   ;call bsod_fatal
 
   call printf_test
-  ;call disk_test
+  call disk_test
   
 getline_loop:
   push ds
