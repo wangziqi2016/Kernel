@@ -10,7 +10,7 @@ disk_test:
 
 disk_param_test:
   push word 'A'
-  call disk_get_param
+  call disk_getparam
   mov bx, ax
   pop ax
   mov ax, [bx + disk_param.capacity]
@@ -31,7 +31,7 @@ disk_chs_test:
   push word 0
   push word 2879
   push word 'A'
-  call disk_get_chs
+  call disk_getchs
   add sp, 6
   push ax
   movzx ax, dl
