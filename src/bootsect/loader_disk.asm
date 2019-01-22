@@ -22,9 +22,9 @@ struc disk_param  ; This defines the structure of the disk parameter table
   .number: resb 1 ; The BIOS assigned number for the device
   .letter: resb 1 ; The letter we use to represent the device, starting from 'A'; Also used as index
   .type:   resb 1 
-  .head:   resb 1 ; Maximum # of head; Note that the actual number of heads should + 1
-  .sector: resb 1 ; Maximum # of sectors; Note that it is the actual number of sectors
   .unused: resb 1
+  .sector: resw 1 ; Maximum # of sectors; Note that it is the actual number of sectors
+  .head:   resw 1 ; Maximum # of head; Note that the actual number of heads should + 1
   .track:  resw 1 ; Maximum # of tracks; Note that the actual number of tracks should + 1
   .capacity:            resd 1 ; Number of sectors; Derived from previous parameters
   .sector_per_cylinder: resw 1 ; This is used to compute CHS given LBA
@@ -226,10 +226,10 @@ disk_probe:
   mov dl, [bp + .CURRENT_DISK_NUMBER]  ; DL is BIOS drive number, 7th bit set if HDD
   int 13h                              ; It does not preserve any register value
   jc .error_13h                        ; Either disk number non-exist or real error
-  mov al, [bp + .CURRENT_DISK_NUMBER]  ; Note that it is possible that this routine returns success even if the 
-  and al, 7fh                          ;   number is invalid. In this case we compare DL (# of drives returned) with
-  cmp dl, al                           ;   the ID of drives to see if it is the case
-  jle .error_13h
+  ;mov al, [bp + .CURRENT_DISK_NUMBER]  ; Note that it is possible that this routine returns success even if the 
+  ;and al, 7fh                          ;   number is invalid. In this case we compare DL (# of drives returned) with
+  ;cmp dl, al                           ;   the ID of drives to see if it is the case
+  ;jle .error_13h
   push cx                              ; Save CX, DX before function call
   push dx                              
   mov ax, disk_param.size              ; Reserve one slot for the detected drive (AX is allocation size)
@@ -240,13 +240,16 @@ disk_probe:
   mov [disk_mapping], ax               ; Save this everytime since the system segment grows downwards
   xchg ax, bx                          ; AL = drive type; BX = starting offset (INT13H/08H returns drive type in BL)
   mov [bx + disk_param.type], al       ; Save disk type
+  xor dl, dl                           
+  xchg dh, dl                          ; DH is always zero, DL is the head number
   mov [bx + disk_param.head], dh       ; Save number of heads (returned by INT13H/08H)
   mov al, ch                           ; Move CL[7:6]CH[7:0] into AX and save as number of tracks; CL has higher 2 bits
   mov ah, cl
   shr ah, 6
   mov [bx + disk_param.track], ax      ; AH = CL >> 6 and AL = CH
   and cl, 03fh
-  mov [bx + disk_param.sector], cl     ; Save number of sectors as (CL & 0x3F), i.e. mask off high two bits
+  xor ch, ch                           ; Higher 8 bits are 0
+  mov [bx + disk_param.sector], cx     ; Save number of sectors as (CL & 0x3F), i.e. mask off high two bits
   mov ax, [bp + .CURRENT_DISK_NUMBER]  ; Low byte number high byte letter
   mov [bx + disk_param.number], ax     ; Save the above info into the table
   call .print_found                    ; Register will be destroyed in this routine
@@ -263,15 +266,12 @@ disk_probe:
   pop di
   pop es
   retn
-.print_found:   ; Print the drive just found using printf
-  mov ax, [bx + disk_param.sector]
-  push ax
-  mov ax, [bx + disk_param.head]
-  push ax
-  mov ax, [bx + disk_param.track]
-  push ax
-  mov ax, [bp + .CURRENT_DISK_NUMBER]
-  push ax
+.print_found:                           ; Print the drive just found using printf
+  push word [bx + disk_param.sector]
+  push word [bx + disk_param.head]
+  push word [bx + disk_param.track]
+  push word [bp + .CURRENT_DISK_NUMBER] ; High 8 bits will be ignored although we also pushed the letter with this
+  xor ax, ax
   mov al, [bp + .CURRENT_DISK_LETTER]
   push ax
   push disk_init_found_str
