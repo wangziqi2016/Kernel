@@ -6,6 +6,7 @@ _loader_test_start:
 disk_test:
   call disk_chs_test
   call disk_param_test
+  call disk_op_test
   retn
 
 disk_param_test:
@@ -14,10 +15,12 @@ disk_param_test:
   mov bx, ax
   push word [bx + disk_param.capacity + 2]
   push word [bx + disk_param.capacity]
-  call video_putuint32
-  add sp, 4
+  push .str
+  call video_printf_near
+  add sp, 6
 .return:
   retn
+.str: db "Disk A size: %U", 0ah, 00h
 
   ; This function tests disk
 disk_chs_test:
@@ -46,6 +49,24 @@ disk_chs_test:
   jae .repeat_chs
   pop si
   retn
+
+disk_op_test:
+  sub sp, 512
+  push ss
+  push sp
+  push word 0
+  push word 0
+  push word 'A'
+  push DISK_OP_READ
+  call disk_op_lba
+  mov bp, sp
+  mov ax, [bp + 510]
+  push ax
+  push .str
+  call video_printf_near
+  add sp, 528
+  ret
+.str: db "Signature: %u", 0ah, 00h
 
 printf_test:
   push dword 675973885
