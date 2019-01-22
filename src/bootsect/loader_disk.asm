@@ -32,8 +32,8 @@ endstruc
 DISK_BUFFER_MAX_ENTRY     equ 16d
 
 ; Constants defined for disk sector buffer
-DISK_BUFFER_STATUS_VALID  equ 01h
-DISK_BUFFER_STATUS_DIRTY  equ 02h
+DISK_BUFFER_STATUS_VALID  equ 0001h
+DISK_BUFFER_STATUS_DIRTY  equ 0002h
 
 ; These two are used as arguments for performing disk r/w
 ; via the common interface
@@ -291,8 +291,47 @@ disk_getchs:
 ; Checks whether a given LBA of a given letter exists in the buffer
 ;   [BP + 4] - Device letter
 ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
+; Return:
+;   AX points to the entry's begin address if found. CF is clear
+;   If not found, CF is set
 disk_lookup_buffer:
-  
+  push bp
+  mov bp, sp
+  push es
+  push bx
+  mov es, MEM_LARGE_BSS_SEG
+  mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
+  xor ax, ax                    ; AX = current index
+  mov cx, [bp + 4]              ; CX = disk letter
+.body:
+  cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
+  je .return_notfound           ; Set CF and return
+  test [bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
+  jz .continue                  ; Skip if not valid
+  cmp cl, [bx + disk_buffer_entry.letter]
+  jne .continue                 ; Skip if letter does not match
+  mov cx, [bx + disk_buffer_entry.lba]
+  cmp cx, [BP + 6]
+  jne .continue                 ; Skip if lower bytes do not match
+  mov cx, [bx + disk_buffer_entry.lba + 2]
+  cmp cx, [BP + 8]
+  jne .continue                 ; Skip if higher bytes do not match
+  clc                           ; If found, clear CF to indicate success
+  mov ax, bx
+  jmp .return                   ; Return value in AX which is the pointer to the entry
+.continue:
+  inc ax
+  add bx, disk_buffer_entry.size
+  jmp .body
+.return:
+  pop bx
+  pop es
+  mov sp, bp
+  pop bp
+  ret
+.return_notfound:
+  stc
+  jmp .return
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
