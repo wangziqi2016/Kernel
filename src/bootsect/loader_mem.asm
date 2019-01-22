@@ -246,11 +246,11 @@ memshift_tolow:
   pop bp
   retn
 
-  ; This function sets a chunk of memory as a given byte value
-  ;   [SP + 0] - Offset
-  ;   [SP + 2] - Segment
-  ;   [SP + 4] - Value (should be a zero-extended byte)
-  ;   [SP + 6] - Length
+; This function sets a chunk of memory as a given byte value
+;   [BP + 4]  - Offset
+;   [BP + 6]  - Segment
+;   [BP + 8]  - Value (should be a zero-extended byte)
+;   [BP + 10] - Length
 memset:
   push bp
   mov bp, sp

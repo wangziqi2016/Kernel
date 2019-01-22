@@ -63,54 +63,34 @@ disk_init:
   sti
   retn
   
-  ; This function allocates buffer for disk sectors and initialize the buffer
+; This function allocates buffer for disk sectors and initialize the buffer
 disk_buffer_init:
   push es
   push bx
   push si
   mov ax, disk_buffer_entry.size
   mov cx, DISK_BUFFER_MAX_ENTRY
-  mov [disk_buffer_size], cx
-  ; DX:AX is the total number of bytes required for the buffer 
-  mul cx
-  ; If overflows to DX then it is too large
-  test dx, dx
+  mov [disk_buffer_size], cx      ; Store number of entry into the global var
+  mul cx                          ; DX:AX is the total number of bytes required
+  test dx, dx                     ; If overflows to DX then it is too large (> 64KB we cannot afford)
   jnz .buffer_too_large
-  ; Save the size to BX
-  mov bx, ax
-  ; Otherwise AX contains requested size
-  call mem_get_large_bss
-  ; If this fails then we know allocation fails
-  jc .buffer_too_large
-  ; Otherwise AX is the beginning of the buffer
-  mov [disk_buffer], ax
-  ; Print
+  mov bx, ax                      ; Save the size to BX
+  call mem_get_large_bss          ; Otherwise AX contains requested size
+  jc .buffer_too_large            ; If allocation fails report error
+  mov [disk_buffer], ax           ; Otherwise AX is the start address
   push bx
   push ax
   push disk_buffer_size_str
-  call video_printf_near
-  add sp, 6
-  ; Then iterate through the buffer to initialize its status
-  ; Use SI as loop index
-  mov si, [disk_buffer_size]
-  ; Use ES:BX as the buffer cache index
-  mov bx, [disk_buffer]
-  ; Load ES with the large BSS segment
-  mov ax, MEM_LARGE_BSS_SEG
-  mov es, ax
-  ; AX value will be preserved
+  call video_printf_near          ; Print the disk buffer info
+  ;add sp, 6                      ; Moved to below
+  push bx                         ; Length
   xor ax, ax
-.body:
-  test si, si
-  jz .after_init
-  dec si
-  ; Set status word to 0x00 (Valid) - must use ES:BX
-  mov [es:bx + disk_buffer_entry.status], al
-  ; Advance the pointer
-  add bx, disk_buffer_entry.size
-  jmp .body
-.after_init:  
-.return:
+  push ax                         ; Value
+  push word MEM_LARGE_BSS_SEG     ; Segment
+  mov ax, [disk_buffer]
+  push ax                         ; Offset
+  call memset                     ; Sets the buffer space to zero
+  add sp, 14                      ; Clear arg for both functions
   pop si
   pop bx
   pop es
@@ -122,8 +102,8 @@ disk_buffer_init:
   push disk_buffer_too_large_str
   call bsod_fatal
 
-; Enumerates FDDs and HDDs using INT13H. Disk parameters are allocated on the system segment and 
-; stored as disk_mapping
+; Enumerates FDDs and HDDs using INT13H. Disk parameters are allocated on the 
+; system segment and stored as disk_mapping
 disk_probe:
   push es
   push di
