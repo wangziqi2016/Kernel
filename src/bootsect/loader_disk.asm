@@ -24,7 +24,6 @@ struc disk_param    ; This defines the structure of the disk parameter table
   .head:     resw 1 ; # of heads
   .track:    resw 1 ; # of tracks
   .capacity: resd 1 ; Total # of sectors in linear address space; double word
-  .padding:  resb 2 ; Make it 16 bytes
   .size:
 endstruc
 
