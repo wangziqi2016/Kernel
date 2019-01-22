@@ -377,7 +377,8 @@ disk_evict_buffer:
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
   jz .after_evict                             ; If non-dirty just clear the bits and return non-changed
   push es                                     ; Segment of data pointer (since we assume ES to be LARGE BSS)
-  push bx                                     ; Offset (current BX) of data pointer
+  lea ax, [bx + disk_buffer_entry.data]       ; Generate address within the entry
+  push ax                                     ; Offset (current BX) of data pointer
   mov ax, [es:bx + disk_buffer_entry.lba + 2]
   push ax                                     ; High 16 bits of LBA
   mov ax, [es:bx + disk_buffer_entry.lba]
