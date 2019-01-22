@@ -87,3 +87,8 @@ of deciding which entries should be invalidated. The buffer pool is also fully d
 No matter how the FS maintains its sectors (e.g. using clusters), the buffer pool always loads and invalidates entries on
 sector granularity.
 
+The entry point of the buffer pool manager is ``disk_insert_buffer``. This function first attempts to find an existing 
+entry having the LBA and the disk letter. If no existing entry can be found, it uses an empty entry (more specifically, 
+the last empty entry) in the buffer pool to insert the sector. If no empty entry can be found, an existing entry is evicted,
+and its slot is allocated to the new sector.
+
