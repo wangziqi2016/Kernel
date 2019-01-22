@@ -65,3 +65,12 @@ as the digit printing function. In order to compute S, we compute (LBA mod (# se
 we compute ((LBA div (# sectors per track)) mod (# of heads per cylinder)). In order to compute C, we compute 
 ((LBA div (# sectors per track)) div (# of heads per cylinder)). Once C/H/S are computed, we return them in a form
 that matches the input format of disk I/O functions in INT13H.
+
+## Buffer Pool
+
+A system-wide buffer pool avoids frequent I/O operations by caching frequently used sectors in the main memory. The 
+buffer pool is allocated on high memory, i.e. the BSS segment after 1MB boundary, using ``mem_get_large_bss``. Every
+time the buffer pool is accessed, ES will be loaded with the corresponding segment descriptor. The buffer pool is 
+initialized during the disk initialization time. 
+
+The disk buffer pool maintains only minimal information for the most basic functionality. 
