@@ -9,14 +9,11 @@ disk_test:
   retn
 
 disk_param_test:
-  push word 'A'
+  mov al, 'A'
   call disk_getparam
   mov bx, ax
-  pop ax
-  mov ax, [bx + disk_param.capacity]
-  mov dx, [bx + disk_param.capacity + 2]
-  push dx
-  push ax
+  push word [bx + disk_param.capacity + 2]
+  push word [bx + disk_param.capacity]
   call video_putuint32
   add sp, 4
   jmp .return
@@ -28,8 +25,11 @@ disk_param_test:
 
   ; This function tests disk
 disk_chs_test:
+  push si
+  mov si, 2879
+.repeat_chs:
   push word 0
-  push word 2879
+  push si
   push word 'A'
   call disk_getchs
   add sp, 6
@@ -42,10 +42,13 @@ disk_chs_test:
   push ax
   movzx ax, ch
   push ax
-  push ds
   push disk_chs_test_str
-  call video_printf
-  add sp, 14
+  call video_printf_near
+  add sp, 12
+  ;inc si
+  ;cmp si, 2979
+  ;jbe .repeat_chs
+  pop si
   retn
 
 printf_test:
