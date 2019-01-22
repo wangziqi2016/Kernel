@@ -53,5 +53,15 @@ the table (it is updated every time we find an entry). ``disk_mapping_num`` stor
 ## Disk Parameters
 
 The following parameters are frequently used during normal disk operation: Disk letter, which is used as the unique 
-identifier of the drive. C/H/S (Cylinder/Head/Sector) which describes the geometry of the disk, and is used to 
+identifier of the drive; C/H/S (Cylinder/Head/Sector) which describes the geometry of the disk, and is used to 
 convert linear block address (LBA) to the C/H/S address for a given sector. 
+
+High level disk operations take LBA to simplify programming. In order to convert LBA to C/H/S notation, which is required 
+for BIOS routine to perform disk operation, we need a translation layer that accepts an LBA and disk letter, and returns 
+the C/H/S or error if the input is invalid. The translation is performed by function ``disk_getchs``. The function decodes 
+a given LBA in a similar way as a "digit printing" program decomposes an integer into digits. Actually, if we think of 
+the C/H/S notation as a special numbering system where each digit has its own base, then this process is exactly the same
+as the digit printing function. In order to compute S, we compute (LBA mod (# sectors per track)). In order to compute H,
+we compute ((LBA div (# sectors per track)) mod (# of heads per cylinder)). In order to compute C, we compute 
+((LBA div (# sectors per track)) div (# of heads per cylinder)). Once C/H/S are computed, we return them in a form
+that matches the input format of disk I/O functions in INT13H.

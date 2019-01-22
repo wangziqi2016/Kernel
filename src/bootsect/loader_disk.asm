@@ -277,7 +277,7 @@ disk_getchs:
   mov [bp + .curr_sector], dx       ; Save sector in the local var
   xor dx, dx                        ; DX:AX = Next step
   mov cx, [bx + disk_param.head]    ; CX = number of heads per cylinder
-  div cx                            ; DX = Head; AX = track (might overflow)
+  div cx                            ; DX = Head; AX = track
   mov dh, dl                        ; DH = head
   mov dl, [bx + disk_param.number]  ; DL = BIOS number
   mov ch, al                        ; CH = low 8 bits of track
