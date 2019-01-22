@@ -314,10 +314,10 @@ disk_insert_buffer:
   cmp cl, [es:bx + disk_buffer_entry.letter]
   jne .continue                 ; Skip if letter does not match
   mov cx, [es:bx + disk_buffer_entry.lba]
-  cmp cx, [BP + 6]
+  cmp cx, [bp + 6]
   jne .continue                 ; Skip if lower bytes do not match
   mov cx, [es:bx + disk_buffer_entry.lba + 2]
-  cmp cx, [BP + 8]
+  cmp cx, [bp + 8]
   jne .continue                 ; Skip if higher bytes do not match
 .return:
   mov ax, bx
@@ -331,13 +331,22 @@ disk_insert_buffer:
   add bx, disk_buffer_entry.size
   jmp .body
 .found_empty:
-  mov ax, [bp + 4]
-  mov [es:bx + disk_buffer_entry.letter], ax                           ; Copy the letter
-  mov ax, [bp + 6]
-  mov [es:bx + disk_buffer_entry.lba], ax                              ; Copy lower 16 bits of LBA
-  mov ax, [bp + 8]
-  mov [es:bx + disk_buffer_entry.lba + 2], ax                          ; Copy higher 16 bits of LBA
   or word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID ; Make the entry valid by setting the bit
+  push es                                     ; 4th argument - Segment of data pointer
+  push bx                                     ; 4th argument - Offset of data pointer
+  mov ax, [bp + 8]
+  mov [es:bx + disk_buffer_entry.lba + 2], ax ; Copy higher 16 bits of LBA
+  push ax                                     ; 3rd argument - LBA high 16 bits
+  mov ax, [bp + 6]
+  mov [es:bx + disk_buffer_entry.lba], ax     ; Copy lower 16 bits of LBA
+  push ax                                     ; 3rd argument - LBA low 16 bits
+  mov ax, [bp + 4]
+  mov [es:bx + disk_buffer_entry.letter], ax  ; Copy the letter
+  push ax                                     ; 2nd argument - Disk letter
+  push word DISK_OP_READ                      ; 1st argument - Opcode for disk LBA operation
+  call disk_op_lba
+  add sp, 12
+  jc .error_read_fail                         ; If read error just BSOD
   jmp .return
 .evict:
   mov ax, [disk_last_evicted]     ; Use the previous eviction index to compute this one (just +1)
@@ -351,6 +360,10 @@ disk_insert_buffer:
   mov bx, ax                      ; BX = Address of entry to evict
   call disk_evict_buffer          ; This function assumes ES:BX points to the entry to be evicted
   jmp .found_empty                ; Now we have an empty entry on ES:BX
+.error_read_fail:
+  push ds
+  push disk_read_fail_str
+  call bsod_fatal
 
 ; Evicts a disk buffer entry. This function also writes back data if the entry is dirty
 ; The returned buffer pointer in BX has both valid and dirty bits off
@@ -373,7 +386,7 @@ disk_evict_buffer:
   push word DISK_OP_WRITE                     ; Opcode for disk LBA operation
   call disk_op_lba
   add sp, 12
-  jc .error_evict_fail                        ; If error just BSOD
+  jc .error_evict_fail                        ; If evict error just BSOD
 .after_evict:
   xor ax, ax
   mov [es:bx + disk_buffer_entry.status], ax  ; Clear all bits
@@ -478,6 +491,7 @@ disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_evict_fail_str:       db "Evict fail", 0ah, 00h
+disk_read_fail_str:       db "Read fail", 0ah, 00h
 
 disk_mapping:      dw 0 ; Offset in the system BSS segment to the start of the disk param table
 disk_mapping_num:  dw 0 ; Number of elements in the disk mapping table
