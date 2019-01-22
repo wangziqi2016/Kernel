@@ -414,33 +414,27 @@ disk_evict_buffer:
 disk_op_lba:
   push bp
   mov bp, sp
-.RETRY_COUNTER equ -2
+.retry_counter equ -2
   xor ax, ax
-  ; This is temp var retry counter
-  push ax
+  push ax                               ; This is temp var retry counter
   push es
   push bx
 .retry:
-  ; Push the same parameter into the stack
   mov ax, [bp + 10]
-  push ax
+  push ax                               ; LBA high 16 bits
   mov ax, [bp + 8]
-  push ax
+  push ax                               ; LBA low 16 bits
   mov ax, [bp + 6]
-  push ax
-  call disk_getchs
+  push ax                               ; Disk letter
+  call disk_getchs                      ; Returns CHS representation in DX and CX
   add sp, 6
   jc .return_fail_wrong_letter
-  ; Load ES:BX to point to the buffer
-  mov bx, [bp + 14]
-  mov es, bx
-  mov bx, [bp + 12]
-  ; Opcode + number of sectors to read/write
-  mov ax, [bp + 4]
-  ; After this line, AX, DX and CX cannot be changed
-  ; as they contain information for performing disk I/O
-  int 13h
-  jc .retry_or_fail
+  mov ax, [bp + 14]
+  mov es, ax
+  mov bx, [bp + 12]                     ; Load ES:BX to point to the buffer
+  mov ax, [bp + 4]                      ; AX = Opcode + number of sectors to read/write
+  int 13h                               ; Read/Write the LBA on given disk drive
+  jc .retry_or_fail                     ; Either retry or fail
   xor ax, ax
   clc
   jmp .return
@@ -465,23 +459,19 @@ disk_op_lba:
   ; we still can retry. If both are true, then we simply retry. Otherwise
   ; return read failure
 .retry_or_fail:
-  mov ax, [bp + .RETRY_COUNTER]
-  cmp ax, DISK_MAX_RETRY
-  je .return_fail_int13h_error
-  inc word [bp + .RETRY_COUNTER]
-  mov ax, [bp + 6]
+  mov ax, [bp + .retry_counter]      ; AX = Current number of failures
+  cmp ax, DISK_MAX_RETRY             ; Compare to see if we exceeds maximum
+  je .return_fail_int13h_error       ; If positive then report INT13H error
+  inc word [bp + .retry_counter]     ; Increment the failure counter for next use
+  mov ax, [bp + 6]                   ; AX = Disk letter
   call disk_getparam
-  mov bx, ax
   jc .return_fail_wrong_letter
-  ; If the number has 7-th bit set then it is a harddisk
-  ; and we do not retry, just fail directly
-  mov al, [bx + disk_param.number]
-  and al, 80h
-  jnz .return_fail_int13h_error
-  ; Do a reset for floppy
-  mov dl, [bx + disk_param.number]
-  xor ax, ax
-  int 13h
+  mov bx, ax                              ; BX = pointer to the table
+  test byte [bx + disk_param.number], 80h ; If the number has 7-th bit set then it is an HDD
+  jnz .return_fail_int13h_error           ; Do not retry for HDD
+  mov dl, [bx + disk_param.number]        ; Otherwise it is FDD and we can reset the motor
+  xor ax, ax                              
+  int 13h                                 ; INT13H/00H - Reset motor
   jc .return_fail_reset_error
   jmp .retry
 
