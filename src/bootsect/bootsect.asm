@@ -5,73 +5,54 @@
 section .text 
 	org	7c00h
   
-  ; Video buffer
-  VIDEO_SEG equ 0b800h
-  ; 80 * 2 = 160 char + attr per line
-  BUFFER_LEN_PER_LINE equ 00a0h
-  ; We start loading the sector at 0x10000, i.e. the second
-  ; 64 KB segment. The boot sector is in the first 64 KB
-  LOAD_SEG equ 8000h
-  ; Each sector is 512 byte
-  SECTOR_SIZE equ 0200h
+  VIDEO_SEG           equ 0b800h   ; Video buffer
+  BUFFER_LEN_PER_LINE equ 00a0h    ; 80 * 2 = 160 char + attr per line
+  LOAD_SEG            equ 8000h    ; We start loading the sector at 0x10000
+  SECTOR_SIZE         equ 0200h    ; Each sector is 512 byte
+  END_MARK            equ 0abcdh   ; Use this magic number to verify integrity of image loaded
 
 	jmp	start
 
 start:
   ; Clear interrupt before we set up the stack
   cli
-	; AH = 00 - set mode; AL = 03h - 80*25@16
 	mov ax, 0003h
-	int 10h
-
-  ; Set DS=SS; ES undefined
+	int 10h        ; AH = 00 - set mode; AL = 03h - 80*25@16
   xor ax, ax
   mov ds, ax
-	; Set up stack end: 0x0FFF0
-	; Note that this sector is on address 0x07C00 - 0x07DFF
-	mov ss, ax
-	mov sp, 0FFF0h
+	mov ss, ax     ; Set DS=SS; ES undefined
+	mov sp, 0FFF0h ; Set up stack end: 0x0FFF0
   sti
 
   mov si, str1
 	call print_msg
 
 start_load:
-  ; Initialize ES:BX to prepare for loading LOAD_SEG:0000
   push word LOAD_SEG
   pop es
-  xor bx, bx
-  mov cx, [num_sector_to_read]
+  xor bx, bx                   ; ES:BX = LOAD_SEG:0000
+  mov cx, [num_sector_to_read] ; This must equal the exact number of sectors
 read_next_sector:
-  ; This is the number of sectors we read from 
-  ; the 1st sector
-  call read_sector
+  call read_sector ; This is the number of sectors we read from the 1st sector
   call next_sector
-  ; This means we have seen an overflow as we always read 512 bytes
-  cmp bx, 0000h
+  cmp bx, 0000h    ; This means we have seen an overflow of offset within the LOAD_SEG
   jnz test_num_sector
-  ; Clear BX as the offset
-  xor bx, bx
-  ; Add 0x1000 to ES, which means we switch to the next 64KB segment
   mov ax, es
   add ax, 1000h
   mov es, ax
 test_num_sector:
   dec cx
-  jnz read_next_sector
-
-  ; Verify the content after reading
-  push word LOAD_SEG
+  jnz read_next_sector         ; If still not finished, repeat the loop
+  push word LOAD_SEG           ; Verify the content after reading
   pop es
-  ; bx has been changed to the new offset
-  mov ax, [es:SECTOR_SIZE - 2]
+  mov ax, [es:SECTOR_SIZE - 2] ; Check if word [LOAD_SEG + SECTOR_SIZE - 2] equals 0xAA55
   cmp ax, 0aa55h
   jne print_verify_sector_error
-
-  ; Jump to the code we just loaded: LOAD_SEG:SECTOR_SIZE (because the bootsector is also loaded)
+  cmp word [es:bx - 2], END_MARK    ; Check if word [CURRENT ES:BX - 2] equals 0xABCD
+  jne print_verify_loader_error 
   push word LOAD_SEG
 	push word SECTOR_SIZE
-  retf
+  retf                         ; Jump to the code we just loaded: LOAD_SEG:SECTOR_SIZE (because the bootsector is also loaded)
   
   ; This function reads a sector into ES:BX
   ; using the parameter at the end of this file
@@ -202,6 +183,11 @@ print_verify_sector_error:
   call print_msg
   jmp die
 
+print_verify_loader_error:
+  mov si, str5
+  call print_msg
+  jmp die
+
 die:
   jmp die
 
@@ -210,36 +196,23 @@ str1:
 str2:
   db "Error reading sectors", 0
 str3:
-  db "Error verifying sectors", 0
+  db "Error verifying sectors (55AA)", 0
 str4:
   db "Reached the end of disk", 0
+str5:
+  db "Error verifying loader (ABCD)", 0
 
-  ; 18 sectors per track
-sector_per_track:
-  db 12h
-  ; 80 tracks per disk
-track_per_disk:
-  db 50h
-head_per_disk:
-  db 02h
-  ; Maximum is 2879 (2880 - 1)
-num_sector_to_read:
-  dw 20d
+sector_per_track:   db 12h ; 18 sectors per track
+track_per_disk:     db 50h ; 80 tracks per disk
+head_per_disk:      db 02h ; 2 heads per disk
+num_sector_to_read: dw 12d ; This must be exact, otherwise verification would fail
   
-  ; CL + CH = sector + track
-current_sector:
-  db 01h
-current_track:
-  db 00h
-  ; DL + DH = drive ID + disk head
-boot_drive:
-  db 0h
-current_head:
-  db 00h
+current_sector: db 01h  ; CL + CH = sector + track
+current_track:  db 00h  ; Track starts with 0
+boot_drive:     db 0h   ; DL + DH = drive ID + disk head
+current_head:   db 00h
 
-video_offset:
-  dw 0
+video_offset:   dw 0
 
-; This line pads the first sector to 512 bytes
-  times 510-($-$$) DB 0 
-  dw 0AA55H
+times 510-($-$$) DB 0   ; Padding to 512 bytes
+dw 0AA55H               ; Magic number
