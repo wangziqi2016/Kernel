@@ -11,6 +11,7 @@ disk_test:
   mov ax, [endmark_total_sect]
   dec ax
   call disk_op_test
+  call disk_buffer_test
   retn
 
 disk_param_test:
@@ -73,6 +74,26 @@ disk_op_test:
   add sp, 530         ; It clears stack for two func calls and the temp var
   ret
 .str: db "Signature: %x (AX %u)", 0ah, 00h
+
+disk_buffer_test:
+  push si
+  call disk_print_buffer
+  mov si, 1
+.load_1:
+  test si, si
+  jz .finish_load_1
+  push word 0
+  push si
+  push word 'A'
+  call disk_insert_buffer
+  add sp, 6
+  dec si
+  jmp .load_1
+.finish_load_1:
+  call disk_print_buffer
+.return:
+  pop si
+  ret
 
 printf_test:
   push dword 675973885
