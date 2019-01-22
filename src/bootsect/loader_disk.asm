@@ -353,7 +353,7 @@ disk_insert_buffer:
   mov cx, [bp + 4]              ; CX = disk letter
 .body:
   cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
-  je .try_evict                 ; Set CF and return
+  je .evict                     ; If no empty or matching entry is found then evict
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   jz .found_empty               ; This is the easy case - there is a valid entry
   cmp cl, [es:bx + disk_buffer_entry.letter]
@@ -384,11 +384,19 @@ disk_insert_buffer:
   mov ax, [bp + 8]
   mov [es:bx + disk_buffer_entry.lba + 2], ax                          ; Copy higher 16 bits of LBA
   or word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID ; Make the entry valid by setting the bit
-  mov ax, bx                    ; Return the newly inserted entry
+  mov ax, bx                      ; Return the newly inserted entry
   jmp .return
-.try_evict:
-  call disk_evict_buffer        ; This function assumes ES:BX points to the entry to be evicted
-  jmp .found_empty              ; Now we have an empty entry on ES:BX
+.evict:
+  mov ax, [disk_last_evicted]     ; Use the previous eviction index to compute this one (just +1)
+  inc ax
+  div byte [disk_buffer_size]     ; AH = remainder
+  movzx ax, ah                    ; AX = (AX % disk_buffer_size)
+  mov [disk_last_evicted], ax     ; Store it for next eviction
+  mul word disk_buffer_entry.size ; DX:AX = offset into the table; We assume DX == 0 because we enforce this in init
+  add ax, [disk_buffer]           ; Add with base address
+  mov bx, ax                      ; BX = Address of entry to evict
+  call disk_evict_buffer          ; This function assumes ES:BX points to the entry to be evicted
+  jmp .found_empty                ; Now we have an empty entry on ES:BX
 
 ; Evicts a disk buffer entry. This function also writes back data if the entry is dirty
 ; The returned buffer pointer in BX has both valid and dirty bits off
@@ -399,22 +407,22 @@ disk_insert_buffer:
 ;   AX may get destroyed
 disk_evict_buffer:
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
-  jz .after_evict                ; If non-dirty just clear the bits and return non-changed
-  push word MEM_LARGE_BSS_SEG                   ; Segment of data pointer
-  push bx                                       ; Offset (current BX) of data pointer
+  jz .after_evict                             ; If non-dirty just clear the bits and return non-changed
+  push es                                     ; Segment of data pointer (since we assume ES to be LARGE BSS)
+  push bx                                     ; Offset (current BX) of data pointer
   mov ax, [es:bx + disk_buffer_entry.lba + 2]
-  push ax                                       ; High 16 bits of LBA
+  push ax                                     ; High 16 bits of LBA
   mov ax, [es:bx + disk_buffer_entry.lba]
-  push ax                                       ; Low 16 bits of LBA
+  push ax                                     ; Low 16 bits of LBA
   mov ax, [es:bx + disk_buffer_entry.letter]
-  push ax                                       ; Disk letter
-  push word DISK_OP_WRITE                       ; Opcode for disk LBA operation
+  push ax                                     ; Disk letter
+  push word DISK_OP_WRITE                     ; Opcode for disk LBA operation
   call disk_op_lba
   add sp, 12
-  jc .error_evict_fail                          ; If error just BSOD
+  jc .error_evict_fail                        ; If error just BSOD
 .after_evict:
   xor ax, ax
-  mov [es:bx + disk_buffer_entry.status], ax
+  mov [es:bx + disk_buffer_entry.status], ax  ; Clear all bits
   ret
 .error_evict_fail:
   push ds
@@ -517,8 +525,9 @@ disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_evict_fail_str:       db "Evict fail", 0ah, 00h
 
-disk_mapping:     dw 0 ; Offset in the system BSS segment to the start of the disk param table
-disk_mapping_num: dw 0 ; Number of elements in the disk mapping table
-disk_buffer:      dw 0 ; This is the starting offset of the disk buffer
-disk_buffer_size: dw 0 ; Number of entries in the buffer
+disk_mapping:      dw 0 ; Offset in the system BSS segment to the start of the disk param table
+disk_mapping_num:  dw 0 ; Number of elements in the disk mapping table
+disk_buffer:       dw 0 ; This is the starting offset of the disk buffer
+disk_buffer_size:  dw 0 ; Number of entries in the buffer
+disk_last_evicted: dw 0 ; Index of the last evicted buffer entry
 
