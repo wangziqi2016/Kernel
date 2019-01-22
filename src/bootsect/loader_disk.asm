@@ -334,6 +334,63 @@ disk_lookup_buffer:
   stc
   jmp .return
 
+; Inserts an entry into the buffer, may evict an existing entry. If an empty entry is found,
+; the LBA and letter is filled into that entry and then returned
+;   [BP + 4] - Device letter
+;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
+; Return:
+;   AX points to the entry's begin address, and the entry is already filled with LBA and letter. CF is clear
+;   CF is set if entry with the same LBA and letter already exists
+disk_insert_buffer:
+  push bp
+  mov bp, sp
+  push es
+  push bx
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax
+  mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
+  xor ax, ax                    ; AX = current index
+  mov cx, [bp + 4]              ; CX = disk letter
+.body:
+  cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
+  je .try_evict                 ; Set CF and return
+  test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
+  jz .found_empty               ; This is the easy case - there is a valid entry
+  cmp cl, [es:bx + disk_buffer_entry.letter]
+  jne .continue                 ; Skip if letter does not match
+  mov cx, [es:bx + disk_buffer_entry.lba]
+  cmp cx, [BP + 6]
+  jne .continue                 ; Skip if lower bytes do not match
+  mov cx, [es:bx + disk_buffer_entry.lba + 2]
+  cmp cx, [BP + 8]
+  jne .continue                 ; Skip if higher bytes do not match
+  stc                           ; If found, SET CF to indicate ENTRY ALREADY EXISTS
+  mov ax, bx
+  jmp .return                   ; Return value in AX which is the pointer to the entry
+.continue:
+  inc ax
+  add bx, disk_buffer_entry.size
+  jmp .body
+.return:
+  pop bx
+  pop es
+  mov sp, bp
+  pop bp
+  ret
+.found_empty:
+  mov ax, [bp + 4]
+  mov [es:bx + disk_buffer_entry.letter], ax
+  mov ax, [bp + 6]
+  mov [es:bx + disk_buffer_entry.lba], ax
+  mov ax, [bp + 8]
+  mov [es:bx + disk_buffer_entry.lba + 2], ax
+  clc                           ; Clear CF to indicate this is a fresh entry
+  mov ax, bx                    ; 
+  jmp .return
+.try_evict:
+  stc
+  jmp .return
+
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
   ; for three times. If all are not successful we just return fail
