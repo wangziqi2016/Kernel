@@ -438,14 +438,8 @@ disk_buffer_print_format:  db "%u,%y ", 00h
 ; Note that we deliberately do not put new line here
 disk_buffer_print_empty:   db "(Empty)", 00h
 
-; This is an offset in the system segment to the start of the disk param table
-; We allocate the table inside the system static data area to save space
-; in the compiled object
-disk_mapping:     dw 0
-; Number of elements in the disk mapping table
-disk_mapping_num: dw 0
-; This is the starting offset of the disk buffer
-disk_buffer:      dw 0
-; Number of entries in the buffer
-disk_buffer_size: dw 0
+disk_mapping:     dw 0 ; Offset in the system BSS segment to the start of the disk param table
+disk_mapping_num: dw 0 ; Number of elements in the disk mapping table
+disk_buffer:      dw 0 ; This is the starting offset of the disk buffer
+disk_buffer_size: dw 0 ; Number of entries in the buffer
 
