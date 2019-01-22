@@ -36,27 +36,16 @@ DISK_BUFFER_STATUS_DIRTY  equ 02h
 
 ; These two are used as arguments for performing disk r/w
 ; via the common interface
-DISK_OP_READ  equ 0201h
-DISK_OP_WRITE equ 0301h
+DISK_OP_READ              equ 0201h
+DISK_OP_WRITE             equ 0301h
 
 ; This is the structure of buffer entry in the disk buffer cache
 struc disk_buffer_entry
-  ; PINNED DIRTY INUSE
-  .status:  resb 1
-  ; The device ID
-  .unused1: resb 1
-  ; The device letter
-  .letter:  resb 1
-  .unused2: resb 1
-  ; The LBA that this sector is read from
-  .lba:     resd 1
-  ; All valid entries form a linked list
-  ; This is the next pointer for maintaining the queue of active buffer entries
-  .next:    resw 1
-  ; The previous 
-  .prev:    resw 1
-  ; Sector data to be stored
-  .data:    resb DISK_SECTOR_SIZE
+  .status:  resw 1                 ; Dirty/Valid
+  .number:  resb 1                 ; BIOS numbering
+  .letter:  resb 1                 ; The device letter
+  .lba:     resd 1                 ; The LBA that this sector is read from
+  .data:    resb DISK_SECTOR_SIZE  ; Sector data to be stored
   .size:
 endstruc
 
@@ -67,9 +56,7 @@ endstruc
   ; This function probes all disks installed on the system
   ; and then computes disk parameters
 disk_init:
-  ; Must disable all interrupts to avoid having non-consecutive disk 
-  ; param table in the BSS segment
-  cli
+  cli                    ; Disable interrupt because we allocate memory during init
   call disk_probe
   call disk_buffer_init
   sti
@@ -134,7 +121,8 @@ disk_buffer_init:
   push disk_buffer_too_large_str
   call bsod_fatal
 
-  ; This function detects all floppy and hard disks using BIOS routine
+; Enumerates FDDs and HDDs using INT13H. Disk parameters are allocated on the system segment and 
+; stored as disk_mapping
 disk_probe:
   push es
   push di
@@ -142,24 +130,24 @@ disk_probe:
   push bp
   mov bp, sp
   sub sp, 4
-.CURRENT_DISK_LETTER equ -1
-.CURRENT_DISK_NUMBER equ -2
-.CURRENT_STATUS      equ -4
-.STATUS_CHECK_FLOPPY equ 0
+.curr_letter         equ -1            ; Local variables
+.curr_number         equ -2
+.curr_status         equ -4
+.STATUS_CHECK_FLOPPY equ 0             ; Constants for the current disk probing status
 .STATUS_CHECK_HDD    equ 1
   xor ax, ax
-  mov [bp + .CURRENT_STATUS], ax       ; Current status is set to 0
+  mov [bp + .curr_status], ax          ; Current status is set to 0
   mov ah, 'A'
-  mov [bp + .CURRENT_DISK_NUMBER], ax  ; We start from 0x00 (disk num) and 'A' (letter assignment)
+  mov [bp + .curr_number], ax          ; We start from 0x00 (disk num) and 'A' (letter assignment)
 .body:
   xor ax, ax
   mov es, ax
   mov di, ax                           ; ES:DI = 0:0 as required by INT13H
   mov ah, 08h                          ; BIOS INT 13h/AH=08H to detect disk param
-  mov dl, [bp + .CURRENT_DISK_NUMBER]  ; DL is BIOS drive number, 7th bit set if HDD
+  mov dl, [bp + .curr_number]          ; DL is BIOS drive number, 7th bit set if HDD
   int 13h                              ; It does not preserve any register value
   jc .error_13h                        ; Either disk number non-exist or real error
-  mov al, [bp + .CURRENT_DISK_NUMBER]  ; Note that it is possible that this routine returns success even if the 
+  mov al, [bp + .curr_number]          ; Note that it is possible that this routine returns success even if the 
   and al, 7fh                          ;   number is invalid. In this case we compare DL (# of drives returned) with
   cmp dl, al                           ;   the ID of drives to see if it is the case
   jle .error_13h
@@ -189,11 +177,11 @@ disk_probe:
   mul dx                               ; DX:AX = AX * DX (# sector * # track * # head)
   mov [bx + disk_param.capacity], ax
   mov [bx + disk_param.capacity + 2], dx ; Store this as capacity in terms of sectors
-  mov ax, [bp + .CURRENT_DISK_NUMBER]  ; Low byte number high byte letter
+  mov ax, [bp + .curr_number]          ; Low byte number high byte letter
   mov [bx + disk_param.number], ax     ; Save the above info into the table
   call .print_found                    ; Register will be destroyed in this routine
-  inc byte [bp + .CURRENT_DISK_NUMBER] ; Increment the current letter and device number
-  inc byte [bp + .CURRENT_DISK_LETTER]
+  inc byte [bp + .curr_number]         ; Increment the current letter and device number
+  inc byte [bp + .curr_letter]
   inc word [disk_mapping_num]          ; Also increment the number of mappings
   cmp word [disk_mapping_num], DISK_MAX_DEVICE ; Report error if too many drives
   ja .error_too_many_disks
@@ -211,22 +199,22 @@ disk_probe:
   push word [bx + disk_param.sector]
   push word [bx + disk_param.head]
   push word [bx + disk_param.track]
-  push word [bp + .CURRENT_DISK_NUMBER] ; High 8 bits will be ignored although we also pushed the letter with this
+  push word [bp + .curr_number]         ; High 8 bits will be ignored although we also pushed the letter with this
   xor ax, ax
-  mov al, [bp + .CURRENT_DISK_LETTER]
+  mov al, [bp + .curr_letter]
   push ax
   push disk_init_found_str
   call video_printf_near
   add sp, 16
   retn
 .finish_checking_floppy: 
-  mov byte [bp + .CURRENT_DISK_NUMBER], DISK_FIRST_HDD_ID ; Begin enumerating HDDs
-  mov word [bp + .CURRENT_STATUS], .STATUS_CHECK_HDD      ; Also change the status such that on next INT13H fail we return
+  mov byte [bp + .curr_number], DISK_FIRST_HDD_ID    ; Begin enumerating HDDs
+  mov word [bp + .curr_status], .STATUS_CHECK_HDD    ; Also change the status such that on next INT13H fail we return
   jmp .body
-.error_13h:                       ; This can be a real error or just because we finished the current drive type
-  cmp word [bp + .CURRENT_STATUS], .STATUS_CHECK_FLOPPY ; If we are checking floppy and see this then switch to enumerate HDD
+.error_13h:                                          ; This can be a real error or just because we finished the current drive type
+  cmp word [bp + .curr_status], .STATUS_CHECK_FLOPPY ; If we are checking floppy and see this then switch to enumerate HDD
   je .finish_checking_floppy                       
-  jmp .return                                      ; Otherwise return because we finished enumerating all disks
+  jmp .return                                        ; Otherwise return because we finished enumerating all disks
 .error_unrecoverable:
   push ax
   push ds
