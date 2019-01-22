@@ -3,6 +3,7 @@ _loader_disk_start:
 ; loader_disk.asm - This file contains disk driver and I/O routine
 ;
 
+%define DISK_DEBUG
 
 DISK_MAX_DEVICE   equ 8     ; The maximum number of hardware devices we could support
 DISK_MAX_RETRY    equ 3     ; The max number of times we retry for read/write failure
@@ -402,6 +403,7 @@ disk_evict_buffer:
   push disk_evict_fail_str
   call bsod_fatal
 
+%ifdef DISK_DEBUG
 ; This function is for debugging purpose. Prints buffer status, LBA and letter
 disk_print_buffer:
   push es
@@ -436,6 +438,7 @@ disk_print_buffer:
   pop es
   ret
 .str: db "%U %c (%u), ", 00h
+%endif
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
@@ -496,9 +499,6 @@ disk_op_lba:
   mov sp, bp
   pop bp
   retn
-  ; In this block we check whether the device is floppy and whether 
-  ; we still can retry. If both are true, then we simply retry. Otherwise
-  ; return read failure
 .retry_or_fail:
   mov ax, [bp + .retry_counter]      ; AX = Current number of failures
   cmp ax, DISK_MAX_RETRY             ; Compare to see if we exceeds maximum
@@ -528,5 +528,5 @@ disk_mapping:      dw 0 ; Offset in the system BSS segment to the start of the d
 disk_mapping_num:  dw 0 ; Number of elements in the disk mapping table
 disk_buffer:       dw 0 ; This is the starting offset of the disk buffer
 disk_buffer_size:  dw 0 ; Number of entries in the buffer
-disk_last_evicted: dw 0 ; Index of the last evicted buffer entry
+disk_last_evicted: dw DISK_BUFFER_MAX_ENTRY - 1 ; Index of the last evicted buffer entry
 
