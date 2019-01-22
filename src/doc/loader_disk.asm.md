@@ -28,9 +28,24 @@ DH stores the maximum addressable disk heads (note that the number of heads shou
 is the maximum addressable sector number (note that sector number starts at 1, and this value equals sector per track). 
 CH and the higher 2 bits of CL together form the maximum addressable track number (note that the number of tracks should be +1
 of this value). The 2 bits in CL are on the higher position of track number. Besides, DL is the number of drives in the 
-current category. The value DL is not clear. It seems that DL always contains the drive number, at least on qemu BIOS.
+current category. Some BIOSes (e.g. the one on VirtualBox) may return success for non-existent drives on probing. To prevent this, 
+we also check the disk number after AND'ing with 0x7F against the value in DL to further determine whether the return value is valid.
 
-### Enumeration Process
+### Enumeration Process and Disk Mapping Table
 
-The disk enumeration begins with drive number 0x00. We call INT13H/08H repeatedly
+The disk enumeration begins with drive number 0x00, and increment this number for every iteration. We call INT13H/08H 
+for each drive number until the routine reports error, after which we begin with 0x80 and repeat. After the routine
+reports error for the second time, we finish the disk enumeration process, and print out disks found and their parameters
+in CHS (Cylinder/Head/Sector) form.
 
+For each disk found during enumeration, we allocate an entry in the disk mapping table. The disk mapping table is a 
+consecutive range of memory consisting of disk parameter entries. It is allocated from system BSS memory (higher end
+of the system segment), and uses the (total_number_entry - (disk letter - 'A')) as the index into the table.
+Note that the indexing scheme into the disk mapping table is non-intuitive because the table is allocated from
+the system BSS memory, and therefore the first drive is located on the highest address.
+
+During the enumeration process we also turn off interrupts to ensure that all disk mapping entries are allocated
+on a consecutive range of memory.
+
+Two variables are used to maintain the disk mapping table: ``disk_mapping`` stores the pointer to the lower address of 
+the table (it is updated every time we find an entry). ``disk_mapping_num`` stores the number of entries in the table.
