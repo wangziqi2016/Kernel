@@ -345,10 +345,14 @@ disk_insert_buffer:
   mov [es:bx + disk_buffer_entry.letter], ax  ; Copy the letter
   push ax                                     ; 2nd argument - Disk letter
   push word DISK_OP_READ                      ; 1st argument - Opcode for disk LBA operation
+  ;push .str
+  ;call video_printf_near                     ; Uncomment this to enable debug printing
+  ;add sp, 2
   call disk_op_lba
   add sp, 12
   jc .error_read_fail                         ; If read error just BSOD
   jmp .return
+;.str: db "%u %c %U %x %x", 0ah, 00h          ; Uncomment this to enable debug printing
 .evict:
   mov ax, [disk_last_evicted]     ; Use the previous eviction index to compute this one (just +1)
   inc ax
