@@ -22,7 +22,7 @@ disk_param_test:
   ; This function tests disk
 disk_chs_test:
   push si
-  mov si, 2879   ; This is the last valid sector
+  mov si, 2881   ; 2879 is the last valid sector, we will see two invalid returns
 .repeat_chs:
   push word 0
   push si

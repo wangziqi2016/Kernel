@@ -58,8 +58,8 @@ endstruc
   ; and then computes disk parameters
 disk_init:
   cli                    ; Disable interrupt because we allocate memory during init
-  call disk_probe
-  call disk_buffer_init
+  call disk_probe        ; Probes disks and populate the disk parameter table
+  call disk_buffer_init  ; Allocates a disk sector buffer at A20 memory region
   sti
   retn
   
@@ -287,6 +287,12 @@ disk_getchs:
 .error_invalid_lba:
   mov ax, DISK_ERR_INVALID_LBA
   jmp .return
+
+; Checks whether a given LBA of a given letter exists in the buffer
+;   [BP + 4] - Device letter
+;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
+disk_lookup_buffer:
+  
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
