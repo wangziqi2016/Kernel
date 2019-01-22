@@ -283,7 +283,7 @@ disk_getchs:
   mov ch, al                        ; CH = low 8 bits of track
   shl ah, 6
   mov cl, ah                        ; High 2 bits of CL is low 2 bits of AH
-  or cl, [bx + disk_param.sector]   ; Low 6 bits of CL is sector
+  or cl, [bp + .curr_sector]        ; Low 6 bits of CL is sector
 .return:
   pop bx
   mov sp, bp
