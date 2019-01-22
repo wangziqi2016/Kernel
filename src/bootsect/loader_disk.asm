@@ -207,7 +207,7 @@ disk_probe:
   call bsod_fatal
 
 ; This function returns a pointer to the disk param block given a disk letter
-;   AX - The disk letter (low byte)
+;   AX - The disk letter (ignore high 8 bits)
 ; Return: 
 ;   AX = Address of the disk_param entry
 ; CF is set on failure. AX is undefined. The only reason of failure is invalid disk letter
@@ -233,7 +233,7 @@ disk_getparam:
 
 ; This function returns the CHS representation given a linear sector ID
 ; and the drive letter
-;   [BP + 4] - Device letter
+;   [BP + 4] - Device letter (ignore high 8 bits)
 ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
 ; Return:
 ;   DH = head
@@ -342,7 +342,7 @@ disk_insert_buffer:
   mov [es:bx + disk_buffer_entry.lba], ax     ; Copy lower 16 bits of LBA
   push ax                                     ; 3rd argument - LBA low 16 bits
   mov ax, [bp + 4]
-  mov [es:bx + disk_buffer_entry.letter], ax  ; Copy the letter
+  mov [es:bx + disk_buffer_entry.letter], al  ; Copy the letter; Note that we should only copy the low byte
   push ax                                     ; 2nd argument - Disk letter
   push word DISK_OP_READ                      ; 1st argument - Opcode for disk LBA operation
   ;push .str
@@ -409,19 +409,19 @@ disk_print_buffer:
   push si
   mov bx, [disk_buffer]
   push word MEM_LARGE_BSS_SEG
-  pop es
-  xor si, si
+  pop es                                       ; ES:BX = Buffer pointer
+  xor si, si                                   ; SI = index on the buffer table
 .body:
   cmp si, [disk_buffer_size]
   je .return
-  mov dx, [es:bx + disk_buffer_entry.status]
-  push dx
-  mov dx, [es:bx + disk_buffer_entry.letter]
-  push dx
-  mov dx, [es:bx + disk_buffer_entry.lba + 2]
-  push dx
-  mov dx, [es:bx + disk_buffer_entry.lba]
-  push dx
+  mov ax, [es:bx + disk_buffer_entry.status]
+  push ax
+  mov ax, [es:bx + disk_buffer_entry.letter]
+  push ax
+  mov ax, [es:bx + disk_buffer_entry.lba + 2]
+  push ax
+  mov ax, [es:bx + disk_buffer_entry.lba]
+  push ax
   push .str
   call video_printf_near
   add sp, 10
@@ -443,7 +443,7 @@ disk_print_buffer:
   ;   int disk_op_lba(int op, char letter, uint32_t lba, void far *buffer_data);
   ;   [BP + 4] - 8 bit opcode on lower byte (0x02 for read, 0x03 for write); 
   ;              8 bit # of sectors to operate on higher byte (should be 1)
-  ;   [BP + 6] - Disk letter
+  ;   [BP + 6] - Disk letter (ignore high 8 bits)
   ;   [BP + 8][BP + 10] - low and high word of the LBA
   ;   [BP + 12][BP + 14] - Far pointer to the buffer data
   ; Return value:
