@@ -72,7 +72,6 @@ disk_init:
   ; param table in the BSS segment
   cli
   call disk_probe
-  call disk_compute_param
   call disk_buffer_init
   sti
   retn
@@ -134,63 +133,6 @@ disk_buffer_init:
   push ax
   push ds
   push disk_buffer_too_large_str
-  call bsod_fatal
-
-  ; This function computes some frequently used parameters for all disks
-  ; and store them in the corresponding entries of the disk parameter mapping
-disk_compute_param:
-  push bx
-  push si
-  push di
-  mov si, [disk_mapping_num]
-.body:
-  test si, si
-  je .return
-  dec si
-  ; Start from the last
-  xor ax, ax
-  mov al, 'A'
-  add ax, si
-  ; Save a copy of the disk letter in DI also
-  mov di, ax
-  push ax
-  ; Need to check return value - although it should not fail in practice
-  call disk_get_param
-  mov bx, ax
-  pop ax
-  test bx, bx
-  je .invalid_letter
-  ; 1. Compute the capacity of the disk, in # of sectors
-  ;   BX is the base address of the param table
-  ;   DI is the letter we are doing computation for
-  push di
-  call disk_get_size
-  pop cx
-  ; Note that this function sets the CF if it fails
-  jc .invalid_letter
-  ; DX:AX contains the capacity in sectors
-  mov [bx + disk_param.capacity], ax
-  mov [bx + disk_param.capacity + 2], dx
-  ; 2. Compute sector per cylinder which is frequently used during
-  ;    CHS computation, and put it back to sector_per_cylinder
-  mov al, [bx + disk_param.head]
-  mov ah, [bx + disk_param.sector]
-  ; Must use head + 1 as its count
-  inc al
-  mul ah
-  mov [bx + disk_param.sector_per_cylinder], ax
-  jmp .body
-.return:    
-  pop di
-  pop si
-  pop bx
-  retn
-.invalid_letter:
-  ; We know DI saves the copy of disk letter
-  push di
-  push di
-  push ds
-  push disk_invalid_letter_str
   call bsod_fatal
 
   ; This function detects all floppy and hard disks using BIOS routine
