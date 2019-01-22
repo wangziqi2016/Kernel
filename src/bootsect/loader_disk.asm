@@ -13,7 +13,7 @@ DISK_FIRST_HDD_ID equ 80h   ; The device ID of first HDD
 DISK_ERR_WRONG_LETTER   equ 1
 DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
-DISK_ERR_INVALID_BUFFER equ 4
+DISK_ERR_INVALID_LBA    equ 4
 
 struc disk_param    ; This defines the structure of the disk parameter table
   .number:   resb 1 ; The BIOS assigned number for the device
@@ -238,8 +238,6 @@ disk_probe:
   push disk_too_many_disk_str
   call bsod_fatal
 
-;%define disk_get_chs_debug
-
   ; This function returns the CHS representation given a linear sector ID
   ; and the drive letter
   ;   [BP + 4] - Device letter
@@ -251,10 +249,28 @@ disk_probe:
   ;   CL[6:7] = high 2 bits of cylinder
   ;   CL[0:5] = sector
   ; CF is clear when success
-  ; CF is set when error
-disk_get_chs:
-  clc
+  ; CF is set when error, AX contains one of the following:
+  ;   - DISK_ERR_WRONG_LETTER if letter is wrong
+  ;   - DISK_ERR_INVALID_LBA if LBA is too large
+disk_getchs:
+  push bp
+  mov bp, sp
+  mov ax, [bp + 4]
+  push ax
+  call disk_getparam     ; Get disk parameter first
+  pop cx                 ; Clear stack
+  jc .error_wrong_letter
+.error_wrong_letter:
+  mov ax, DISK_ERR_WRONG_LETTER
+  jmp .return
+.error_invalid_lba:
+  mov ax, DISK_ERR_INVALID_LBA
+.return:
+  mov sp, bp
+  pop bp
   ret
+
+
 
   ; This function reads or writes LBA of a given disk
   ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
@@ -288,7 +304,7 @@ disk_op_lba:
   push ax
   mov ax, [bp + 6]
   push ax
-  call disk_get_chs
+  call disk_getchs
   add sp, 6
   jc .return_fail_wrong_letter
   ; Load ES:BX to point to the buffer
@@ -331,7 +347,7 @@ disk_op_lba:
   inc word [bp + .RETRY_COUNTER]
   mov ax, [bp + 6]
   push ax
-  call disk_get_param
+  call disk_getparam
   mov bx, ax
   pop ax
   jc .return_fail_wrong_letter
@@ -352,7 +368,7 @@ disk_op_lba:
   ;   [BP + 4] - The disk letter (low byte)
   ; Returns in AX; Returns NULL if letter is invalid
   ; We also set CF if fail; You can choose one to check
-disk_get_param:
+disk_getparam:
   push bp
   mov bp, sp
   mov al, [bp + 4]
