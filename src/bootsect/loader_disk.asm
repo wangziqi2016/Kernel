@@ -319,7 +319,7 @@ disk_insert_buffer:
   mov cx, [es:bx + disk_buffer_entry.lba + 2]
   cmp cx, [bp + 8]
   jne .continue                 ; Skip if higher bytes do not match
-.return:
+.return:                        ; If found matching entry then fall through and return
   mov ax, bx
   pop bx
   pop es
@@ -333,7 +333,8 @@ disk_insert_buffer:
 .found_empty:
   or word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID ; Make the entry valid by setting the bit
   push es                                     ; 4th argument - Segment of data pointer
-  push bx                                     ; 4th argument - Offset of data pointer
+  lea ax, [bx + disk_buffer_entry.data]       ; Generate the address within the entry
+  push ax                                     ; 4th argument - Offset of data pointer
   mov ax, [bp + 8]
   mov [es:bx + disk_buffer_entry.lba + 2], ax ; Copy higher 16 bits of LBA
   push ax                                     ; 3rd argument - LBA high 16 bits
