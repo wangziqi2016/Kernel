@@ -265,6 +265,7 @@ disk_getchs:
 .body:
   mov cx, [bx + disk_param.sector]  ; CX = number of sectors per track
   div cx                            ; DX = Sector (only DL, no more than 6 bits); AX = Next step;
+  inc dx                            ; Note that sector begins at 1
   mov [bp + .curr_sector], dx       ; Save sector in the local var
   xor dx, dx                        ; DX:AX = Next step
   mov cx, [bx + disk_param.head]    ; CX = number of heads per cylinder
