@@ -226,10 +226,10 @@ disk_probe:
   mov dl, [bp + .CURRENT_DISK_NUMBER]  ; DL is BIOS drive number, 7th bit set if HDD
   int 13h                              ; It does not preserve any register value
   jc .error_13h                        ; Either disk number non-exist or real error
-  ;mov al, [bp + .CURRENT_DISK_NUMBER]  ; Note that it is possible that this routine returns success even if the 
-  ;and al, 7fh                          ;   number is invalid. In this case we compare DL (# of drives returned) with
-  ;cmp dl, al                           ;   the ID of drives to see if it is the case
-  ;jle .error_13h
+  mov al, [bp + .CURRENT_DISK_NUMBER]  ; Note that it is possible that this routine returns success even if the 
+  and al, 7fh                          ;   number is invalid. In this case we compare DL (# of drives returned) with
+  cmp dl, al                           ;   the ID of drives to see if it is the case
+  jle .error_13h
   push cx                              ; Save CX, DX before function call
   push dx                              
   mov ax, disk_param.size              ; Reserve one slot for the detected drive (AX is allocation size)
@@ -242,7 +242,7 @@ disk_probe:
   mov [bx + disk_param.type], al       ; Save disk type
   xor dl, dl                           
   xchg dh, dl                          ; DH is always zero, DL is the head number
-  mov [bx + disk_param.head], dh       ; Save number of heads (returned by INT13H/08H)
+  mov [bx + disk_param.head], dx       ; Save number of heads (returned by INT13H/08H)
   mov al, ch                           ; Move CL[7:6]CH[7:0] into AX and save as number of tracks; CL has higher 2 bits
   mov ah, cl
   shr ah, 6
