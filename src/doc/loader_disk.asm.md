@@ -80,3 +80,9 @@ active, an eviction decision will be made, and one of the entries will be invali
 fashion: It always follows the pattern 0, 1, 2, ..., MAX_ENTRY, 0, 1, ..., etc. If the selected entry is dirty, it will
 be written back to the disk before invalidation.
 
+The buffer pool provides an abstraction of byte-addressable disk image, while being transparent to the upper level functions.
+All disk requests must go through the buffer pool using special interfaces in order to access the disk. We choose not to
+expose the fact that disk sectors are buffered to the application, such that the buffer pool manager has full freedom 
+of deciding which entries should be invalidated. The buffer pool is also fully decoupled from the file system implementation:
+No matter how the FS maintains its sectors (e.g. using clusters), the buffer pool always loads and invalidates entries on
+sector granularity.
