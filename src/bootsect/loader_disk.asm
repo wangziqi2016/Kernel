@@ -20,10 +20,10 @@ struc disk_param    ; This defines the structure of the disk parameter table
   .letter:   resb 1 ; The letter we use to represent the device, starting from 'A'; Also used as index
   .type:     resb 1 
   .unused:   resb 1
-  .sector:   resw 1 ; Maximum # of sectors; Note that it is the actual number of sectors
-  .head:     resw 1 ; Maximum # of head; Note that the actual number of heads should + 1
-  .track:    resw 1 ; Maximum # of tracks; Note that the actual number of tracks should + 1
-  .capacity: resd 1 ; Number of sectors; Derived from previous parameters
+  .sector:   resw 1 ; # of sectors
+  .head:     resw 1 ; # of heads
+  .track:    resw 1 ; # of tracks
+  .capacity: resd 1 ; Total # of sectors in linear address space; double word
   .size:
 endstruc
 
@@ -175,17 +175,17 @@ disk_probe:
   mov [bx + disk_param.type], al       ; Save disk type
   xor dl, dl                           
   xchg dh, dl                          ; DH is always zero, DL is the head number
+  inc dx                               ; DX is the number of heads
   mov [bx + disk_param.head], dx       ; Save number of heads (returned by INT13H/08H)
   mov al, ch                           ; Move CL[7:6]CH[7:0] into AX and save as number of tracks; CL has higher 2 bits
   mov ah, cl
   shr ah, 6
+  inc ax                               ; Store the # of tracks
   mov [bx + disk_param.track], ax      ; AH = CL >> 6 and AL = CH
   and cl, 03fh
   xor ch, ch                           ; Higher 8 bits are 0
   mov [bx + disk_param.sector], cx     ; Save number of sectors as (CL & 0x3F), i.e. mask off high two bits
-  inc al
-  mul cl                               ; AX = CL * AL (sector * track)
-  inc dx                      
+  mul cl                               ; AX = CL * AL (# sector * # track)
   mul dx                               ; DX:AX = AX * DX (# sector * # track * # head)
   mov [bx + disk_param.capacity], ax
   mov [bx + disk_param.capacity + 2], dx ; Store this as capacity in terms of sectors
@@ -244,7 +244,7 @@ disk_probe:
   ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
   ; Return:
   ;   DH = head
-  ;   DL = device number (i.e. the hardward number)
+  ;   DL = device number (i.e. the hardware number)
   ;   CH = low 8 bits of cylinder
   ;   CL[6:7] = high 2 bits of cylinder
   ;   CL[0:5] = sector
@@ -255,20 +255,46 @@ disk_probe:
 disk_getchs:
   push bp
   mov bp, sp
+  push ax                ; One local variable
+.curr_sector equ -2
+  push bx
   mov ax, [bp + 4]
   push ax
   call disk_getparam     ; Get disk parameter first
   pop cx                 ; Clear stack
   jc .error_wrong_letter
+  mov bx, ax             ; BX is the table entry
+  mov dx, [bp + 8]       ; Next compare the input LBA and the maximum LBA
+  mov ax, [bp + 6]       ;   DX:AX = Input LBA
+  cmp dx, [bx + disk_param.capacity + 2]
+  ja .error_invalid_lba  ; If higher word is larger then LBA is too large
+  jne .body              ; Jump to body is higher word is less than capacity
+  cmp ax, [bx + disk_param.capacity] 
+  jae .error_invalid_lba ; Lower word must be capacity - 1 or less
+.body:
+  mov cx, [bx + disk_param.sector]  ; CX = number of sectors per track
+  div cx                            ; DX = Sector (only DL, no more than 6 bits); AX = Next step;
+  mov [bp + .curr_sector], dx       ; Save sector in the local var
+  xor dx, dx                        ; DX:AX = Next step
+  mov cx, [bx + disk_param.head]    ; CX = number of heads per cylinder
+  div cx                            ; DX = Head; AX = track (might overflow)
+  mov dh, dl                        ; DH = head
+  mov dl, [bx + disk_param.number]  ; DL = BIOS number
+  mov ch, al                        ; CH = low 8 bits of track
+  shl ah, 6
+  mov cl, ah                        ; High 2 bits of CL is low 2 bits of AH
+  or cl, [bx + disk_param.sector]   ; Low 6 bits of CL is sector
+.return:
+  pop bx
+  mov sp, bp
+  pop bp
+  ret
 .error_wrong_letter:
   mov ax, DISK_ERR_WRONG_LETTER
   jmp .return
 .error_invalid_lba:
   mov ax, DISK_ERR_INVALID_LBA
-.return:
-  mov sp, bp
-  pop bp
-  ret
+  jmp .return
 
 
 
