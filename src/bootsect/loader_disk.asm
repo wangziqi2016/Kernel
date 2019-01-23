@@ -295,15 +295,25 @@ disk_read_word:
   push bx                               ; [BP - 4]
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax                            ; Load ES as the segment of buffer
-  mov ax, [bp + 8]                      ; Transform
   push ax                               ; [BP - 6]
-  mov ax, [bp + 6]
-  push ax                               ; [BP - 8]
+  mov ax, [bp + 8]                      ; Offset high
+  mov cx, ax
+  shr ax, 9                             ; AX >>= 9 to shift out the lowest 9 bits into lower
+  shl cx, 7                             ; CX = offset_hi << 7, high 9 bits are low 9 bits of lba high
+  push ax                               ; [BP - 8]  lba_hi
+  mov ax, [bp + 6]                      ; Offset low
+  shr ax, 9                             ; AX >>= 9 to shift out the offset bits
+  or ax, cx
+  push ax                               ; [BP - 10] lba_lo
   mov ax, [bp + 4]
-  push ax                               ; [BP - 10]
-.offset_hi equ -6
-.offset_lo equ -8
-.letter    equ -10                      ; Local variables
+  push ax                               ; [BP - 12] letter
+.offset    equ -6
+.lba_hi    equ -8
+.lba_lo    equ -10
+.letter    equ -12                      ; Local variables
+  mov ax, [bp + 6]                      ; Offset low
+  and ax, 01ffh                         ; Extract lowest 9 bits
+  mov [bp + .offset]                    ; Store as offset
 .return:
   pop bx
   pop es
