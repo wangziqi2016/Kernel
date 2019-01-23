@@ -276,11 +276,10 @@ disk_getchs:
   mov sp, bp
   pop bp
   ret
-.error_wrong_letter:
-  mov ax, DISK_ERR_WRONG_LETTER
-  jmp .return
 .error_invalid_lba:
   mov ax, DISK_ERR_INVALID_LBA
+  stc
+.error_wrong_letter:                ; AX is already the error code
   jmp .return
 
 ; Reads a word from disk, given the byte offset. Supports maximum 4GB disk.
@@ -390,6 +389,7 @@ disk_insert_buffer:
   and word [es:bx + disk_buffer_entry.status], \
     ~(DISK_BUFFER_STATUS_VALID | \
       DISK_BUFFER_STATUS_DIRTY)   ; Clear dirty and valid bits if read reports an error
+  stc                             ; Previous operation may reset CF
   jmp .return_err
 
 ; Evicts a disk buffer entry. This function also writes back data if the entry is dirty
@@ -505,7 +505,7 @@ disk_op_lba:
   xor ax, ax
   clc
   jmp .return
-.return_getchs_err:                     ; This is executed if getchs returns error, most likely LBA or letter problem
+.return_getchs_err:                     ; This is executed if getchs returns error, must be invalid LBA or letter
   jmp .return_err
 .return_fail_reset_error:
   mov ax, DISK_ERR_RESET_ERROR
