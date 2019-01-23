@@ -6,12 +6,13 @@ _loader_test_start:
 disk_test:
   call disk_chs_test
   call disk_param_test
-  xor ax, ax
+  xor ax, ax                        ; Pass LBA in AX (low 16 bits)
   call disk_op_test
   mov ax, [endmark_total_sect]
   dec ax
   call disk_op_test
   call disk_buffer_test
+  call dist_rw_test
   retn
 
 disk_param_test:
@@ -103,6 +104,23 @@ disk_buffer_test:
   pop si
   ret
 .str1: db "AX = %u", 0ah, 00h
+
+; Tests whether disk_read_word works
+dist_rw_test:
+  push word 0
+  push word 510
+  push word 'A'
+  call disk_read_word
+  setc cl
+  xor ch, ch
+  add sp, 6
+  push cx
+  push ax
+  push .str1
+  call video_printf_near
+  add sp, 6
+  ret
+.str1: db "AX = %x, CF = %u", 0ah, 00h
 
 printf_test:
   push dword 675973885

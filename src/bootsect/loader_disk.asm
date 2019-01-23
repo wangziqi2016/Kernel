@@ -340,7 +340,7 @@ disk_read_word:
 .return_err:
   stc                                   ; Note that the add sp, 8 below will clear CF
 .return_normal:
-  add sp, 10                            ; Clear stack local variables (resets CF; we clc anyway to stress the point)
+  add sp, 12                            ; Clear stack local variables (resets CF; we clc anyway to stress the point)
   pop bx
   pop es
   mov sp, bp
