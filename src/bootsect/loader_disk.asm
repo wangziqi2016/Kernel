@@ -11,7 +11,7 @@ DISK_SECTOR_SIZE  equ 512d  ; The byte size of a sector of the disk
 DISK_FIRST_HDD_ID equ 80h   ; The device ID of first HDD
 
 ; Error code for disk operations
-DISK_ERR_WRONG_LETTER   equ 1
+DISK_ERR_WRONG_LETTER   equ 1    
 DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
 DISK_ERR_INVALID_LBA    equ 4
@@ -50,12 +50,6 @@ struc disk_buffer_entry
   .size:
 endstruc
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Disk Initialization
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-  ; This function probes all disks installed on the system
-  ; and then computes disk parameters
 disk_init:
   cli                    ; Disable interrupt because we allocate memory during init
   call disk_probe        ; Probes disks and populate the disk parameter table
@@ -63,7 +57,7 @@ disk_init:
   sti
   retn
   
-; This function allocates buffer for disk sectors and initialize the buffer
+; This function allocates buffer pool for disk sectors and initialize the buffer
 disk_buffer_init:
   push es
   push bx
@@ -249,7 +243,7 @@ disk_getparam:
 disk_getchs:
   push bp
   mov bp, sp
-  push ax                ; One local variable
+  push ax                ; Local variable used as current sector (starting from 1, must not be more than 6 bits)
 .curr_sector equ -2
   push bx
   mov ax, [bp + 4]       ; AX = Paremeter to the function
@@ -274,9 +268,9 @@ disk_getchs:
   mov dh, dl                        ; DH = head
   mov dl, [bx + disk_param.number]  ; DL = BIOS number
   mov ch, al                        ; CH = low 8 bits of track
-  shl ah, 6
+  shl ah, 6                         ; Shift lower 2 bits to highest 2 bits (<<= 6)
   mov cl, ah                        ; High 2 bits of CL is low 2 bits of AH
-  or cl, [bp + .curr_sector]        ; Low 6 bits of CL is sector
+  or cl, [bp + .curr_sector]        ; Low 6 bits of CL is OR'ed with sector (we know sector must not be more than 6 bits)
 .return:
   pop bx
   mov sp, bp
@@ -301,14 +295,13 @@ disk_insert_buffer:
   push bp
   mov bp, sp
 .empty_slot equ -2
-  xor ax, ax
+  xor ax, ax                    ; AX is also used as the current index
   push ax                       ; [BP + empty_slot], if 0 then there is no empty slot (0 is not valid offset in this case)
   push es
   push bx
-  mov ax, MEM_LARGE_BSS_SEG
-  mov es, ax
+  push word MEM_LARGE_BSS_SEG
+  pop es
   mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
-  xor ax, ax                    ; AX = current index
 .body:
   cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
   je .try_empty                 ; If no matching entry is found then first try to claim empty then evict
@@ -388,6 +381,7 @@ disk_insert_buffer:
 ; Return:
 ;   BX - The address of the buffer entry
 ;   AX may get destroyed
+;   CF is undefined. BSOD if eviction I/O fails
 disk_evict_buffer:
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_DIRTY
   jz .after_evict                             ; If non-dirty just clear the bits and return non-changed
@@ -405,8 +399,9 @@ disk_evict_buffer:
   add sp, 12
   jc .error_evict_fail                        ; If evict error just BSOD
 .after_evict:
-  xor ax, ax
-  mov [es:bx + disk_buffer_entry.status], ax  ; Clear all bits
+  mov word [es:bx + disk_buffer_entry.status], \
+    ~(DISK_BUFFER_STATUS_VALID | \
+      DISK_BUFFER_STATUS_DIRTY)               ; Clear dirty and valid bits
   ret
 .error_evict_fail:
   push ds
