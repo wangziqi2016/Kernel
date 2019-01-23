@@ -318,12 +318,13 @@ disk_read_word:
 .letter      equ -16
   mov ax, [bp + 6]                      ; Offset low
   and ax, 01ffh                         ; Extract lowest 9 bits
-  mov [bp + .offset]                    ; Store as offset
+  mov [bp + .offset], ax                ; ... and store as offset
   call disk_insert_buffer               ; Arguments have been set up
   jc .return_err                        ; We can directly use jc because stack is not cleared
-  mov ax, [es:bx + disk_buffer_entry.data + \
-           .offset]                     ; Read data into AX
-  cmp [bp + .offset], 01ffh              ; If offset is not 511 then the read does not cross boundary
+  add bx, [bp +.offset]                 
+  mov ax, [es:bx + \
+           disk_buffer_entry.data]      ; Read ES:BX + offset entry.data + logical offset (not .offset variable)
+  cmp word [bp + .offset], 01ffh        ; If offset is not 511 then the read does not cross boundary
   jne .finish
   mov [bp + .buffer_data], ax           ; Save AX to local var (high byte is ignored)
   inc word [bp + .lba_lo]
@@ -331,7 +332,7 @@ disk_read_word:
   call disk_insert_buffer               ; Read second half
   jc .return_err                        ; Same as above
   mov ah, [es:bx + \
-           disk_buffer_entry.data]      ; Read data into AX high byte
+           disk_buffer_entry.data]      ; Read first byte of buffer data into AX high byte
   mov al, [bp + .buffer_data]           ; Read into AX low byte
 .finish:
   clc
