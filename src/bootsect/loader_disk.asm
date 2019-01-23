@@ -369,8 +369,10 @@ disk_insert_buffer:
   ;call video_printf_near                     ; Uncomment this to enable debug printing
   ;add sp, 2
   call disk_op_lba
+  sbb cx, cx                                  ; Save CF bit in CX
   add sp, 12
-  jc .error_read_fail                         ; If read error just return with CF
+  test cx, cx
+  jnz .error_read_fail                        ; If read error just return with CF
   jmp .return
 ;.str: db "%u %c %U %x %x", 0ah, 00h          ; Uncomment this to enable debug printing
 .evict:
@@ -414,8 +416,10 @@ disk_evict_buffer:
   push ax                                     ; Disk letter
   push word DISK_OP_WRITE                     ; Opcode for disk LBA operation
   call disk_op_lba                            ; We assume invalid entries will not be entered into buffer
+  sbb cx, cx
   add sp, 12
-  jc .error_evict_fail                        ; ... and therefore if this fails it must be data corruption or code bug
+  test cx, cx
+  jnz .error_evict_fail                       ; ... and therefore if this fails it must be data corruption or code bug
 .after_evict:
   and word [es:bx + disk_buffer_entry.status], \
     ~(DISK_BUFFER_STATUS_VALID | \
@@ -494,8 +498,10 @@ disk_op_lba:
   mov ax, [bp + 6]
   push ax                               ; Disk letter
   call disk_getchs                      ; Returns CHS representation in DX and CX; This may return err code in AX
+  sbb cx, cx
   add sp, 6
-  jc .return_getchs_err
+  test cx, cx
+  jnz .return_err                       ; Both CF and AX are properly set, directly return
   mov ax, [bp + 14]
   mov es, ax
   mov bx, [bp + 12]                     ; Load ES:BX to point to the buffer
@@ -505,8 +511,6 @@ disk_op_lba:
   xor ax, ax
   clc
   jmp .return
-.return_getchs_err:                     ; This is executed if getchs returns error, must be invalid LBA or letter
-  jmp .return_err
 .return_fail_reset_error:
   mov ax, DISK_ERR_RESET_ERROR
   jmp .return_err
@@ -527,7 +531,7 @@ disk_op_lba:
   inc word [bp + .retry_counter]          ; Increment the failure counter for next use
   mov ax, [bp + 6]                        ; AX = Disk letter
   call disk_getparam
-  jc .return_getchs_err
+  jc .return_err                          ; Both CF and AX are properly set
   mov bx, ax                              ; BX = pointer to the table
   test byte [bx + disk_param.number], 80h ; If the number has 7-th bit set then it is an HDD
   jnz .return_fail_int13h_error           ; Do not retry for HDD
