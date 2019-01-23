@@ -371,7 +371,7 @@ disk_insert_buffer:
   ;add sp, 2
   call disk_op_lba
   add sp, 12
-  jc .error_read_fail                         ; If read error just BSOD
+  jc .error_read_fail                         ; If read error just return with CF
   jmp .return
 ;.str: db "%u %c %U %x %x", 0ah, 00h          ; Uncomment this to enable debug printing
 .evict:
@@ -543,7 +543,6 @@ disk_buffer_too_large_str: db "Disk buffer too large! (%U)", 0ah, 00h
 disk_buffer_size_str:      db "Sector buffer begins at 0x%x; size %u bytes", 0ah, 00h
 disk_too_many_disk_str:    db "Too many disks detected. Max = %u", 0ah, 00h
 disk_evict_fail_str:       db "Evict fail", 0ah, 00h
-disk_read_fail_str:       db "Read fail", 0ah, 00h
 
 disk_mapping:      dw 0 ; Offset in the system BSS segment to the start of the disk param table
 disk_mapping_num:  dw 0 ; Number of elements in the disk mapping table
