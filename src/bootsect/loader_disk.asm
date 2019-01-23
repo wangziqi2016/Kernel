@@ -292,7 +292,7 @@ disk_read_word:
   push bp
   mov bp, sp
   push es                               ; [BP - 2]
-  push bx                               ; [BP - 4]
+  push bx                               ; [BP - 4] - Note: Must clear arguments before restoring these two reg
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax                            ; Load ES as the segment of buffer
   push ax                               ; [BP - 6]
@@ -307,14 +307,22 @@ disk_read_word:
   push ax                               ; [BP - 10] lba_lo
   mov ax, [bp + 4]
   push ax                               ; [BP - 12] letter
-.offset    equ -6
-.lba_hi    equ -8
-.lba_lo    equ -10
-.letter    equ -12                      ; Local variables
+.offset    equ -6                       ; Local variables
+.lba_hi    equ -8                       ;   ... Note that stack layout is exactly the same as the argument list
+.lba_lo    equ -10                      ;   ... that disk_insert_buffer accept
+.letter    equ -12                      
   mov ax, [bp + 6]                      ; Offset low
   and ax, 01ffh                         ; Extract lowest 9 bits
   mov [bp + .offset]                    ; Store as offset
-.return:
+  call disk_insert_buffer               ; Arguments have been set up
+  jc .return_err                        ; We can directly use jc because stack is not cleared
+  
+  clc
+  jmp .return_normal
+.return_err:
+  stc                                   ; Note that the add sp, 8 below will clear CF
+.return_normal:
+  add sp, 8                             ; Clear stack local variables (resets CF; we clc anyway to stress the point)
   pop bx
   pop es
   mov sp, bp
