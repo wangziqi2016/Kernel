@@ -490,6 +490,7 @@ disk_op_lba:
   push ax                               ; This is temp var retry counter
   push es
   push bx
+  push si
 .retry:
   mov ax, [bp + 10]
   push ax                               ; LBA high 16 bits
@@ -498,9 +499,9 @@ disk_op_lba:
   mov ax, [bp + 6]
   push ax                               ; Disk letter
   call disk_getchs                      ; Returns CHS representation in DX and CX; This may return err code in AX
-  sbb cx, cx
+  sbb si, si                            ; Can't use CX b/c it is the register for returning
   add sp, 6
-  test cx, cx
+  test si, si
   jnz .return_err                       ; Both CF and AX are properly set, directly return
   mov ax, [bp + 14]
   mov es, ax
@@ -519,6 +520,7 @@ disk_op_lba:
 .return_err:
   stc
 .return:
+  pop si
   pop bx
   pop es
   mov sp, bp
