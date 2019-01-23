@@ -295,34 +295,42 @@ disk_read_word:
   push bx                               ; [BP - 4] - Note: Must clear arguments before restoring these two reg
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax                            ; Load ES as the segment of buffer
-  push ax                               ; [BP - 6]
+  push ax                               ; [BP - 6] - Buffer data
+  push ax                               ; [BP - 8] - Offset
   mov ax, [bp + 8]                      ; Offset high
   mov cx, ax
   shr ax, 9                             ; AX >>= 9 to shift out the lowest 9 bits into lower
   shl cx, 7                             ; CX = offset_hi << 7, high 9 bits are low 9 bits of lba high
-  push ax                               ; [BP - 8]  lba_hi
+  push ax                               ; [BP - 10]  lba_hi
   mov ax, [bp + 6]                      ; Offset low
   shr ax, 9                             ; AX >>= 9 to shift out the offset bits
   or ax, cx
-  push ax                               ; [BP - 10] lba_lo
+  push ax                               ; [BP - 12] lba_lo
   mov ax, [bp + 4]
-  push ax                               ; [BP - 12] letter
-.offset    equ -6                       ; Local variables
-.lba_hi    equ -8                       ;   ... Note that stack layout is exactly the same as the argument list
-.lba_lo    equ -10                      ;   ... that disk_insert_buffer accept
-.letter    equ -12                      
+  push ax                               ; [BP - 14] letter
+.buffer_data equ -6
+.offset      equ -8                     ; Local variables
+.lba_hi      equ -10                    ;   ... Note that stack layout is exactly the same as the argument list
+.lba_lo      equ -12                    ;   ... that disk_insert_buffer accept
+.letter      equ -14                      
   mov ax, [bp + 6]                      ; Offset low
   and ax, 01ffh                         ; Extract lowest 9 bits
   mov [bp + .offset]                    ; Store as offset
   call disk_insert_buffer               ; Arguments have been set up
   jc .return_err                        ; We can directly use jc because stack is not cleared
-  
+  mov ax, [es:bx + disk_buffer_entry + data + offset] ; Read data into AX
+  cmp [bp + offset], 01ffh              ; If offset is not 511 then the read does not cross boundary
+  jne .finish
+  mov [bp + .buffer_data], ax           ; Save AX to local var
+  inc [bp + .lba_lo]
+  adc [bp + .lba_hi], 0                 ; Increment the 32 bit LBA by 1 using INC + ADC
+.finish:
   clc
   jmp .return_normal
 .return_err:
   stc                                   ; Note that the add sp, 8 below will clear CF
 .return_normal:
-  add sp, 8                             ; Clear stack local variables (resets CF; we clc anyway to stress the point)
+  add sp, 10                            ; Clear stack local variables (resets CF; we clc anyway to stress the point)
   pop bx
   pop es
   mov sp, bp
