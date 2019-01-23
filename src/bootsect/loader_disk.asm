@@ -287,11 +287,29 @@ disk_getchs:
 ;   [BP + 6][BP + 8] - Byte offset of the word, can be unaligned
 ; Return:
 ;   AX stores the 16 bit word
-;   CF is set if error occurs. AX has one of the following error code:
-;     - DISK_ERR_WRONG_LETTER if the disk does not exist
-;     - DISK_ERR_INVALID_LBA if LBA is too large
+;   On error, CF and AX are set based on the same condition as disk_insert_buffer
 disk_read_word:
-  
+  push bp
+  mov bp, sp
+  push es                               ; [BP - 2]
+  push bx                               ; [BP - 4]
+  mov ax, MEM_LARGE_BSS_SEG
+  mov es, ax                            ; Load ES as the segment of buffer
+  mov ax, [bp + 8]                      ; Transform
+  push ax                               ; [BP - 6]
+  mov ax, [bp + 6]
+  push ax                               ; [BP - 8]
+  mov ax, [bp + 4]
+  push ax                               ; [BP - 10]
+.offset_hi equ -6
+.offset_lo equ -8
+.letter    equ -10                      ; Local variables
+.return:
+  pop bx
+  pop es
+  mov sp, bp
+  pop bp
+  ret
 
 ; Inserts an entry into the buffer, may evict an existing entry. If an empty entry is found,
 ; the LBA and letter is filled into that entry and data is loaded from disk. On eviction,
@@ -299,13 +317,10 @@ disk_read_word:
 ;   [BP + 4] - Device letter
 ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
 ; Return:
-;   AX points to the entry's begin address, and the entry is already filled with LBA and letter
-;   CF set if error occurs. AX contains the error code that can be one of the following:
-;     - DISK_ERR_WRONG_LETTER if the disk does not exist
-;     - DISK_ERR_INVALID_LBA if LBA is too large
-;     - DISK_ERR_INT13H_FAIL if INT13H fails that is not the above reason
-;     - DISK_ERR_RESET_ERROR if disk motor reset fails
-;   On error the buffer is not affected and no invalid entry will be entered
+;   AX points to the entry's begin address, and the entry is already filled with LBA and letter and is valid.
+;     Dirty bit may or may not be set
+;   On error, CF and AX are set based on the same condition as disk_op_lba
+;   On error, the buffer is not affected and no invalid entry will be entered
 disk_insert_buffer:
   push bp
   mov bp, sp
