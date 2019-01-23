@@ -296,24 +296,26 @@ disk_read_word:
   push bx                               ; [BP - 4] - Note: Must clear arguments before restoring these two reg
   mov ax, MEM_LARGE_BSS_SEG
   mov es, ax                            ; Load ES as the segment of buffer
-  push ax                               ; [BP - 6] - Buffer data
-  push ax                               ; [BP - 8] - Offset
+  push ax                               ; [BP - 6] - Unused for now
+  push ax                               ; [BP - 8] - Buffer data
+  push ax                               ; [BP - 10] - Offset
   mov ax, [bp + 8]                      ; Offset high
   mov cx, ax
   shr ax, 9                             ; AX >>= 9 to shift out the lowest 9 bits into lower
   shl cx, 7                             ; CX = offset_hi << 7, high 9 bits are low 9 bits of lba high
-  push ax                               ; [BP - 10]  lba_hi
+  push ax                               ; [BP - 12]  lba_hi
   mov ax, [bp + 6]                      ; Offset low
   shr ax, 9                             ; AX >>= 9 to shift out the offset bits
   or ax, cx
-  push ax                               ; [BP - 12] lba_lo
+  push ax                               ; [BP - 14] lba_lo
   mov ax, [bp + 4]
-  push ax                               ; [BP - 14] letter
-.buffer_data equ -6
-.offset      equ -8                     ; Local variables
-.lba_hi      equ -10                    ;   ... Note that stack layout is exactly the same as the argument list
-.lba_lo      equ -12                    ;   ... that disk_insert_buffer accept
-.letter      equ -14                      
+  push ax                               ; [BP - 16] letter
+.unused      equ -6                     ; Local variables
+.buffer_data equ -8
+.offset      equ -10
+.lba_hi      equ -12                    ; Note that stack layout below is exactly the same as the argument list
+.lba_lo      equ -14                    ; ... that disk_insert_buffer accept
+.letter      equ -16
   mov ax, [bp + 6]                      ; Offset low
   and ax, 01ffh                         ; Extract lowest 9 bits
   mov [bp + .offset]                    ; Store as offset
@@ -323,14 +325,15 @@ disk_read_word:
            data + offset]               ; Read data into AX
   cmp [bp + offset], 01ffh              ; If offset is not 511 then the read does not cross boundary
   jne .finish
-  and ax, 00ffh                         ; Invalidate high 
-  mov [bp + .buffer_data], ax           ; Save AX to local var
+  mov [bp + .buffer_data], ax           ; Save AX to local var (high byte is ignored)
   inc [bp + .lba_lo]
   adc [bp + .lba_hi], 0                 ; Increment the 32 bit LBA by 1 using INC + ADC
   call disk_insert_buffer               ; Read second half
   jc .return_err                        ; Same as above
   mov ax, [es:bx + disk_buffer_entry + \
            data + offset]               ; Read data into AX
+  mov ah, al                            
+  mov al, [bp + .buffer_data]           ; Move low byte to high and load low byte from memory
 .finish:
   clc
   jmp .return_normal
