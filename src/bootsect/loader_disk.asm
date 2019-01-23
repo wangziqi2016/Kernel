@@ -283,6 +283,17 @@ disk_getchs:
   mov ax, DISK_ERR_INVALID_LBA
   jmp .return
 
+; Reads a word from disk, given the byte offset. Supports maximum 4GB disk.
+;   [BP + 4] - Device letter
+;   [BP + 6][BP + 8] - Byte offset of the word, can be unaligned
+; Return:
+;   AX stores the 16 bit word
+;   CF is set if error occurs. AX has one of the following error code:
+;     - DISK_ERR_WRONG_LETTER if the disk does not exist
+;     - DISK_ERR_INVALID_LBA if LBA is too large
+disk_read_word:
+  
+
 ; Inserts an entry into the buffer, may evict an existing entry. If an empty entry is found,
 ; the LBA and letter is filled into that entry and data is loaded from disk. On eviction,
 ; if the buffer entry is dirty then the sector is written back
@@ -290,7 +301,12 @@ disk_getchs:
 ;   [BP + 6][BP + 8] - Linear sector ID (LBA) in small endian
 ; Return:
 ;   AX points to the entry's begin address, and the entry is already filled with LBA and letter
-;   CF is not defined
+;   CF set if error occurs. AX contains the error code that can be one of the following:
+;     - DISK_ERR_WRONG_LETTER if the disk does not exist
+;     - DISK_ERR_INVALID_LBA if LBA is too large
+;     - DISK_ERR_INT13H_FAIL if INT13H fails that is not the above reason
+;     - DISK_ERR_RESET_ERROR if disk motor reset fails
+;   On error the buffer is not affected and no invalid entry will be entered
 disk_insert_buffer:
   push bp
   mov bp, sp
@@ -321,6 +337,7 @@ disk_insert_buffer:
   jne .continue                 ; Skip if higher bytes do not match
 .return:                        ; If found matching entry then fall through and return
   mov ax, bx
+.return_err:                    ; Do not change AX (which is the err code) on error
   pop bx
   pop es
   mov sp, bp
@@ -370,16 +387,17 @@ disk_insert_buffer:
   call disk_evict_buffer          ; This function assumes ES:BX points to the entry to be evicted
   jmp .found_empty                ; Now we have an empty entry on ES:BX
 .error_read_fail:
-  push ds
-  push disk_read_fail_str
-  call bsod_fatal
+  and word [es:bx + disk_buffer_entry.status], \
+    ~(DISK_BUFFER_STATUS_VALID | \
+      DISK_BUFFER_STATUS_DIRTY)   ; Clear dirty and valid bits if read reports an error
+  jmp .return_err
 
 ; Evicts a disk buffer entry. This function also writes back data if the entry is dirty
 ; The returned buffer pointer in BX has both valid and dirty bits off
 ;   BX - The address of the buffer entry
 ;   ES - The large BSS segment
 ; Return:
-;   BX - The address of the buffer entry
+;   ES:BX - The address of the buffer entry (unchanged)
 ;   AX may get destroyed
 ;   CF is undefined. BSOD if eviction I/O fails
 disk_evict_buffer:
@@ -395,11 +413,11 @@ disk_evict_buffer:
   mov ax, [es:bx + disk_buffer_entry.letter]
   push ax                                     ; Disk letter
   push word DISK_OP_WRITE                     ; Opcode for disk LBA operation
-  call disk_op_lba
+  call disk_op_lba                            ; We assume invalid entries will not be entered into buffer
   add sp, 12
-  jc .error_evict_fail                        ; If evict error just BSOD
+  jc .error_evict_fail                        ; ... and therefore if this fails it must be data corruption or code bug
 .after_evict:
-  mov word [es:bx + disk_buffer_entry.status], \
+  and word [es:bx + disk_buffer_entry.status], \
     ~(DISK_BUFFER_STATUS_VALID | \
       DISK_BUFFER_STATUS_DIRTY)               ; Clear dirty and valid bits
   ret
@@ -445,21 +463,21 @@ disk_print_buffer:
 .str: db "%U %c (%u), ", 00h
 %endif
 
-  ; This function reads or writes LBA of a given disk
-  ; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
-  ; for three times. If all are not successful we just return fail
-  ;   int disk_op_lba(int op, char letter, uint32_t lba, void far *buffer_data);
-  ;   [BP + 4] - 8 bit opcode on lower byte (0x02 for read, 0x03 for write); 
-  ;              8 bit # of sectors to operate on higher byte (should be 1)
-  ;   [BP + 6] - Disk letter (ignore high 8 bits)
-  ;   [BP + 8][BP + 10] - low and high word of the LBA
-  ;   [BP + 12][BP + 14] - Far pointer to the buffer data
-  ; Return value:
-  ;   CF cleared if success
-  ;   CF set if error
-  ; AX = 0 if success
-  ; AX = DISK_ERR_WRONG_LETTER   if the letter is wrong
-  ; AX = DISK_ERR_INT13H_FAIL    if INT 13h fails after 0 or more retries
+; This function reads or writes LBA of a given disk
+; Note that we use 32 bit LBA. For floppy disks, if INT13H fails, we retry
+; for three times. If all are not successful we just return fail
+;   int disk_op_lba(int op, char letter, uint32_t lba, void far *buffer_data);
+;   [BP + 4] - 8 bit opcode on lower byte (0x02 for read, 0x03 for write); 
+;              8 bit # of sectors to operate on higher byte (should be 1)
+;   [BP + 6] - Disk letter (ignore high 8 bits)
+;   [BP + 8][BP + 10] - low and high word of the LBA
+;   [BP + 12][BP + 14] - Far pointer to the buffer data
+; Return value:
+;   CF set if error occurs. AX contains the error code that can be one of the following:
+;     - DISK_ERR_WRONG_LETTER if the disk does not exist
+;     - DISK_ERR_INVALID_LBA if LBA is too large
+;     - DISK_ERR_INT13H_FAIL if INT13H fails that is not the above reason
+;     - DISK_ERR_RESET_ERROR if disk motor reset fails
 disk_op_lba:
   push bp
   mov bp, sp
@@ -475,9 +493,9 @@ disk_op_lba:
   push ax                               ; LBA low 16 bits
   mov ax, [bp + 6]
   push ax                               ; Disk letter
-  call disk_getchs                      ; Returns CHS representation in DX and CX
+  call disk_getchs                      ; Returns CHS representation in DX and CX; This may return err code in AX
   add sp, 6
-  jc .return_fail_wrong_letter
+  jc .return_getchs_err
   mov ax, [bp + 14]
   mov es, ax
   mov bx, [bp + 12]                     ; Load ES:BX to point to the buffer
@@ -487,9 +505,7 @@ disk_op_lba:
   xor ax, ax
   clc
   jmp .return
-.return_fail_wrong_letter:
-  stc
-  mov ax, DISK_ERR_WRONG_LETTER
+.return_getchs_err:                     ; This is executed if getchs returns error, most likely LBA or letter problem
   jmp .return
 .return_fail_reset_error:
   stc
@@ -498,6 +514,8 @@ disk_op_lba:
 .return_fail_int13h_error:
   stc
   mov ax, DISK_ERR_INT13H_FAIL
+.return_err:
+
 .return:
   pop bx
   pop es
