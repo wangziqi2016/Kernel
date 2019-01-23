@@ -321,19 +321,18 @@ disk_read_word:
   mov [bp + .offset]                    ; Store as offset
   call disk_insert_buffer               ; Arguments have been set up
   jc .return_err                        ; We can directly use jc because stack is not cleared
-  mov ax, [es:bx + disk_buffer_entry + \
-           data + offset]               ; Read data into AX
-  cmp [bp + offset], 01ffh              ; If offset is not 511 then the read does not cross boundary
+  mov ax, [es:bx + disk_buffer_entry.data + \
+           .offset]                     ; Read data into AX
+  cmp [bp + .offset], 01ffh              ; If offset is not 511 then the read does not cross boundary
   jne .finish
   mov [bp + .buffer_data], ax           ; Save AX to local var (high byte is ignored)
-  inc [bp + .lba_lo]
-  adc [bp + .lba_hi], 0                 ; Increment the 32 bit LBA by 1 using INC + ADC
+  inc word [bp + .lba_lo]
+  adc word [bp + .lba_hi], 0            ; Increment the 32 bit LBA by 1 using INC + ADC
   call disk_insert_buffer               ; Read second half
   jc .return_err                        ; Same as above
-  mov ax, [es:bx + disk_buffer_entry + \
-           data + offset]               ; Read data into AX
-  mov ah, al                            
-  mov al, [bp + .buffer_data]           ; Move low byte to high and load low byte from memory
+  mov ah, [es:bx + \
+           disk_buffer_entry.data]      ; Read data into AX high byte
+  mov al, [bp + .buffer_data]           ; Read into AX low byte
 .finish:
   clc
   jmp .return_normal
