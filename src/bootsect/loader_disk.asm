@@ -205,7 +205,7 @@ disk_probe:
 ;   AX - The disk letter (ignore high 8 bits)
 ; Return: 
 ;   AX = Address of the disk_param entry
-; CF is set on failure. AX is undefined. The only reason of failure is invalid disk letter
+; CF is set on failure. AX is set to DISK_ERR_WRONG_LETTER
 disk_getparam:
   mov ah, al
   cmp ah, 'A'
@@ -220,11 +220,11 @@ disk_getparam:
   mul ah                     ; Get the byte offset of the entry
   add ax, [disk_mapping]     ; Add with the base address
   clc
-.return:  
   retn
 .return_invalid:
   stc
-  jmp .return
+  mov ax, DISK_ERR_WRONG_LETTER
+  retn
 
 ; This function returns the CHS representation given a linear sector ID
 ; and the drive letter
@@ -506,16 +506,14 @@ disk_op_lba:
   clc
   jmp .return
 .return_getchs_err:                     ; This is executed if getchs returns error, most likely LBA or letter problem
-  jmp .return
+  jmp .return_err
 .return_fail_reset_error:
-  stc
   mov ax, DISK_ERR_RESET_ERROR
-  jmp .return
+  jmp .return_err
 .return_fail_int13h_error:
-  stc
   mov ax, DISK_ERR_INT13H_FAIL
 .return_err:
-
+  stc
 .return:
   pop bx
   pop es
@@ -523,13 +521,13 @@ disk_op_lba:
   pop bp
   retn
 .retry_or_fail:
-  mov ax, [bp + .retry_counter]      ; AX = Current number of failures
-  cmp ax, DISK_MAX_RETRY             ; Compare to see if we exceeds maximum
-  je .return_fail_int13h_error       ; If positive then report INT13H error
-  inc word [bp + .retry_counter]     ; Increment the failure counter for next use
-  mov ax, [bp + 6]                   ; AX = Disk letter
+  mov ax, [bp + .retry_counter]           ; AX = Current number of failures
+  cmp ax, DISK_MAX_RETRY                  ; Compare to see if we exceeds maximum
+  je .return_fail_int13h_error            ; If positive then report INT13H error
+  inc word [bp + .retry_counter]          ; Increment the failure counter for next use
+  mov ax, [bp + 6]                        ; AX = Disk letter
   call disk_getparam
-  jc .return_fail_wrong_letter
+  jc .return_getchs_err
   mov bx, ax                              ; BX = pointer to the table
   test byte [bx + disk_param.number], 80h ; If the number has 7-th bit set then it is an HDD
   jnz .return_fail_int13h_error           ; Do not retry for HDD
