@@ -90,10 +90,19 @@ disk_buffer_test:
   dec si
   jmp .load_1
 .finish_load_1:
+  push word 1234h
+  push word 5678h
+  push word 'B'
+  call disk_insert_buffer ; Tests invalid LBA on disk 'A'
   call disk_print_buffer
+  push ax
+  push .str1
+  call video_printf_near
+  add sp, 10
 .return:
   pop si
   ret
+.str1: db "AX = %u", 0ah, 00h
 
 printf_test:
   push dword 675973885
