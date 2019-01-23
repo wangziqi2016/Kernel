@@ -47,6 +47,7 @@ struc disk_buffer_entry
   .letter:  resb 1                 ; The device letter
   .lba:     resd 1                 ; The LBA that this sector is read from
   .data:    resb DISK_SECTOR_SIZE  ; Sector data to be stored
+  .padding: resw 1                 ; Avoid invalid read when reading the last byte
   .size:
 endstruc
 
@@ -318,12 +319,18 @@ disk_read_word:
   mov [bp + .offset]                    ; Store as offset
   call disk_insert_buffer               ; Arguments have been set up
   jc .return_err                        ; We can directly use jc because stack is not cleared
-  mov ax, [es:bx + disk_buffer_entry + data + offset] ; Read data into AX
+  mov ax, [es:bx + disk_buffer_entry + \
+           data + offset]               ; Read data into AX
   cmp [bp + offset], 01ffh              ; If offset is not 511 then the read does not cross boundary
   jne .finish
+  and ax, 00ffh                         ; Invalidate high 
   mov [bp + .buffer_data], ax           ; Save AX to local var
   inc [bp + .lba_lo]
   adc [bp + .lba_hi], 0                 ; Increment the 32 bit LBA by 1 using INC + ADC
+  call disk_insert_buffer               ; Read second half
+  jc .return_err                        ; Same as above
+  mov ax, [es:bx + disk_buffer_entry + \
+           data + offset]               ; Read data into AX
 .finish:
   clc
   jmp .return_normal
