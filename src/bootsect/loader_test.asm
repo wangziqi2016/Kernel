@@ -92,10 +92,10 @@ disk_buffer_test:
 .finish_load_1:
   push word 1234h
   push word 5678h
-  push word 'B'
+  push word 'A'           ; Change this for wrong letter
   call disk_insert_buffer ; Tests invalid LBA on disk 'A'
+  push ax                 ; AX will be destroyed below, so push it here
   call disk_print_buffer
-  push ax
   push .str1
   call video_printf_near
   add sp, 10
