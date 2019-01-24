@@ -29,7 +29,8 @@ struc disk_param    ; This defines the structure of the disk parameter table
 endstruc
 
 ; 16 sectors are cached in memory
-DISK_BUFFER_MAX_ENTRY     equ 16d
+DISK_BUFFER_MAX_ENTRY     equ 10h        ; 16 entries
+DISK_BUFFER_SIZE_MASK     equ 000fh      ; Mask is 0x000F to extract the index bit
 
 ; Constants defined for disk sector buffer
 DISK_BUFFER_STATUS_VALID  equ 0001h
@@ -389,17 +390,14 @@ disk_insert_buffer:
   mov bp, sp
 .empty_slot equ -2
   xor ax, ax
-  push ax                       ; [BP + empty_slot], if 0 then there is no empty slot (0 is not valid offset in this case)
+  push ax                       ; [BP + .empty_slot], if 0 then there is no empty slot (0 is not valid offset in this case)
   push es
   push bx
   push si                       ; SI counts the number of entries, break loop if this equals buffer size
-  mov ax, [bp + 6]
-  mov cl, [disk_buffer_size]
-  div cl                        ; Compute hash; AH = index in the table
-  movzx ax, ah                  ; AX = AH zero extension
-  mov cx, disk_buffer_entry.size; Note that this is greater than 256, must use CX
-  xchg ax, cx                   ; CX = Table index, AX = entry size
-  mul cx                        ; DX:AX = Offset; Ignore DX because we know it must < 64KB
+  mov cx, [bp + 6]
+  and cx, DISK_BUFFER_SIZE_MASK ; CX = Table index
+  mov ax, disk_buffer_entry.size; Note that this is greater than 256
+  mul cx                        ; DX:AX = Offset; Ignore DX because we know it must be < 64KB
   mov bx, ax
   add bx, [disk_buffer]         ; BX = table base + entry offset
   mov ax, cx                    ; AX = Table index
@@ -407,6 +405,7 @@ disk_insert_buffer:
   push word MEM_LARGE_BSS_SEG
   pop es
   ;mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
+  ;xor ax, ax
 .body:
   cmp si, [disk_buffer_size]    ; Check whether we finished all entries
   je .try_empty                 ; If no matching entry is found then first try to claim empty then evict
@@ -437,7 +436,7 @@ disk_insert_buffer:
   inc si                          ; Update number of entries
   inc ax                          ; Update current index
   add bx, disk_buffer_entry.size  ; Update current entry pointer
-  cmp ax, [disk_buffer_entry]
+  cmp ax, [disk_buffer_size]
   jne .body                       ; If AX has not reached the very end no wrap back
   xor ax, ax
   mov bx, [disk_buffer]           ; Wrap back - Set AX and BX
