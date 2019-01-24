@@ -25,9 +25,11 @@ fat12_init:
   push bx                                   ; [BP - 2] - Reg saving
   push si                                   ; [BP - 4] - Reg saving
   push di                                   ; [BP - 6] - Reg saving
-  mov bx, [disk_mapping]
-  mov si, [disk_mapping_size]
+  xor si, si                                ; SI = index of the current entry
 .body:
+  mov ax, si
+  mul disk_param.size                       ; DX:AX = offset within the table (ignore DX)
+  mov bx, ax                                ; BX = base address of disk param entry
 .addr_hi           equ -8                   ; Local variables
 .addr_lo           equ -10
 .letter            equ -12
@@ -42,10 +44,10 @@ fat12_init:
   cmp ax, 29h
   je .found
 .continue:
-  add bx, disk_param.size
-  dec si
-  test si, si
-  jnz .body
+  ;add bx, disk_param.size
+  inc si
+  cmp si, [disk_mapping_size]
+  jne .body
 .return:
   pop di
   pop si
@@ -58,17 +60,18 @@ fat12_init:
   call mem_get_sys_bss                      ; Allocate a perameter entry for FAT 12
   jc .err                                   ; Usually means sys static mem runs out
   mov [bx + disk_param.fsptr], ax           ; Save it in the fsptr field of disk param
-  mov bx, ax                                ; BX = Ptr to the FAT12 param
+  xchg ax, bx                               ; BX = Ptr to the FAT12 param; AX = new pointer
+  mov [bx + fat12_param.disk_param], ax     ; Store the back pointer
   xor ax, ax
   mov [bp + .addr_lo], ax                   ; Clear high bits of the address (we only use low 256 bytes for sure)
   mov di, .offset_table                     ; DI uses DS as implicit segment
   jmp .read_param
 .offset_table:                              ; Defines the metadata we copy from sector 0
-.db 0dh, fat12_param.cluster_size
-.db 0eh, fat12_param.reserved
-.db 10h, fat12_param.num_fat
-.db 16h, fat12_param.fat_size
-.db 00h                                     ; Marks the end of table
+db 0dh, fat12_param.cluster_size
+db 0eh, fat12_param.reserved
+db 10h, fat12_param.num_fat
+db 16h, fat12_param.fat_size
+db 00h                                     ; Marks the end of table
 .read_param:
   mov al, [di]                              ; Offset within first sector
   inc di
@@ -81,9 +84,22 @@ fat12_init:
   push si                                   ; Register saving
   mov si, [di]                              ; SI = offset within FAT12 param entry
   inc di                                    ; DI = next entry
-  mov [ds:bx + si], ax                      ; Store data using BX + SI
+  mov [ds:bx + si], ax                      ; Store data using BX + SI; Note that byte data may overwrite later entries
   pop si                                    ; Register restore
   jmp .read_param
+.print_found:
+  xor ax, ax
+  mov al, [bx + fat12_param.num_fat]
+  mul [bx + fat12_param.fat_size]           ; DX:AX = Number of sectors for all (two) FATs
+  add ax, [bx + fat12_param.reserved]
+  mov [bx + fat12_param.data_begin], ax     ; Begin LBA (from zero) of data section
+  push ax
+  mov ax, [bp + .letter]
+  push ax
+  push fat12_init_str
+  call video_printf_near
+  add sp, 6
+  jmp .continue
 .err:
   push ds
   push fat12_init_err
@@ -91,3 +107,4 @@ fat12_init:
 
 fat12_init_str: db "FAT12 @ %c BEGIN %U", 0ah, 00h
 fat12_init_err: db "FAT12 Init Error", 0ah, 00h
+
