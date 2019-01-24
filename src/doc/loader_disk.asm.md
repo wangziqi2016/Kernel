@@ -92,3 +92,11 @@ entry having the LBA and the disk letter. If no existing entry can be found, it 
 the last empty entry) in the buffer pool to insert the sector. If no empty entry can be found, an existing entry is evicted,
 and its slot is allocated to the new sector.
 
+## Buffered I/O
+
+The buffered I/O interface has one single entry point: ``disk_op_word``. It takes the linear byte offset, the disk letter, 
+a piece of 16 bit data if it is write operation, and finally the operation code in AX to indicate read or write.
+This function supports reading from or writing into misaligned bytes, even if they cross the sector boundary. Operations
+performed by this function uses the buffer pool described in the previous section to provide fast access. The function
+only supports 16 bit reads and writes, and only takes the linear byte address rather than sector/offset. The upper level
+functions can take advantage of this feature to simplify their implementations
