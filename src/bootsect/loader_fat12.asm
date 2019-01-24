@@ -28,25 +28,27 @@ fat12_init:
   xor si, si                                ; SI = index of the current entry
 .body:
   mov ax, si
-  mul disk_param.size                       ; DX:AX = offset within the table (ignore DX)
-  mov bx, ax                                ; BX = base address of disk param entry
+  mov cx, disk_param.size
+  mul cx                                    ; DX:AX = offset within the table (ignore DX)
+  mov bx, ax                                ; BX = offset of disk param entry
+  add bx, [disk_mapping]                    ; BX = offset + base of disk mapping
 .addr_hi           equ -8                   ; Local variables
 .addr_lo           equ -10
 .letter            equ -12
   push word 0                               ; [BP - 8] - Addr hi
   push word 26h                             ; [BP - 10] - Addr lo; Byte offset 0x26 (extended boot record)
-  push word [bx + disk_mapping.letter]      ; [BP - 12] - Current letter of the disk
+  push word [bx + disk_param.letter]        ; [BP - 12] - Current letter of the disk
   mov ax, DISK_OP_READ                      ; Perform read
   call disk_op_word                         ; Read the first sector of the current disk
   jc .err                                   ; Do not clear stack because we read multiple words
-  cmp ax, 28h
+  cmp al, 28h
   je .found
-  cmp ax, 29h
+  cmp al, 29h
   je .found
 .continue:
   ;add bx, disk_param.size
   inc si
-  cmp si, [disk_mapping_size]
+  cmp si, [disk_mapping_num]
   jne .body
 .return:
   pop di
@@ -73,7 +75,7 @@ db 10h, fat12_param.num_fat
 db 16h, fat12_param.fat_size
 db 00h                                     ; Marks the end of table
 .read_param:
-  mov al, [di]                              ; Offset within first sector
+  mov al, [di]                              ; Offset within first sector  
   inc di
   test al, al                               ; Check if this is zero, if true then finished
   jz .print_found                           ; Reached the end of table
@@ -83,28 +85,32 @@ db 00h                                     ; Marks the end of table
   jc .err
   push si                                   ; Register saving
   mov si, [di]                              ; SI = offset within FAT12 param entry
+  and si, 0ffh                              ; Only byte value
   inc di                                    ; DI = next entry
-  mov [ds:bx + si], ax                      ; Store data using BX + SI; Note that byte data may overwrite later entries
+  mov [bx + si], ax                         ; Store data using BX + SI; Note that byte data may overwrite later entries
   pop si                                    ; Register restore
   jmp .read_param
 .print_found:
   xor ax, ax
   mov al, [bx + fat12_param.num_fat]
-  mul [bx + fat12_param.fat_size]           ; DX:AX = Number of sectors for all (two) FATs
+  push ax                                   ; Push number of FATs
+  mul word [bx + fat12_param.fat_size]      ; DX:AX = Number of sectors for all (two) FATs
   add ax, [bx + fat12_param.reserved]
+  push word [bx + fat12_param.fat_size]     ; Push FAT size
+  push word [bx + fat12_param.reserved]     ; Push # of reserved sectors
   mov [bx + fat12_param.data_begin], ax     ; Begin LBA (from zero) of data section
-  push ax
+  push ax                                   ; Push data begin
   mov ax, [bp + .letter]
-  push ax
-  push fat12_init_str
+  push ax                                   ; Push letter
+  push fat12_init_str                       ; Push format string
   call video_printf_near
-  add sp, 6
+  add sp, 12
   jmp .continue
 .err:
   push ds
   push fat12_init_err
   call bsod_fatal
 
-fat12_init_str: db "FAT12 @ %c BEGIN %U", 0ah, 00h
+fat12_init_str: db "FAT12 @ %c DATA BEGIN %u (RSV %u FAT SZ %u #FAT %u)", 0ah, 00h
 fat12_init_err: db "FAT12 Init Error", 0ah, 00h
 
