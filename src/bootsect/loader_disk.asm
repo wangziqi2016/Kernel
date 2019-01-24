@@ -392,11 +392,13 @@ disk_insert_buffer:
   push ax                       ; [BP + empty_slot], if 0 then there is no empty slot (0 is not valid offset in this case)
   push es
   push bx
+  push si                       ; SI counts the number of entries, break loop if this equals buffer size
   push word MEM_LARGE_BSS_SEG
   pop es
   mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
+  xor si, si                    ; SI begins at 0
 .body:
-  cmp ax, [disk_buffer_size]    ; Check if we reached the end of the buffer pool
+  cmp si, [disk_buffer_size]    ; Check whether we finished all entries
   je .try_empty                 ; If no matching entry is found then first try to claim empty then evict
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   jnz .check_existing           ; If it is valid entry then check parameters
@@ -415,14 +417,20 @@ disk_insert_buffer:
 .return:                        ; If found matching entry then fall through and return
   mov ax, bx
 .return_err:                    ; Do not change AX (which is the err code) on error
+  pop si
   pop bx
   pop es
   mov sp, bp
   pop bp
   ret
 .continue:
-  inc ax
-  add bx, disk_buffer_entry.size
+  inc si                          ; Update number of entries
+  inc ax                          ; Update current index
+  add bx, disk_buffer_entry.size  ; Update current entry pointer
+  cmp ax, [disk_buffer_entry]
+  jne .body                       ; If AX has not reached the very end no wrap back
+  xor ax, ax
+  mov bx, [disk_buffer]           ; Wrap back - Set AX and BX
   jmp .body
 .try_empty:                     ; Get here if all entries are checked and no matching is found 
   mov bx, [bp + .empty_slot]    ; BX = Either empty slot or 0x0000
