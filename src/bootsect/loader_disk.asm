@@ -29,7 +29,7 @@ struc disk_param    ; This defines the structure of the disk parameter table
 endstruc
 
 ; 16 sectors are cached in memory
-DISK_BUFFER_MAX_ENTRY     equ 10h        ; 16 entries
+DISK_BUFFER_SIZE          equ 10h        ; 16 entries
 DISK_BUFFER_SIZE_MASK     equ 000fh      ; Mask is 0x000F to extract the index bit
 
 ; Constants defined for disk sector buffer
@@ -65,8 +65,7 @@ disk_buffer_init:
   push bx
   push si
   mov ax, disk_buffer_entry.size
-  mov cx, DISK_BUFFER_MAX_ENTRY
-  mov [disk_buffer_size], cx      ; Store number of entry into the global var
+  mov cx, DISK_BUFFER_SIZE
   mul cx                          ; DX:AX is the total number of bytes required
   test dx, dx                     ; If overflows to DX then it is too large (> 64KB we cannot afford)
   jnz .buffer_too_large
@@ -407,7 +406,7 @@ disk_insert_buffer:
   ;mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
   ;xor ax, ax
 .body:
-  cmp si, [disk_buffer_size]    ; Check whether we finished all entries
+  cmp si, DISK_BUFFER_SIZE      ; Check whether we finished all entries
   je .try_empty                 ; If no matching entry is found then first try to claim empty then evict
   test word [es:bx + disk_buffer_entry.status], DISK_BUFFER_STATUS_VALID
   jnz .check_existing           ; If it is valid entry then check parameters
@@ -436,7 +435,7 @@ disk_insert_buffer:
   inc si                          ; Update number of entries
   inc ax                          ; Update current index
   add bx, disk_buffer_entry.size  ; Update current entry pointer
-  cmp ax, [disk_buffer_size]
+  cmp ax, DISK_BUFFER_SIZE
   jne .body                       ; If AX has not reached the very end no wrap back
   xor ax, ax
   mov bx, [disk_buffer]           ; Wrap back - Set AX and BX
@@ -473,8 +472,7 @@ disk_insert_buffer:
 .evict:
   mov ax, [disk_last_evicted]     ; Use the previous eviction index to compute this one (just +1)
   inc ax
-  div byte [disk_buffer_size]     ; AH = remainder (size must be less than 128, o.w. total would be > 64KB)
-  movzx ax, ah                    ; AX = (AX % disk_buffer_size)
+  and ax, DISK_BUFFER_SIZE_MASK   ; Potentially wrap back
   mov [disk_last_evicted], ax     ; Store it for next eviction
   mov cx, disk_buffer_entry.size
   mul cx                          ; DX:AX = offset into the table; We assume DX == 0 because we enforce this in init
@@ -543,7 +541,7 @@ disk_print_buffer:
   pop es                                       ; ES:BX = Buffer pointer
   xor si, si                                   ; SI = index on the buffer table
 .body:
-  cmp si, [disk_buffer_size]
+  cmp si, DISK_BUFFER_SIZE
   je .return
   mov ax, [es:bx + disk_buffer_entry.status]
   test ax, DISK_BUFFER_STATUS_VALID
@@ -665,6 +663,5 @@ disk_evict_fail_str:       db "Evict fail", 0ah, 00h
 disk_mapping:      dw 0 ; Offset in the system BSS segment to the start of the disk param table
 disk_mapping_num:  dw 0 ; Number of elements in the disk mapping table
 disk_buffer:       dw 0 ; This is the starting offset of the disk buffer
-disk_buffer_size:  dw 0 ; Number of entries in the buffer
-disk_last_evicted: dw DISK_BUFFER_MAX_ENTRY - 1 ; Index of the last evicted buffer entry
+disk_last_evicted: dw DISK_BUFFER_SIZE - 1 ; Index of the last evicted buffer entry
 
