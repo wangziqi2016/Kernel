@@ -321,6 +321,7 @@ disk_read_word:
   mov [bp + .offset], ax                ; ... and store as offset
   call disk_insert_buffer               ; Arguments have been set up
   jc .return_err                        ; We can directly use jc because stack is not cleared
+  mov bx, ax                            ; Return value is in AX
   add bx, [bp +.offset]                 
   mov ax, [es:bx + \
            disk_buffer_entry.data]      ; Read ES:BX + offset entry.data + logical offset (not .offset variable)
@@ -331,6 +332,7 @@ disk_read_word:
   adc word [bp + .lba_hi], 0            ; Increment the 32 bit LBA by 1 using INC + ADC
   call disk_insert_buffer               ; Read second half
   jc .return_err                        ; Same as above
+  mov bx, ax                            ; Return value is in AX
   mov ah, [es:bx + \
            disk_buffer_entry.data]      ; Read first byte of buffer data into AX high byte
   mov al, [bp + .buffer_data]           ; Read into AX low byte
