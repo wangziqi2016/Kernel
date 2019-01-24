@@ -283,7 +283,7 @@ disk_getchs:
 .error_wrong_letter:                ; AX is already the error code
   jmp .return
 
-; Reads a word from disk, given the byte offset. Supports maximum 4GB disk.
+; Reads or writes a word from/into disk, given the byte offset. Supports maximum 4GB disk.
 ;   [BP + 4] - Device letter
 ;   [BP + 6][BP + 8] - Byte offset of the word, can be unaligned
 ;   [BP + 10] - Data for write; Data just written for write
@@ -291,7 +291,7 @@ disk_getchs:
 ; Return:
 ;   AX stores the 16 bit word for read; undefined for write
 ;   On error, CF and AX are set based on the same condition as disk_insert_buffer
-disk_read_word:
+disk_op_word:
   push bp
   mov bp, sp
   push es                               ; [BP - 2]

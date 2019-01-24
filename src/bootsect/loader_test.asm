@@ -114,7 +114,7 @@ dist_rw_test:
   push word 511
   push word 'A'
   mov ax, DISK_OP_WRITE
-  call disk_read_word
+  call disk_op_word
   setc cl
   xor ch, ch
   push cx
@@ -123,7 +123,7 @@ dist_rw_test:
   call video_printf_near                   ; Should print "FAAA", 0xAA from previous sect, 0xFA from next
   add sp, 6
   mov ax, DISK_OP_READ
-  call disk_read_word
+  call disk_op_word
   setc cl
   xor ch, ch
   push cx
@@ -133,7 +133,7 @@ dist_rw_test:
   add sp, 6                                ; Clears printf arguments
   mov ax, DISK_DEBUG_EVICT                 ; Tests force evict
   call disk_print_buffer
-  add sp, 8                                ; Clears two disk_read_word arguments
+  add sp, 8                                ; Clears two disk_op_word arguments
   ret
 .str1: db "AX = %x, CF = %u", 0ah, 00h
 
