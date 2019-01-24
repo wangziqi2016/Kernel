@@ -353,7 +353,7 @@ disk_read_word:
            disk_buffer_entry.data]      ; Read first byte of buffer data into AX high byte
   mov al, [bp + .buffer_data]           ; Read into AX low byte
   jmp .finish
-process_write_2:
+.process_write_2:
   mov al, [bp + 11]                     ; This is the high byte
   mov [es:bx + \
        disk_buffer_entry.data], al      ; Just write first byte using the higher byte
