@@ -388,15 +388,25 @@ disk_insert_buffer:
   push bp
   mov bp, sp
 .empty_slot equ -2
-  xor ax, ax                    ; AX is also used as the current index
+  xor ax, ax
   push ax                       ; [BP + empty_slot], if 0 then there is no empty slot (0 is not valid offset in this case)
   push es
   push bx
   push si                       ; SI counts the number of entries, break loop if this equals buffer size
+  mov ax, [bp + 6]
+  mov cl, [disk_buffer_size]
+  div cl                        ; Compute hash; AH = index in the table
+  movzx ax, ah                  ; AX = AH zero extension
+  mov cx, disk_buffer_entry.size; Note that this is greater than 256, must use CX
+  xchg ax, cx                   ; CX = Table index, AX = entry size
+  mul cx                        ; DX:AX = Offset; Ignore DX because we know it must < 64KB
+  mov bx, ax
+  add bx, [disk_buffer]         ; BX = table base + entry offset
+  mov ax, cx                    ; AX = Table index
+  xor si, si                    ; SI begins at 0
   push word MEM_LARGE_BSS_SEG
   pop es
-  mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
-  xor si, si                    ; SI begins at 0
+  ;mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
 .body:
   cmp si, [disk_buffer_size]    ; Check whether we finished all entries
   je .try_empty                 ; If no matching entry is found then first try to claim empty then evict
