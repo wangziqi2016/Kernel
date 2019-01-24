@@ -45,7 +45,7 @@ run: bootsect
 	bochs -q -f ./test/bochs-ubuntu.bxrc
 
 qemu: bootsect
-	qemu-system-x86_64 -fda $(BIN_DIR)/bootdisk.img
+	qemu-system-x86_64 -fda $(BIN_DIR)/bootdisk.img -fdb $(BIN_DIR)/testdisk.ima
 
 peekline: 
 	python $(SRC_DIR)/util/peek_line.py $(SRC_DIR)/bootsect "loader*.asm" _loader.tmp $(LINE)
