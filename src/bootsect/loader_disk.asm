@@ -509,11 +509,18 @@ disk_evict_buffer:
   call bsod_fatal
 
 %ifdef DISK_DEBUG
+
+DISK_DEBUG_NONE      equ 0 ; Do nothing
+DISK_DEBUG_EVICT     equ 1 ; Whether this function also evicts dirty buffers
+
 ; This function is for debugging purpose. Prints buffer status, LBA and letter
+;   AX - One or more of the above constants to control behavior
 disk_print_buffer:
   push es
   push bx
   push si
+  push di
+  mov di, ax                                   ; DI = options passed via AX
   mov bx, [disk_buffer]
   push word MEM_LARGE_BSS_SEG
   pop es                                       ; ES:BX = Buffer pointer
@@ -521,6 +528,15 @@ disk_print_buffer:
 .body:
   cmp si, [disk_buffer_size]
   je .return
+  mov ax, [es:bx + disk_buffer_entry.status]
+  test ax, DISK_BUFFER_STATUS_VALID
+  jz .after_evict
+  test ax, DISK_BUFFER_STATUS_DIRTY
+  jz .after_evict
+  test di, DISK_DEBUG_EVICT
+  jz .after_evict
+  call disk_evict_buffer                       ; ES:BX has been set and will not be changed
+.after_evict:
   mov ax, [es:bx + disk_buffer_entry.status]
   push ax
   mov ax, [es:bx + disk_buffer_entry.letter]
@@ -538,6 +554,7 @@ disk_print_buffer:
 .return:
   mov ax, 000ah
   call putchar
+  pop di
   pop si
   pop bx
   pop es
