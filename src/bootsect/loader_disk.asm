@@ -47,7 +47,7 @@ struc disk_buffer_entry
   .letter:  resb 1                 ; The device letter
   .lba:     resd 1                 ; The LBA that this sector is read from
   .data:    resb DISK_SECTOR_SIZE  ; Sector data to be stored
-  .padding: resw 1                 ; Avoid invalid read when reading the last byte
+  .padding: resw 1                 ; Avoid invalid read/write when accessing the last byte - DO NOT REMOVE
   .size:
 endstruc
 
@@ -286,17 +286,19 @@ disk_getchs:
 ; Reads a word from disk, given the byte offset. Supports maximum 4GB disk.
 ;   [BP + 4] - Device letter
 ;   [BP + 6][BP + 8] - Byte offset of the word, can be unaligned
+;   [BP + 10] - Data for write; If read then ignore
+;   AX - operation code; DISK_OP_READ/DISK_OP_WRITE
 ; Return:
-;   AX stores the 16 bit word
+;   AX stores the 16 bit word for read; undefined for write
 ;   On error, CF and AX are set based on the same condition as disk_insert_buffer
 disk_read_word:
   push bp
   mov bp, sp
   push es                               ; [BP - 2]
   push bx                               ; [BP - 4] - Note: Must clear arguments before restoring these two reg
-  mov ax, MEM_LARGE_BSS_SEG
-  mov es, ax                            ; Load ES as the segment of buffer
-  push ax                               ; [BP - 6] - Unused for now
+  push word MEM_LARGE_BSS_SEG
+  pop es                                ; Load ES as the segment of buffer
+  push ax                               ; [BP - 6] - Operation code (R/W)
   push ax                               ; [BP - 8] - Buffer data
   push ax                               ; [BP - 10] - Offset
   mov ax, [bp + 8]                      ; Offset high
@@ -310,8 +312,8 @@ disk_read_word:
   push ax                               ; [BP - 14] lba_lo
   mov ax, [bp + 4]
   push ax                               ; [BP - 16] letter
-.unused      equ -6                     ; Local variables
-.buffer_data equ -8
+.opcode      equ -6                     ; Local variables
+.buffer_data equ -8                     ; The following two are local scratch pads
 .offset      equ -10
 .lba_hi      equ -12                    ; Note that stack layout below is exactly the same as the argument list
 .lba_lo      equ -14                    ; ... that disk_insert_buffer accept
@@ -323,19 +325,31 @@ disk_read_word:
   jc .return_err                        ; We can directly use jc because stack is not cleared
   mov bx, ax                            ; Return value is in AX
   add bx, [bp +.offset]                 
+  cmp word [bp + opcode], DISK_OP_WRITE
+  je .process_write_1                   ; Fall through to read
   mov ax, [es:bx + \
            disk_buffer_entry.data]      ; Read ES:BX + offset entry.data + logical offset (not .offset variable)
+  jmp .after_1
+.process_write_1:
+  mov ax, [bp + 10]
+  mov [es:bx + \
+       disk_buffer_entry.data], ax      ; We can do this even at sector boundary b/c the buffer has padding
+.after_1:
   cmp word [bp + .offset], 01ffh        ; If offset is not 511 then the read does not cross boundary
   jne .finish
-  mov [bp + .buffer_data], ax           ; Save AX to local var (high byte is ignored)
+  mov [bp + .buffer_data], ax           ; Save AX to local var (high byte is ignored) - for write this is ignored
   inc word [bp + .lba_lo]
   adc word [bp + .lba_hi], 0            ; Increment the 32 bit LBA by 1 using INC + ADC
   call disk_insert_buffer               ; Read second half
   jc .return_err                        ; Same as above
   mov bx, ax                            ; Return value is in AX
+  cmp word [bp + opcode], DISK_OP_WRITE
+  je .process_write_2                   ; Fall through to read for the 2nd half
   mov ah, [es:bx + \
            disk_buffer_entry.data]      ; Read first byte of buffer data into AX high byte
   mov al, [bp + .buffer_data]           ; Read into AX low byte
+  jmp .finish
+process_write_2:
 .finish:
   clc
   jmp .return_normal
