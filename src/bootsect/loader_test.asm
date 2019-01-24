@@ -78,6 +78,7 @@ disk_op_test:
 
 disk_buffer_test:
   push si
+  mov ax, DISK_DEBUG_NONE
   call disk_print_buffer
   mov si, 18
 .load_1:
@@ -96,6 +97,7 @@ disk_buffer_test:
   push word 'A'           ; Change this for wrong letter
   call disk_insert_buffer ; Tests invalid LBA on disk 'A'
   push ax                 ; AX will be destroyed below, so push it here
+  mov ax, DISK_DEBUG_NONE
   call disk_print_buffer
   push .str1
   call video_printf_near
@@ -128,9 +130,10 @@ dist_rw_test:
   push ax
   push .str1
   call video_printf_near                   ; Should print "FAAA", 0xAA from previous sect, 0xFA from next
-  add sp, 6
-  add sp, 8
+  add sp, 6                                ; Clears printf arguments
+  mov ax, DISK_DEBUG_EVICT                 ; Tests force evict
   call disk_print_buffer
+  add sp, 8                                ; Clears two disk_read_word arguments
   ret
 .str1: db "AX = %x, CF = %u", 0ah, 00h
 
