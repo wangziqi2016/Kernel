@@ -108,7 +108,7 @@ disk_buffer_test:
 ; Tests whether disk_read_word works
 dist_rw_test:
   push word 0
-  push word 510
+  push word 511
   push word 'A'
   call disk_read_word
   setc cl
@@ -117,7 +117,7 @@ dist_rw_test:
   push cx
   push ax
   push .str1
-  call video_printf_near
+  call video_printf_near                   ; Should print "FAAA", 0xAA from previous sect, 0xFA from next
   add sp, 6
   ret
 .str1: db "AX = %x, CF = %u", 0ah, 00h
@@ -145,10 +145,4 @@ printf_far_str: db "FAR", 00h
 disk_chs_test_str: db "CH = %y CL = %y DH = %y DL = %y AX = %x", 0ah, 00h
 disk_get_size_error_str: db "Disk size error", 0ah, 00h
 
-; The following can be used for debugging purposes
-debug_U_str: db "%U", 0ah, 00h
-debug_u_str: db "%u", 0ah, 00h
-debug_x_str: db "%x", 0ah, 00h
-debug_y_str: db "%y", 0ah, 00h
-debug_X_str: db "%X", 0ah, 00h
 
