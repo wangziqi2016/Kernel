@@ -4,8 +4,8 @@ _loader_test_start:
 ;
 
 disk_test:
-  call disk_chs_test
-  call disk_param_test
+  ;call disk_chs_test
+  ;call disk_param_test
   xor ax, ax                        ; Pass LBA in AX (low 16 bits)
   call disk_op_test
   mov ax, [endmark_total_sect]
