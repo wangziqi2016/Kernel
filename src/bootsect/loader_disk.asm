@@ -287,10 +287,10 @@ disk_getchs:
 ; Reads or writes a word from/into disk, given the byte offset. Supports maximum 4GB disk.
 ;   [BP + 4] - Device letter
 ;   [BP + 6][BP + 8] - Byte offset of the word, can be unaligned
-;   [BP + 10] - Data for write; Data just written for write
+;   [BP + 10] - Data for write; do not need this for read
 ;   AX - operation code; DISK_OP_READ/DISK_OP_WRITE
 ; Return:
-;   AX stores the 16 bit word for read; undefined for write
+;   AX stores the 16 bit word for read; Returns data just written for write
 ;   On error, CF and AX are set based on the same condition as disk_insert_buffer
 disk_op_word:
   push bp
