@@ -286,7 +286,7 @@ disk_getchs:
 ; Reads a word from disk, given the byte offset. Supports maximum 4GB disk.
 ;   [BP + 4] - Device letter
 ;   [BP + 6][BP + 8] - Byte offset of the word, can be unaligned
-;   [BP + 10] - Data for write; If read then ignore
+;   [BP + 10] - Data for write; Data just written for write
 ;   AX - operation code; DISK_OP_READ/DISK_OP_WRITE
 ; Return:
 ;   AX stores the 16 bit word for read; undefined for write
@@ -324,8 +324,8 @@ disk_read_word:
   call disk_insert_buffer               ; Arguments have been set up
   jc .return_err                        ; We can directly use jc because stack is not cleared
   mov bx, ax                            ; Return value is in AX
-  add bx, [bp +.offset]                 
-  cmp word [bp + opcode], DISK_OP_WRITE
+  add bx, [bp +.offset]                 ; First add in-sector offset. We also add field offset below
+  cmp word [bp + .opcode], DISK_OP_WRITE
   je .process_write_1                   ; Fall through to read
   mov ax, [es:bx + \
            disk_buffer_entry.data]      ; Read ES:BX + offset entry.data + logical offset (not .offset variable)
@@ -334,6 +334,10 @@ disk_read_word:
   mov ax, [bp + 10]
   mov [es:bx + \
        disk_buffer_entry.data], ax      ; We can do this even at sector boundary b/c the buffer has padding
+  sub bx, [bp +.offset]                 ; Reset BX to the head of the buffer
+  or word [es:bx + \
+      disk_buffer_entry.status], \
+    DISK_BUFFER_STATUS_DIRTY            ; Set dirty bits
 .after_1:
   cmp word [bp + .offset], 01ffh        ; If offset is not 511 then the read does not cross boundary
   jne .finish
@@ -343,13 +347,20 @@ disk_read_word:
   call disk_insert_buffer               ; Read second half
   jc .return_err                        ; Same as above
   mov bx, ax                            ; Return value is in AX
-  cmp word [bp + opcode], DISK_OP_WRITE
+  cmp word [bp + .opcode], DISK_OP_WRITE
   je .process_write_2                   ; Fall through to read for the 2nd half
   mov ah, [es:bx + \
            disk_buffer_entry.data]      ; Read first byte of buffer data into AX high byte
   mov al, [bp + .buffer_data]           ; Read into AX low byte
   jmp .finish
 process_write_2:
+  mov al, [bp + 11]                     ; This is the high byte
+  mov [es:bx + \
+       disk_buffer_entry.data], al      ; Just write first byte using the higher byte
+  or word [es:bx + \
+      disk_buffer_entry.status], \
+    DISK_BUFFER_STATUS_DIRTY            ; Set dirty bits
+  mov ax, [bp + 10]                     ; Return data just written
 .finish:
   clc
   jmp .return_normal
