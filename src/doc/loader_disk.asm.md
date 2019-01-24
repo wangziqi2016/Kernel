@@ -99,4 +99,10 @@ a piece of 16 bit data if it is write operation, and finally the operation code 
 This function supports reading from or writing into misaligned bytes, even if they cross the sector boundary. Operations
 performed by this function uses the buffer pool described in the previous section to provide fast access. The function
 only supports 16 bit reads and writes, and only takes the linear byte address rather than sector/offset. The upper level
-functions can take advantage of this feature to simplify their implementations
+functions can take advantage of this feature to simplify their implementations.
+
+To avoid searching the buffer pool every time this function is called, we adopt an optimization that can improve the 
+average case given good locality. Instead of searching from the beginning of the buffer pool on each call, the lower
+byte of the LBA is hashed into an offset, and search begins at this offset. This guarantees that if the upper level
+function accesses only a few sectors repeatedly, the search process only needs to check a few entries before the 
+cached entry can be found.
