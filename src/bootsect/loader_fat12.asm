@@ -24,16 +24,17 @@ fat12_init:
   mov bp, sp
   push bx                                   ; [BP - 2] - Reg saving
   push si                                   ; [BP - 4] - Reg saving
+  push di                                   ; [BP - 6] - Reg saving
   mov bx, [disk_mapping]
   mov si, [disk_mapping_size]
 .body:
-.addr_hi           equ -6                   ; Local variables
-.addr_lo           equ -8
-.letter            equ -10
-  push word 0                               ; [BP - 6] - Addr hi
-  push word 26h                             ; [BP - 8] - Addr lo; Byte offset 0x26 (extended boot record)
-  push word [bx + disk_mapping.letter]      ; [BP - 10] - Current letter of the disk
-  mov ax, si                                ; Perform read
+.addr_hi           equ -8                   ; Local variables
+.addr_lo           equ -10
+.letter            equ -12
+  push word 0                               ; [BP - 8] - Addr hi
+  push word 26h                             ; [BP - 10] - Addr lo; Byte offset 0x26 (extended boot record)
+  push word [bx + disk_mapping.letter]      ; [BP - 12] - Current letter of the disk
+  mov ax, DISK_OP_READ                      ; Perform read
   call disk_op_word                         ; Read the first sector of the current disk
   jc .err                                   ; Do not clear stack because we read multiple words
   cmp ax, 28h
@@ -46,6 +47,7 @@ fat12_init:
   test si, si
   jnz .body
 .return:
+  pop di
   pop si
   pop bx
   mov sp, bp
@@ -59,20 +61,29 @@ fat12_init:
   mov bx, ax                                ; BX = Ptr to the FAT12 param
   xor ax, ax
   mov [bp + .addr_lo], ax                   ; Clear high bits of the address (we only use low 256 bytes for sure)
+  mov di, .offset_table                     ; DI uses DS as implicit segment
+  jmp .read_param
 .offset_table:                              ; Defines the metadata we copy from sector 0
 .db 0dh, fat12_param.cluster_size
 .db 0eh, fat12_param.reserved
 .db 10h, fat12_param.num_fat
 .db 16h, fat12_param.fat_size
-  mov byte [bp + .addr_lo], 0dh             ; Update address we read
-  mov ax, si                                ; Read 0x0D byte
+.db 00h                                     ; Marks the end of table
+.read_param:
+  mov al, [di]                              ; Offset within first sector
+  inc di
+  test al, al                               ; Check if this is zero, if true then finished
+  jz .print_found                           ; Reached the end of table
+  mov byte [bp + .addr_lo], al              ; Update address
+  mov ax, DISK_OP_READ                      ; Call for read
   call disk_op_word
   jc .err
-  mov [bx + fat12_param.cluster_size], al
-  mov byte [bp + .addr_lo], 0eh             
-  mov ax, si                                ; Read 0x0E word
-  call disk_op_word
-  jc .err
+  push si                                   ; Register saving
+  mov si, [di]                              ; SI = offset within FAT12 param entry
+  inc di                                    ; DI = next entry
+  mov [ds:bx + si], ax                      ; Store data using BX + SI
+  pop si                                    ; Register restore
+  jmp .read_param
 .err:
   push ds
   push fat12_init_err
