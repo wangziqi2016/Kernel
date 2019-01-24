@@ -8,7 +8,11 @@ _loader_fat12_start:
 
 struc fat12_param           ; This defines FAT12 file system metadata
   .disk_param:       resw 1 ; Back pointer to disk parameter
-
+  .cluster_size:     resb 1 ; Number of sectors per cluster (Sector 1, 0x0D)
+  .reserved:         resw 1 ; Number of reserved sectors including sector 1 (Sector 1, 0x0E)
+  .num_fat:          resb 1 ; Number of FAT tables (Sector 1, 0x10)
+  .fat_size:         resw 1 ; Number of sectors per FAT (Sector 1, 0x16)
+  .data_begin:       resw 1 ; Offset of sector that data begins (from 0), derived from above values
   .size:
 endstruc
 
@@ -18,6 +22,7 @@ fat12_init:
   push bp
   mov bp, sp
   push bx                                   ; [BP - 2] - Reg saving
+  push si
   mov bx, [disk_mapping]
   mov cx, [disk_mapping_size]
 .check_fat12:
@@ -37,6 +42,8 @@ fat12_init:
 .continue:
   add bx, disk_param.size
   loop .check_fat12
+.return:
+  pop si
   pop bx
   mov sp, bp
   pop bp
@@ -46,6 +53,7 @@ fat12_init:
   call mem_get_sys_bss                      ; Allocate a perameter entry for FAT 12
   jc .err                                   ; Usually means sys static mem runs out
   mov [bx + disk_param.fsptr], ax           ; Save it in the fsptr field of disk param
+  mov ax, DISK_OP_READ
 .err:
   push ds
   push fat12_init_err
