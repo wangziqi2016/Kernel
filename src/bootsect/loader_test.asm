@@ -107,18 +107,30 @@ disk_buffer_test:
 
 ; Tests whether disk_read_word works
 dist_rw_test:
+  push 1234h
   push word 0
   push word 511
   push word 'A'
+  mov ax, DISK_OP_WRITE
   call disk_read_word
   setc cl
   xor ch, ch
-  add sp, 6
   push cx
   push ax
   push .str1
   call video_printf_near                   ; Should print "FAAA", 0xAA from previous sect, 0xFA from next
   add sp, 6
+  mov ax, DISK_OP_READ
+  call disk_read_word
+  setc cl
+  xor ch, ch
+  push cx
+  push ax
+  push .str1
+  call video_printf_near                   ; Should print "FAAA", 0xAA from previous sect, 0xFA from next
+  add sp, 6
+  add sp, 8
+  call disk_print_buffer
   ret
 .str1: db "AX = %x, CF = %u", 0ah, 00h
 
