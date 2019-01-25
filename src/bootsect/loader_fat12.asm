@@ -6,11 +6,15 @@ _loader_fat12_start:
 ; of 1 word is sufficient, because we can address 32MB. Using offset of 1 word
 ; is problematic because only 64KB can be addressed
 
+FAT12_DIR_LENGTH     equ 32 ; Byte size of directory record 
+FAT12_DIR_SHIFT      equ 5  ; log2(FAT12_DIR_LENGTH)
+
 struc fat12_param           ; This defines FAT12 file system metadata
   .disk_param:       resw 1 ; Back pointer to disk parameter
   .cluster_size:     resb 1 ; Number of sectors per cluster (Sector 1, 0x0D)
   .reserved:         resw 1 ; Number of reserved sectors including sector 1 (Sector 1, 0x0E)
   .num_fat:          resb 1 ; Number of FAT tables (Sector 1, 0x10)
+  .root_size:        resw 1 ; Number of entries in the root (root cannot be extended, Sector 1, 0x11)
   .fat_size:         resw 1 ; Number of sectors per FAT (Sector 1, 0x16)
   .data_begin:       resw 1 ; Offset of sector that data begins (from 0), derived from above values
   .padding:          resb 1 ; Padding
@@ -77,6 +81,7 @@ fat12_init:
 db 0dh, fat12_param.cluster_size
 db 0eh, fat12_param.reserved
 db 10h, fat12_param.num_fat
+db 11h, fat12_param.root_size
 db 16h, fat12_param.fat_size
 db 00h                                     ; Marks the end of table
 .read_param:
@@ -163,7 +168,7 @@ fat12_getnext:
 .even_sect:
   and ax, 0fffh                             ; For even sectors, use low 12 bits
 .after_process:                             ; AX stores the next sector number
-  cmp ax, 0ff7h                             ; Everything below 0x0FF7 is normal
+  cmp ax, 0ff0h                             ; Everything below 0x0FF0 is normal (in-use, free)
   jb .return
   xor ax, ax                                ; Otherwise it is invalid (end of chain, bad sect, etc.)
   dec ax                                    ; Return 0xFFFF
