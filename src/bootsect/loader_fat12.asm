@@ -119,6 +119,13 @@ db 00h                                     ; Marks the end of table
   push fat12_init_err
   call bsod_fatal
 
+; Returns the next sector given a sector
+;   AX - The sector number
+; Return:
+;   AX - Next sector number. 0 means invalid sector b/c sector 0 must be boot record
+;   BSOD on error. No invalid sector should be used to call this function
+fat12_getnext:
+
 fat12_init_str: db "FAT12 @ %c DATA BEGIN %u (RSV %u FAT SZ %u #FAT %u)", 0ah, 00h
 fat12_init_err: db "FAT12 Init Error: %s", 0ah, 00h
 fat12_init_inv_csz: db "Cluster size not 1", 0ah, 00h ; Failure reason, cluster size is greater than 1
