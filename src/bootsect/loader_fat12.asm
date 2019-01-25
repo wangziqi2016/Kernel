@@ -118,15 +118,18 @@ db 00h                                     ; Marks the end of table
   push word [bx + fat12_param.fat_size]     ; Push FAT size
   push word [bx + fat12_param.reserved]     ; Push # of reserved sectors
   mov [bx + fat12_param.root_begin], ax     ; Begin LBA (from zero) of data section
-  push ax                                   ; Push data begin
-  mov cx, [bx + fat12_param.root_size]      ; CX = Number of entries in the root
-  shl cx, FAT12_DIR_SHIFT                   ; CX = Number of bytes in the root
-  
+  push ax                                   ; Push root directory begin
+  mov cx, [bx + fat12_param.root_size]      ; CX = # of entries in the root
+  shr cx, \
+    DISK_SECTOR_SHIFT - FAT12_DIR_SHIFT     ; CX = # of sectors in the root (assume it is exact)
+  add ax, cx
+  mov [bx + fat12_param.data_begin], ax
+  push ax                                   ; Push data begin sector
   mov ax, [bx + fat12_param.letter]
   push ax                                   ; Push letter
   push fat12_init_str                       ; Push format string
   call video_printf_near
-  add sp, 12
+  add sp, 14
   jmp .continue
 .err:                                       ; Jump here on error, stack must have an error message pushed
   push ds

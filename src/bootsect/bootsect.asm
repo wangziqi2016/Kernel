@@ -205,7 +205,7 @@ str5:
 sector_per_track:   db 12h ; 18 sectors per track
 track_per_disk:     db 50h ; 80 tracks per disk
 head_per_disk:      db 02h ; 2 heads per disk
-num_sector_to_read: dw 11d ; This must be exact, otherwise verification would fail
+num_sector_to_read: dw 12d ; This must be exact, otherwise verification would fail
   
 current_sector: db 01h  ; CL + CH = sector + track
 current_track:  db 00h  ; Track starts with 0
