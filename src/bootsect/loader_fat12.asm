@@ -128,7 +128,7 @@ db 00h                                     ; Marks the end of table
 ;   AX - The sector number
 ;   [BP + 4] - Ptr to the current instance of FAT12 table
 ; Return:
-;   AX - Next sector number. 0 means invalid sector b/c sector 0 must be boot record
+;   AX - Next sector number. 0 means empty sector; 0xFFFF means end of chain and other
 ;   BSOD on error. No invalid sector should be used to call this function
 fat12_getnext:
   push bp
@@ -166,6 +166,7 @@ fat12_getnext:
   cmp ax, 0ff7h                             ; Everything below 0x0FF7 is normal
   jb .return
   xor ax, ax                                ; Otherwise it is invalid (end of chain, bad sect, etc.)
+  dec ax                                    ; Return 0xFFFF
 .return:
   pop si
   pop bx
