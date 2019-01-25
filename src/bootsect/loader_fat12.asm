@@ -148,7 +148,16 @@ fat12_getnext:
   push bx                                   ; [BP - 2] - Reg save
   push si                                   ; [BP - 4] - Reg save
   mov bx, [bp + 4]                          ; BX = Ptr to FAT12 param table
-  mov cx, ax                                
+  cmp ax, 2                                 ; Cluster numbering begins at 2 (b/c 0x0000 means empty)
+  jb .err
+  mov si, [bp + fat12_param.disk_param]     ; SI = disk param ptr
+  mov cx, [ds:si + disk_param.capacity]     ; CX = Low word of disk capacity. For FAT12 we know high word is 0
+  sub cx, [bx + data_begin]
+  inc cx
+  inc cx                                    ; CX = data area sectors + 2
+  cmp ax, cx
+  jae .err                                  ; Note that AX begins at 2, and is relative to data area
+  mov cx, ax
   and cx, 1                                 ; CX = odd/even bit
   shr ax, 1
   mov dx, ax                                ; DX = AX / 2
