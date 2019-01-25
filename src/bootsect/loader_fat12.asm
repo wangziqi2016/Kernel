@@ -136,6 +136,14 @@ db 00h                                     ; Marks the end of table
   push fat12_init_err
   call bsod_fatal
 
+; Opens a device for FAT12 access. A device can be opened multiple times, and there is 
+; no need for a corresponding close
+;   AX - The letter of the device
+; Return:
+;   AX - A transparent token used to access the file system; In practice it is pointer
+;        to the disk_param struct
+fat12_open:
+
 ; Returns the next sector given a sector
 ;   AX - The sector number
 ;   [BP + 4] - Ptr to the current instance of FAT12 table
