@@ -142,7 +142,19 @@ db 00h                                     ; Marks the end of table
 ; Return:
 ;   AX - A transparent token used to access the file system; In practice it is pointer
 ;        to the disk_param struct
+;   CF is set if letter is invalid or device is not FAT12
 fat12_open:
+  call disk_getparam                        ; AX has already been set
+  jc .err                                   ; Invalid letter
+  mov bx, ax                                ; BX = base address to disk_param
+  cmp byte [bx + disk_param.fstype], \
+    DISK_FS_FAT12                           ; If the fs type is not FAT12 report error
+  jne .err
+  mov ax, [bx + disk_param.fsptr]           ; Return ptr to fat12_param in AX
+  ret
+.err:
+  stc
+  ret
 
 ; Returns the next sector given a sector
 ;   AX - The sector number
