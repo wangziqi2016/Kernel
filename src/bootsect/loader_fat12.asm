@@ -152,7 +152,7 @@ fat12_getnext:
   jb .err
   mov si, [bp + fat12_param.disk_param]     ; SI = disk param ptr
   mov cx, [ds:si + disk_param.capacity]     ; CX = Low word of disk capacity. For FAT12 we know high word is 0
-  sub cx, [bx + data_begin]
+  sub cx, [bx + fat12_param.data_begin]
   inc cx
   inc cx                                    ; CX = data area sectors + 2
   cmp ax, cx
