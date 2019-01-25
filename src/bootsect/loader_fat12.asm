@@ -91,6 +91,14 @@ db 00h                                     ; Marks the end of table
   pop si                                    ; Register restore
   jmp .read_param
 .print_found:
+  mov al, [bx + fat12_param.cluster_size]
+  dec al
+  test al, al                               ; Only supports 1 sector cluster
+  jz .begin_print
+  push fat12_init_inv_csz
+  call video_printf_near                    ; Print error message and then goes BSOD
+  jmp .err
+.begin_print:
   xor ax, ax
   mov al, [bx + fat12_param.num_fat]
   push ax                                   ; Push number of FATs
@@ -106,11 +114,12 @@ db 00h                                     ; Marks the end of table
   call video_printf_near
   add sp, 12
   jmp .continue
-.err:
+.err:                                       ; Jump here on error, stack must have an error message pushed
   push ds
   push fat12_init_err
   call bsod_fatal
 
 fat12_init_str: db "FAT12 @ %c DATA BEGIN %u (RSV %u FAT SZ %u #FAT %u)", 0ah, 00h
-fat12_init_err: db "FAT12 Init Error", 0ah, 00h
+fat12_init_err: db "FAT12 Init Error: %s", 0ah, 00h
+fat12_init_inv_csz: db "Cluster size not 1", 0ah, 00h ; Failure reason, cluster size is greater than 1
 
