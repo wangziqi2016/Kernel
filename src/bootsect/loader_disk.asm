@@ -159,7 +159,7 @@ disk_probe:
   mov [bx + disk_param.capacity + 2], dx ; Store this as capacity in terms of sectors
   mov ax, [bp + .curr_number]          ; Low byte number high byte letter
   mov [bx + disk_param.number], ax     ; Save the above info into the table
-  mov [bx + disk_param.fstype], \
+  mov byte [bx + disk_param.fstype], \
     DISK_FS_NONE                       ; Initialize fstype to zero
   call .print_found                    ; Register will be destroyed in this routine
   inc byte [bp + .curr_number]         ; Increment the current letter and device number

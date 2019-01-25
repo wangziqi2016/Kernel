@@ -62,6 +62,8 @@ fat12_init:
   call mem_get_sys_bss                      ; Allocate a perameter entry for FAT 12
   jc .err                                   ; Usually means sys static mem runs out
   mov [bx + disk_param.fsptr], ax           ; Save it in the fsptr field of disk param
+  mov byte [bx + disk_param.fstype], \
+    DISK_FS_FAT12                           ; Adding FS type explicitly
   xchg ax, bx                               ; BX = Ptr to the FAT12 param; AX = new pointer
   mov [bx + fat12_param.disk_param], ax     ; Store the back pointer
   xor ax, ax
