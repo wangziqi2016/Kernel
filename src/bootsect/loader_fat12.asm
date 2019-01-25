@@ -113,7 +113,7 @@ db 00h                                     ; Marks the end of table
   push word [bx + fat12_param.reserved]     ; Push # of reserved sectors
   mov [bx + fat12_param.data_begin], ax     ; Begin LBA (from zero) of data section
   push ax                                   ; Push data begin
-  mov ax, [bp + .letter]
+  mov ax, [bx + fat12_param.letter]
   push ax                                   ; Push letter
   push fat12_init_str                       ; Push format string
   call video_printf_near
@@ -133,10 +133,19 @@ db 00h                                     ; Marks the end of table
 fat12_getnext:
   push bp
   mov sp, bp
-  push bx
-  mov ax, [bp + 4]
+  push bx                                   ; [BP - 2] - Reg save
+  push si                                   ; [BP - 4] - Reg save
+.offset_hi              equ -6
+.offset_lo              equ -8
+.letter                 equ -10
+  push ax                                   ; [BP - 6] - Arg offset hi (filled later)
+  push ax                                   ; [BP - 8] - Arg offset lo (filled later)
+  mov bx, [bp + 4]                          ; BX = Ptr to FAT12 param table
+  mov ax, [bp + fat12_param.letter]         ; Arg letter
+  push ax                                   ; [BP - 10] - Letter
   
 .return:
+  pop si
   pop bx
   mov sp, bp
   pop bp
