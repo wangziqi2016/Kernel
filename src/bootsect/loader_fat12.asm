@@ -121,12 +121,31 @@ db 00h                                     ; Marks the end of table
 
 ; Returns the next sector given a sector
 ;   AX - The sector number
+;   [BP + 4] - Disk letter
 ; Return:
 ;   AX - Next sector number. 0 means invalid sector b/c sector 0 must be boot record
 ;   BSOD on error. No invalid sector should be used to call this function
 fat12_getnext:
+  push bp
+  mov sp, bp
+  push bx
+  mov ax, [bp + 4]
+  call disk_getparam
+  jc .err
+  mov bx, ax
+  mov bx, [bx + disk_param.fsptr]
+.return:
+  pop bx
+  mov sp, bp
+  pop bp
+  ret
+.err:
+  push ds
+  push fat12_getnext_err
+  call bsod_fatal
 
 fat12_init_str: db "FAT12 @ %c DATA BEGIN %u (RSV %u FAT SZ %u #FAT %u)", 0ah, 00h
 fat12_init_err: db "FAT12 Init Error: %s", 0ah, 00h
 fat12_init_inv_csz: db "Cluster size not 1", 0ah, 00h ; Failure reason, cluster size is greater than 1
+fat12_getnext_err: db "FAT12 invarg getnext", 0ah, 00h
 
