@@ -27,7 +27,17 @@ struc fat12_dir           ; This defines FAT12 directory structure (standard 8.3
   .name:             resb 8 ; File name
   .suffix:           resb 3 ; Suffix
   .attr:             resb 1 ; File attribute
-  .size:
+  .reserved:         resb 1 ; Reserved for windows NT
+  .create_time_ms:   resb 1 ; Create time in 10ms resolution
+  .create_time:      resw 1 ; Create time in sec-min-hour
+  .create_date:      resw 1 ; Create date in day-month-year
+  .last_accessed:    resw 1 ; Last accessed data in day-month-year
+  .ea_index:         resw 1 ; Don't know what it is
+  .modified_time:    resw 1 ; Last modified time in sec-min-hour
+  .modified_date:    resw 1 ; Last modified date in day-month-year
+  .cluster:          resw 1 ; First cluster (0 for special files and empty files)
+  .size_byte:        resd 1 ; File size in bytes
+  .size:                    ; Should be 32, there are constants defined for it
 endstruc
 
 ; Initialization. This must be called after disk_mapping and disk_buffer is setup 
