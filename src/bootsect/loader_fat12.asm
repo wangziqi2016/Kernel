@@ -140,7 +140,7 @@ db 00h                                     ; Marks the end of table
 ;   AX - The sector number
 ;   [BP + 4] - Ptr to the current instance of FAT12 table
 ; Return:
-;   AX - Next sector number. 0 means empty sector; 0xFFFF means end of chain and other
+;   AX - Next sector number, beginning from 0. 0xFFFF means other cases (free, invalid, end of chain, etc.)
 ;   BSOD on error. No invalid sector should be used to call this function
 fat12_getnext:
   push bp
@@ -185,15 +185,20 @@ fat12_getnext:
   and ax, 0fffh                             ; For even sectors, use low 12 bits
 .after_process:                             ; AX stores the next sector number
   cmp ax, 0ff0h                             ; Everything below 0x0FF0 is normal (in-use, free)
-  jb .return
-  xor ax, ax                                ; Otherwise it is invalid (end of chain, bad sect, etc.)
-  dec ax                                    ; Return 0xFFFF
+  jae .return_reserved
+  cmp ax, 0002h                             ; Everything below 0x2 is reserved
+  jb .return_reserved
+  dec ax
+  dec ax                                    ; Minus 2 because cluster ID begins at 2
 .return:
   pop si
   pop bx
   mov sp, bp
   pop bp
   ret
+.return_reserved:
+  xor ax, ax
+  dec ax                                    ; Return 0xFFFF for all cases except normal sector in the chain
 .err:
   push ds
   push fat12_getnext_err
