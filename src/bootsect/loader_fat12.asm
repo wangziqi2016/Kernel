@@ -135,15 +135,37 @@ fat12_getnext:
   mov sp, bp
   push bx                                   ; [BP - 2] - Reg save
   push si                                   ; [BP - 4] - Reg save
-.offset_hi              equ -6
-.offset_lo              equ -8
-.letter                 equ -10
-  push ax                                   ; [BP - 6] - Arg offset hi (filled later)
-  push ax                                   ; [BP - 8] - Arg offset lo (filled later)
   mov bx, [bp + 4]                          ; BX = Ptr to FAT12 param table
-  mov ax, [bp + fat12_param.letter]         ; Arg letter
-  push ax                                   ; [BP - 10] - Letter
-  
+  mov cx, ax                                
+  and cx, 1                                 ; CX = odd/even bit
+  shr ax, 1
+  mov dx, ax                                ; DX = AX / 2
+  add ax, ax                                ; AX = AX / 2 * 2
+  add ax, dx                                ; AX = AX / 2 * 3
+  add ax, cx                                ; AX = (AX / 2) * 3 + odd/even bit which is the sector number
+  mov si, ax                                ; SI = Byte offset within FAT
+  mov ax, [bx + fat12_param.reserved]
+  mov dx, DISK_SECTOR_SIZE
+  mul dx                                    ; DX:AX = Begin offset of FAT table
+  add ax, si
+  adc dx, 0                                 ; DX:AX = Begin offset of FAT entry (16 bit word)
+  mov si, cx                                ; SI = Odd/even bit
+  push dx                                   ; Arg offset high
+  push ax                                   ; Arg offset low
+  push word [bx + fat12_param.letter]       ; Arg letter
+  mov ax, DISK_OP_READ
+  call disk_op_word
+  add sp, 6
+  test si, si                               ; Zero means even, 1 means odd
+  jz .even_sect
+  shr ax, 12                                ; For odd sectors, use high 12 bits
+  jmp .after_process
+.even_sect:
+  and ax, 0fffh                             ; For even sectors, use low 12 bits
+.after_process:                             ; AX stores the next sector number
+  cmp ax, 0ff7h                             ; Everything below 0x0FF7 is normal
+  jb .return
+  xor ax, ax                                ; Otherwise it is invalid (end of chain, bad sect, etc.)
 .return:
   pop si
   pop bx
