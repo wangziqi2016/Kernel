@@ -7,7 +7,8 @@ _loader_disk_start:
 
 DISK_MAX_DEVICE   equ 8     ; The maximum number of hardware devices we could support
 DISK_MAX_RETRY    equ 3     ; The max number of times we retry for read/write failure
-DISK_SECTOR_SIZE  equ 512d  ; The byte size of a sector of the disk
+DISK_SECTOR_SIZE  equ 512   ; The byte size of a sector of the disk
+DISK_SECTOR_SHIFT equ 9     ; Number of bits that need to be shifted
 DISK_FIRST_HDD_ID equ 80h   ; The device ID of first HDD
 
 ; Error code for disk operations

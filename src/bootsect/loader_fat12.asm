@@ -16,6 +16,7 @@ struc fat12_param           ; This defines FAT12 file system metadata
   .num_fat:          resb 1 ; Number of FAT tables (Sector 1, 0x10)
   .root_size:        resw 1 ; Number of entries in the root (root cannot be extended, Sector 1, 0x11)
   .fat_size:         resw 1 ; Number of sectors per FAT (Sector 1, 0x16)
+  .root_begin:       resw 1 ; Offset of sector that root begins (from 0), derived from above values
   .data_begin:       resw 1 ; Offset of sector that data begins (from 0), derived from above values
   .padding:          resb 1 ; Padding
   .letter:           resb 1 ; Assigned letter of the drive
@@ -116,8 +117,11 @@ db 00h                                     ; Marks the end of table
   add ax, [bx + fat12_param.reserved]
   push word [bx + fat12_param.fat_size]     ; Push FAT size
   push word [bx + fat12_param.reserved]     ; Push # of reserved sectors
-  mov [bx + fat12_param.data_begin], ax     ; Begin LBA (from zero) of data section
+  mov [bx + fat12_param.root_begin], ax     ; Begin LBA (from zero) of data section
   push ax                                   ; Push data begin
+  mov cx, [bx + fat12_param.root_size]      ; CX = Number of entries in the root
+  shl cx, FAT12_DIR_SHIFT                   ; CX = Number of bytes in the root
+  
   mov ax, [bx + fat12_param.letter]
   push ax                                   ; Push letter
   push fat12_init_str                       ; Push format string
@@ -183,7 +187,7 @@ fat12_getnext:
   push fat12_getnext_err
   call bsod_fatal
 
-fat12_init_str: db "FAT12 @ %c DATA BEGIN %u (RSV %u FAT SZ %u #FAT %u)", 0ah, 00h
+fat12_init_str: db "FAT12 @ %c DATA %u ROOT %u (RSV %u FAT SZ %u #FAT %u)", 0ah, 00h
 fat12_init_err: db "FAT12 Init Error: %s", 0ah, 00h
 fat12_init_inv_csz: db "Cluster size not 1", 0ah, 00h ; Failure reason, cluster size is greater than 1
 fat12_getnext_err: db "FAT12 invarg getnext", 0ah, 00h
