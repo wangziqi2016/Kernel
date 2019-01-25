@@ -14,6 +14,7 @@ struc fat12_param           ; This defines FAT12 file system metadata
   .fat_size:         resw 1 ; Number of sectors per FAT (Sector 1, 0x16)
   .data_begin:       resw 1 ; Offset of sector that data begins (from 0), derived from above values
   .padding:          resb 1 ; Padding
+  .letter:           resb 1 ; Assigned letter of the drive
   .size:
 endstruc
 
@@ -66,6 +67,8 @@ fat12_init:
     DISK_FS_FAT12                           ; Adding FS type explicitly
   xchg ax, bx                               ; BX = Ptr to the FAT12 param; AX = new pointer
   mov [bx + fat12_param.disk_param], ax     ; Store the back pointer
+  mov al, [bp + .letter]                    ; AL = Letter
+  mov [bx + fat12_param.letter], al         ; Stoer the letter for disk function calls
   xor ax, ax
   mov [bp + .addr_lo], ax                   ; Clear high bits of the address (we only use low 256 bytes for sure)
   mov di, .offset_table                     ; DI uses DS as implicit segment
@@ -123,7 +126,7 @@ db 00h                                     ; Marks the end of table
 
 ; Returns the next sector given a sector
 ;   AX - The sector number
-;   [BP + 4] - Disk letter
+;   [BP + 4] - Ptr to the current instance of FAT12 table
 ; Return:
 ;   AX - Next sector number. 0 means invalid sector b/c sector 0 must be boot record
 ;   BSOD on error. No invalid sector should be used to call this function
@@ -132,10 +135,7 @@ fat12_getnext:
   mov sp, bp
   push bx
   mov ax, [bp + 4]
-  call disk_getparam
-  jc .err
-  mov bx, ax
-  mov bx, [bx + disk_param.fsptr]
+  
 .return:
   pop bx
   mov sp, bp
