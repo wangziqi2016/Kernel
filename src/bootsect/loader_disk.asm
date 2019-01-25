@@ -16,11 +16,14 @@ DISK_ERR_INT13H_FAIL    equ 2
 DISK_ERR_RESET_ERROR    equ 3
 DISK_ERR_INVALID_LBA    equ 4
 
+DISK_FS_NONE            equ 0
+DISK_FS_FAT12           equ 1
+
 struc disk_param    ; This defines the structure of the disk parameter table
   .number:   resb 1 ; The BIOS assigned number for the device
   .letter:   resb 1 ; The letter we use to represent the device, starting from 'A'; Also used as index
   .type:     resb 1 
-  .unused:   resb 1
+  .fstype:   resb 1 ; Type of the FS
   .sector:   resw 1 ; # of sectors
   .head:     resw 1 ; # of heads
   .track:    resw 1 ; # of tracks
@@ -156,6 +159,8 @@ disk_probe:
   mov [bx + disk_param.capacity + 2], dx ; Store this as capacity in terms of sectors
   mov ax, [bp + .curr_number]          ; Low byte number high byte letter
   mov [bx + disk_param.number], ax     ; Save the above info into the table
+  mov [bx + disk_param.fstype], \
+    DISK_FS_NONE                       ; Initialize fstype to zero
   call .print_found                    ; Register will be destroyed in this routine
   inc byte [bp + .curr_number]         ; Increment the current letter and device number
   inc byte [bp + .curr_letter]
