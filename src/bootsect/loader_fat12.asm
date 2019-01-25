@@ -23,6 +23,13 @@ struc fat12_param           ; This defines FAT12 file system metadata
   .size:
 endstruc
 
+struc fat12_dir           ; This defines FAT12 directory structure (standard 8.3 file name)
+  .name:             resb 8 ; File name
+  .suffix:           resb 3 ; Suffix
+  .attr:             resb 1 ; File attribute
+  .size:
+endstruc
+
 ; Initialization. This must be called after disk_mapping and disk_buffer is setup 
 ; because we use disk buffered I/O to perform init
 fat12_init:
@@ -151,6 +158,7 @@ fat12_open:
     DISK_FS_FAT12                           ; If the fs type is not FAT12 report error
   jne .err
   mov ax, [bx + disk_param.fsptr]           ; Return ptr to fat12_param in AX
+  clc
   ret
 .err:
   stc
