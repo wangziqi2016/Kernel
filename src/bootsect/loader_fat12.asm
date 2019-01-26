@@ -178,7 +178,8 @@ fat12_open:
 ;   AX - The sector number
 ;   [BP + 4] - Ptr to the current instance of FAT12 table
 ; Return:
-;   AX - Next sector number, beginning from 0. 0xFFFF means other cases (free, invalid, end of chain, etc.)
+;   AX - Next sector number, beginning from 0, relative to data area. 0xFFFF means other 
+;        cases (free, invalid, end of chain, etc.)
 ;   BSOD on error. No invalid sector should be used to call this function
 fat12_getnext:
   push bp
@@ -188,7 +189,7 @@ fat12_getnext:
   mov bx, [bp + 4]                          ; BX = Ptr to FAT12 param table
   cmp ax, 2                                 ; Cluster numbering begins at 2 (b/c 0x0000 means empty)
   jb .err
-  mov si, [bp + fat12_param.disk_param]     ; SI = disk param ptr
+  mov si, [bx + fat12_param.disk_param]     ; SI = disk param ptr
   mov cx, [ds:si + disk_param.capacity]     ; CX = Low word of disk capacity. For FAT12 we know high word is 0
   sub cx, [bx + fat12_param.data_begin]
   inc cx
@@ -206,14 +207,18 @@ fat12_getnext:
   mov ax, [bx + fat12_param.reserved]
   mov dx, DISK_SECTOR_SIZE
   mul dx                                    ; DX:AX = Begin offset of FAT table
-  add ax, si
-  adc dx, 0                                 ; DX:AX = Begin offset of FAT entry (16 bit word)
+  add ax, si                                ; Add byte offset within table
+  adc dx, 0                                 ; DX:AX = Begin offset of FAT entry odd/even (16 bit word)
   mov si, cx                                ; SI = Odd/even bit
   push dx                                   ; Arg offset high
   push ax                                   ; Arg offset low
   push word [bx + fat12_param.letter]       ; Arg letter
   mov ax, DISK_OP_READ
   call disk_op_word
+;push ax
+;call video_putuint16
+;while1
+  ;jc .err                                   ; It will BSOD, do not need to clear stack
   add sp, 6
   test si, si                               ; Zero means even, 1 means odd
   jz .even_sect
@@ -227,6 +232,7 @@ fat12_getnext:
   cmp ax, 0002h                             ; Everything below 0x2 is reserved
   jb .return_reserved
   dec ax
+.return_reserved_before_dec:
   dec ax                                    ; Minus 2 because cluster ID begins at 2
 .return:
   pop si
@@ -236,7 +242,7 @@ fat12_getnext:
   ret
 .return_reserved:
   xor ax, ax
-  dec ax                                    ; Return 0xFFFF for all cases except normal sector in the chain
+  jmp .return_reserved_before_dec           ; The dec is shared
 .err:
   push ds
   push fat12_getnext_err
