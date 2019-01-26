@@ -5,11 +5,12 @@ _loader_disk_start:
 
 %define DISK_DEBUG
 
-DISK_MAX_DEVICE   equ 8     ; The maximum number of hardware devices we could support
-DISK_MAX_RETRY    equ 3     ; The max number of times we retry for read/write failure
-DISK_SECTOR_SIZE  equ 512   ; The byte size of a sector of the disk
-DISK_SECTOR_SHIFT equ 9     ; Number of bits that need to be shifted
-DISK_FIRST_HDD_ID equ 80h   ; The device ID of first HDD
+DISK_MAX_DEVICE        equ 8      ; The maximum number of hardware devices we could support
+DISK_MAX_RETRY         equ 3      ; The max number of times we retry for read/write failure
+DISK_SECTOR_SIZE       equ 512    ; The byte size of a sector of the disk
+DISK_SECTOR_SIZE_SHIFT equ 9      ; Number of bits that need to be shifted
+DISK_SECTOR_SIZE_MASK  equ 01ffh  ; Mask that leaves only sector offset bits
+DISK_FIRST_HDD_ID      equ 80h    ; The device ID of first HDD
 
 ; Error code for disk operations
 DISK_ERR_WRONG_LETTER   equ 1    
@@ -310,11 +311,11 @@ disk_op_word:
   push ax                               ; [BP - 10] - Offset
   mov ax, [bp + 8]                      ; Offset high
   mov cx, ax
-  shr ax, 9                             ; AX >>= 9 to shift out the lowest 9 bits into lower
+  shr ax, DISK_SECTOR_SIZE_SHIFT        ; AX >>= 9 to shift out the lowest 9 bits into lower
   shl cx, 7                             ; CX = offset_hi << 7, high 9 bits are low 9 bits of lba high
   push ax                               ; [BP - 12]  lba_hi
   mov ax, [bp + 6]                      ; Offset low
-  shr ax, 9                             ; AX >>= 9 to shift out the offset bits
+  shr ax, DISK_SECTOR_SIZE_SHIFT        ; AX >>= 9 to shift out the offset bits
   or ax, cx
   push ax                               ; [BP - 14] lba_lo
   mov ax, [bp + 4]
@@ -326,7 +327,7 @@ disk_op_word:
 .lba_lo      equ -14                    ; ... that disk_insert_buffer accept
 .letter      equ -16
   mov ax, [bp + 6]                      ; Offset low
-  and ax, 01ffh                         ; Extract lowest 9 bits
+  and ax, DISK_SECTOR_SIZE_MASK         ; Extract lowest 9 bits
   mov [bp + .offset], ax                ; ... and store as offset
   call disk_insert_buffer               ; Arguments have been set up
   jc .return_err                        ; We can directly use jc because stack is not cleared
