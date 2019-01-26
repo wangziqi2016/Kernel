@@ -182,7 +182,7 @@ fat12_open:
 ;   BSOD on error. No invalid sector should be used to call this function
 fat12_getnext:
   push bp
-  mov sp, bp
+  mov bp, sp
   push bx                                   ; [BP - 2] - Reg save
   push si                                   ; [BP - 4] - Reg save
   mov bx, [bp + 4]                          ; BX = Ptr to FAT12 param table
