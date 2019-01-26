@@ -247,7 +247,19 @@ fat12_getnext:
   push fat12_getnext_err
   call bsod_fatal
 
-fat12_init_str: db "FAT12 @ %c DATA %u ROOT %u (RSV %u FAT SZ %u #FAT %u)", 0ah, 00h
+; Reads a directory entry. This function takes a token that represents the current read position
+; on the disk, and modifies the token for next read. The structure of the token is transparent
+; to the caller.
+; The destination buffer has the layout of fat12_dir. The caller is responsible for parsing the struct.
+;   [BP + 4] - Low word of the token
+;   [BP + 6] - High word of the token
+;   [BP + 8] - Offset of destination buffer
+;   [BP + 10] - Segment of destination buffer
+; Return:
+;   CF is set if error; CF is cleared if success
+fat12_readdir:
+
+fat12_init_str: db "FAT12 %c DATA %u ROOT %u (RSV %u FATSZ %u #FAT %u)", 0ah, 00h
 fat12_init_err: db "FAT12 Init Error: %s", 0ah, 00h
 fat12_init_inv_csz: db "Cluster size not 1", 0ah, 00h ; Failure reason, cluster size is greater than 1
 fat12_getnext_err: db "FAT12 invarg getnext", 0ah, 00h
