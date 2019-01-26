@@ -175,12 +175,14 @@ fat12_open:
   ret
 
 ; Returns the next sector given a sector
-;   AX - The sector number
+;   AX - The clsuter number
 ;   [BP + 4] - Ptr to the current instance of FAT12 table
 ; Return:
 ;   AX - Next sector number, beginning from 0, relative to data area. 0xFFFF means other 
 ;        cases (free, invalid, end of chain, etc.)
 ;   BSOD on error. No invalid sector should be used to call this function
+;   NOTE: Input value is clsuter number, return value is sector offset from data region
+;         In order to get the cluster number we must add 2 to sector offset
 fat12_getnext:
   push bp
   mov bp, sp
@@ -215,14 +217,11 @@ fat12_getnext:
   push word [bx + fat12_param.letter]       ; Arg letter
   mov ax, DISK_OP_READ
   call disk_op_word
-;push ax
-;call video_putuint16
-;while1
-  ;jc .err                                   ; It will BSOD, do not need to clear stack
+  jc .err                                   ; It will BSOD, do not need to clear stack
   add sp, 6
   test si, si                               ; Zero means even, 1 means odd
   jz .even_sect
-  shr ax, 12                                ; For odd sectors, use high 12 bits
+  shr ax, 4                                 ; For odd sectors, use high 12 bits
   jmp .after_process
 .even_sect:
   and ax, 0fffh                             ; For even sectors, use low 12 bits
