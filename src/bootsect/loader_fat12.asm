@@ -164,20 +164,22 @@ db 00h                                     ; Marks the end of table
 ;     (i.e. DX:CX is the byte offset of the root directory entry point)
 ;   CF is set if letter is invalid or device is not FAT12
 fat12_open:
+  push bx
   call disk_getparam                        ; AX has already been set
   jc .err                                   ; Invalid letter
-  mov bx, ax                                ; BX = base address to disk_param
+  mov bx, ax                                ; BX = AX = base address to disk_param. Return AX also set here
   cmp byte [bx + disk_param.fstype], \
     DISK_FS_FAT12                           ; If the fs type is not FAT12 report error
   jne .err
   mov bx, [bx + disk_param.fsptr]           ; Pointer to fat12_param
   mov dx, [bx + fat12_param.root_begin]     ; DX = Begin sector
   xor cx, cx                                ; DX:CX = Sector:Offset = RootSector:0
-  mov ax, bx                                ; Return ptr to fat12_param in AX
   clc
+  pop bx
   ret
 .err:
   stc
+  pop bx
   ret
 
 ; Returns the next sector given a sector
@@ -279,7 +281,7 @@ fat12_readdir:
   jnz .err
 
   and ax, DISK_SECTOR_SIZE_MASK             ; Check whether the lowest 9 bits are zero
-  jz .next_sector                           ; If it is the case then go to the next sector
+  ;jz .next_sector                           ; If it is the case then go to the next sector
 .return:
   pop bx
   mov sp, bp
