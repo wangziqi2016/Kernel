@@ -138,7 +138,7 @@ db 00h                                     ; Marks the end of table
   push ax                                   ; Push root directory begin
   mov cx, [bx + fat12_param.root_size]      ; CX = # of entries in the root
   shr cx, \
-    DISK_SECTOR_SHIFT - FAT12_DIR_SHIFT     ; CX = # of sectors in the root (assume it is exact)
+    DISK_SECTOR_SIZE_SHIFT - FAT12_DIR_SHIFT; CX = # of sectors in the root (assume it is exact)
   add ax, cx
   mov [bx + fat12_param.data_begin], ax
   push ax                                   ; Push data begin sector
@@ -159,6 +159,9 @@ db 00h                                     ; Marks the end of table
 ; Return:
 ;   AX - A transparent token used to access the file system; In practice it is pointer
 ;        to the disk_param struct
+;   CX - Low word of the root token (used to access root directory)
+;   DX - High word of the root token
+;     (i.e. DX:CX is the byte offset of the root directory entry point)
 ;   CF is set if letter is invalid or device is not FAT12
 fat12_open:
   call disk_getparam                        ; AX has already been set
@@ -167,7 +170,10 @@ fat12_open:
   cmp byte [bx + disk_param.fstype], \
     DISK_FS_FAT12                           ; If the fs type is not FAT12 report error
   jne .err
-  mov ax, [bx + disk_param.fsptr]           ; Return ptr to fat12_param in AX
+  mov bx, [bx + disk_param.fsptr]           ; Pointer to fat12_param
+  mov dx, [bx + fat12_param.root_begin]     ; DX = Begin sector
+  xor cx, cx                                ; DX:CX = Sector:Offset = RootSector:0
+  mov ax, bx                                ; Return ptr to fat12_param in AX
   clc
   ret
 .err:
@@ -251,16 +257,41 @@ fat12_getnext:
 ; on the disk, and modifies the token for next read. The structure of the token is transparent
 ; to the caller.
 ; The destination buffer has the layout of fat12_dir. The caller is responsible for parsing the struct.
-;   [BP + 4] - Low word of the token
-;   [BP + 6] - High word of the token
-;   [BP + 8] - Offset of destination buffer
-;   [BP + 10] - Segment of destination buffer
+;   [BP + 4] - The FAT12 token
+;   [BP + 6] - Low word of the token
+;   [BP + 8] - High word of the token
+;   [BP + 10] - Offset of destination buffer
+;   [BP + 12] - Segment of destination buffer
 ; Return:
 ;   CF is set if error; CF is cleared if success
 fat12_readdir:
+  push bp
+  mov bp, sp
+  push bx
+  mov bx, [bp + 4]                          ; BX = Ptr to fat12_param
+  push word [bp + 8]
+  push word [bp + 6]                        ; Arg byte offset 
+  push word [bx + fat12_param.letter]       ; Arg letter
+  call disk_op_word
+  sbb cx, cx                                 ; If CF is set CX will be 0xFFFF
+  add sp, 6
+  test cx, cx
+  jnz .err
+
+  and ax, DISK_SECTOR_SIZE_MASK             ; Check whether the lowest 9 bits are zero
+  jz .next_sector                           ; If it is the case then go to the next sector
+.return:
+  pop bx
+  mov sp, bp
+  pop bp
+  ret
+.err:
+  stc                                       ; Set carry bit
+  jmp .return
 
 fat12_init_str: db "FAT12 %c DATA %u ROOT %u (RSV %u FATSZ %u #FAT %u)", 0ah, 00h
 fat12_init_err: db "FAT12 Init Error: %s", 0ah, 00h
 fat12_init_inv_csz: db "Cluster size not 1", 0ah, 00h ; Failure reason, cluster size is greater than 1
 fat12_getnext_err: db "FAT12 invarg getnext", 0ah, 00h
+fat12_readdir_err: db "readdir invarg", 0ah, 00h
 
