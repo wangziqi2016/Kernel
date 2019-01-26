@@ -167,7 +167,7 @@ fat12_open:
   push bx
   call disk_getparam                        ; AX has already been set
   jc .err                                   ; Invalid letter
-  mov bx, ax                                ; BX = AX = base address to disk_param. 
+  mov bx, ax                                ; BX = base address to disk_param. 
   cmp byte [bx + disk_param.fstype], \
     DISK_FS_FAT12                           ; If the fs type is not FAT12 report error
   jne .err
@@ -261,34 +261,53 @@ fat12_getnext:
 ; to the caller.
 ; The destination buffer has the layout of fat12_dir. The caller is responsible for parsing the struct.
 ;   [BP + 4] - The FAT12 token
-;   [BP + 6] - Low word of the token
-;   [BP + 8] - High word of the token
+;   [BP + 6] - Low word of the token (offset)
+;   [BP + 8] - High word of the token (sector)
 ;   [BP + 10] - Offset of destination buffer
 ;   [BP + 12] - Segment of destination buffer
 ; Return:
+;   AX = 0 if there are entries; Otherwise this is the last entry
 ;   CF is set if error; CF is cleared if success
 fat12_readdir:
   push bp
   mov bp, sp
-  push bx
+  push es                                   ; [BP - 2]
+  push bx                                   ; [BP - 4]
+  mov ax, LARGE_BSS
+  mov es, ax
   mov bx, [bp + 4]                          ; BX = Ptr to fat12_param
-  push word [bp + 8]
-  push word [bp + 6]                        ; Arg byte offset 
+.lba_hi             equ -6
+.lba_lo             equ -8
+.letter             equ -10
+  xor ax, ax                                ; AX = 0
+  push ax                                   ; Arg LBA hi = AX = 0 b/c we assume FAT12 does not handle > 64K sectors
+  push word [bp + 8]                        ; Arg LBA lo
   push word [bx + fat12_param.letter]       ; Arg letter
-  call disk_op_word
-  sbb cx, cx                                 ; If CF is set CX will be 0xFFFF
-  add sp, 6
-  test cx, cx
-  jnz .err
+.read_sector:
+  call disk_insert_buffer                   ; After return AX = Ptr to disk buffer entry
+  jc .err                                   ; Don't clear stack here
+  add ax, disk_buffer_entry.data            ; AX = Ptr to buffer
+  mov bx, ax                                ; BX = Ptr to the sector buffer
+.read_entry:
+  ; TODO: CHECK VALID ENTRY
+  add bx, fat12_dir.size                    ; To next entry in the sector
+  add [bp + 6], fat12_dir.size              ;
+  cmp [bp + 6], DISK_SECTOR_SIZE            ; 
+  jne .read_entry                           ; If we has not reached end of sector then read next entry
+  xor ax, ax
+  mov [bp + 6], ax
+  
 
   and ax, DISK_SECTOR_SIZE_MASK             ; Check whether the lowest 9 bits are zero
   ;jz .next_sector                           ; If it is the case then go to the next sector
 .return:
   pop bx
+  pop es
   mov sp, bp
   pop bp
   ret
 .err:
+  add sp, 6
   stc                                       ; Set carry bit
   jmp .return
 
