@@ -260,6 +260,8 @@ fat12_getnext:
 ; on the disk, and modifies the token for next read. The structure of the token is transparent
 ; to the caller.
 ; The destination buffer has the layout of fat12_dir. The caller is responsible for parsing the struct.
+; Only valid directory entries are copied. They do not include entries beginning with 0x00 (free), 0xE5 (deleted)
+; and 0x2E (. and .. entry)
 ;   [BP + 4] - The FAT12 token
 ;   [BP + 6] - Low word of the token (offset)
 ;   [BP + 8] - High word of the token (sector)
@@ -276,27 +278,34 @@ fat12_readdir:
   mov ax, LARGE_BSS
   mov es, ax
   mov bx, [bp + 4]                          ; BX = Ptr to fat12_param
-.lba_hi             equ -6
+.lba_hi             equ -6                  ; Local var
 .lba_lo             equ -8
 .letter             equ -10
   xor ax, ax                                ; AX = 0
-  push ax                                   ; Arg LBA hi = AX = 0 b/c we assume FAT12 does not handle > 64K sectors
-  push word [bp + 8]                        ; Arg LBA lo
-  push word [bx + fat12_param.letter]       ; Arg letter
+  push ax                                   ; [BP - 6] Arg LBA hi = AX = 0 b/c we assume FAT12 does not handle > 64K sectors
+  push word [bp + 8]                        ; [BP - 8] Arg LBA lo
+  push word [bx + fat12_param.letter]       ; [BP - 10] Arg letter
 .read_sector:
   call disk_insert_buffer                   ; After return AX = Ptr to disk buffer entry
   jc .err                                   ; Don't clear stack here
-  add ax, disk_buffer_entry.data            ; AX = Ptr to buffer
-  mov bx, ax                                ; BX = Ptr to the sector buffer
+  add ax, disk_buffer_entry.data            ; AX = Ptr to buffer data area
+  add ax, [bp + 6]                          ; AX = Ptr to current dir entry in the buffer
+  mov bx, ax                                ; BX = Ptr to current dir entry in the buffer
 .read_entry:
   ; TODO: CHECK VALID ENTRY
-  add bx, fat12_dir.size                    ; To next entry in the sector
-  add [bp + 6], fat12_dir.size              ;
-  cmp [bp + 6], DISK_SECTOR_SIZE            ; 
-  jne .read_entry                           ; If we has not reached end of sector then read next entry
+.continue:
+  mov ax, fat12_dir.size
+  add bx, ax                                ; To next entry in the sector
+  add [bp + 6], ax                          ; Also modify the argument
+  cmp [bp + 6], DISK_SECTOR_SIZE            ; Check if current read offset reached the end of the sector
+  jne .read_entry                           ; If we has not reached end of sector then keep reading next entry
   xor ax, ax
-  mov [bp + 6], ax
-  
+  mov [bp + 6], ax                          ; Offset is cleared to zero - to the beginning of next sector, if any
+  mov ax, [bx + fat12_param.data_begin]     ; AX = Sector that data begins (i.e. non-root dir should be after this)
+  cmp [bp + lba_lo], ax                     ; Compare the root LBA with data area sector
+  jb .next_sector_root                      ; If below then it is root and the area is consecutive
+
+next_sector_root:
 
   and ax, DISK_SECTOR_SIZE_MASK             ; Check whether the lowest 9 bits are zero
   ;jz .next_sector                           ; If it is the case then go to the next sector
@@ -309,6 +318,10 @@ fat12_readdir:
 .err:
   add sp, 6
   stc                                       ; Set carry bit
+  jmp .return
+ret_nomore:                                 ; Jump to here if no more entry is in the directory
+  xor ax, ax
+  inc ax
   jmp .return
 
 fat12_init_str: db "FAT12 %c DATA %u ROOT %u (RSV %u FATSZ %u #FAT %u)", 0ah, 00h
