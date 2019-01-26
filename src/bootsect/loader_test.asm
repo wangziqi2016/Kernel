@@ -141,6 +141,10 @@ helper_print_ax_cf:
 ; Tests FAT 12 getnext() function
 fat12_getnext_test:
   push si
+  mov ax, 'B'
+  call fat12_open                          ; Returns the pointer to fat12_param
+  jc .err
+  push ax                                  ; fat12_getnext takes this as stack arg
   mov si, 2
 .body:
   cmp si, 20                               ; Test first 20 sectors (clusters)
@@ -151,8 +155,14 @@ fat12_getnext_test:
   inc si
   jmp .body
 .return:
+  pop ax
   pop si
   ret
+.err:
+  push ds
+  push .str1
+  call bsod_fatal
+.str1: db "fat12 open error", 0ah, 00h
 
 printf_test:
   push dword 675973885
