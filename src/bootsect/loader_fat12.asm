@@ -167,19 +167,20 @@ fat12_open:
   push bx
   call disk_getparam                        ; AX has already been set
   jc .err                                   ; Invalid letter
-  mov bx, ax                                ; BX = AX = base address to disk_param. Return AX also set here
+  mov bx, ax                                ; BX = AX = base address to disk_param. 
   cmp byte [bx + disk_param.fstype], \
     DISK_FS_FAT12                           ; If the fs type is not FAT12 report error
   jne .err
   mov bx, [bx + disk_param.fsptr]           ; Pointer to fat12_param
   mov dx, [bx + fat12_param.root_begin]     ; DX = Begin sector
   xor cx, cx                                ; DX:CX = Sector:Offset = RootSector:0
-  clc
+  mov ax, bx                                ; AX = Ptr to fat12_param
   pop bx
+  clc
   ret
 .err:
-  stc
   pop bx
+  stc
   ret
 
 ; Returns the next sector given a sector
