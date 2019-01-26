@@ -137,7 +137,18 @@ helper_print_ax_cf:
   ret
 .str1: db "AX = %x, CF = %u", 0ah, 00h
 
+; Tests FAT 12 getnext() function
+fat12_getnext_test:
+  push si
+  xor si, si
+.body:
+  cmp si, 20                               ; Test first 20 sectors (clusters)
+  je .return
 
+  dec si
+.return:
+  pop si
+  ret
 
 printf_test:
   push dword 675973885
