@@ -3,12 +3,7 @@ _loader_mem_start:
 ; loader_mem.asm - This file contains memory functions
 ;
 
-; This is the large BSS's segment address. We could start using this
-; address range from offset 0x10 (note that 0x0 - 0xf are still within 1MB
-; and is potentially used )
-MEM_LARGE_BSS_SEG equ 0ffffh
-
-  ; This function initializes memory management
+; This function initializes memory management
 mem_init:
   ; If A20 is enabled, then we continue with other jobs
   call mem_check_a20

@@ -11,6 +11,7 @@ DISK_SECTOR_SIZE       equ 512    ; The byte size of a sector of the disk
 DISK_SECTOR_SIZE_SHIFT equ 9      ; Number of bits that need to be shifted
 DISK_SECTOR_SIZE_MASK  equ 01ffh  ; Mask that leaves only sector offset bits
 DISK_FIRST_HDD_ID      equ 80h    ; The device ID of first HDD
+DISK_BUFFER_SEG        equ LARGE_BSS ; Segment of disk buffer
 
 ; Error code for disk operations
 DISK_ERR_WRONG_LETTER   equ 1    

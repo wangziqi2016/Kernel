@@ -31,9 +31,9 @@ _loader_start:
 
 %define while1 .die: jmp .die
 
-SYS_DS equ        8000h       ; System code, data and bss
-SYS_SS equ        9000h       ; System stack
-LARGE_BSS_SEG equ 0ffffh      ; Large bss (A20)
+SYS_DS       equ 8000h       ; System code, data and bss
+SYS_SS       equ 9000h       ; System stack
+LARGE_BSS    equ 0ffffh      ; Large BSS segment after A20 is activated
 
 section .text
 	org	0200h ; Because we load the image from floppy disk including sector 0. $$ will evaluates to 0x200
