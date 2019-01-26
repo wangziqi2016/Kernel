@@ -115,27 +115,29 @@ dist_rw_test:
   push word 'A'
   mov ax, DISK_OP_WRITE
   call disk_op_word
-  setc cl
-  xor ch, ch
-  push cx
-  push ax
-  push .str1
-  call video_printf_near                   ; Should print "FAAA", 0xAA from previous sect, 0xFA from next
-  add sp, 6
+  call disk_print_buffer                   ; Should print "1234", 0xAA from previous sect, 0xFA from next
   mov ax, DISK_OP_READ
   call disk_op_word
-  setc cl
-  xor ch, ch
-  push cx
-  push ax
-  push .str1
-  call video_printf_near                   ; Should print "FAAA", 0xAA from previous sect, 0xFA from next
-  add sp, 6                                ; Clears printf arguments
+  call helper_print_ax_cf                  ; Should print "1234", the value we wrote
   mov ax, DISK_DEBUG_EVICT                 ; Tests force evict
   call disk_print_buffer
   add sp, 8                                ; Clears two disk_op_word arguments
   ret
+
+; This helper function prints AX and CF value. Must be called immediately after 
+; the call returns.
+helper_print_ax_cf:
+  setc cl
+  xor ch, ch
+  push cx
+  push ax
+  push .str1
+  call video_printf_near
+  add sp, 6                                ; Clears printf arguments
+  ret
 .str1: db "AX = %x, CF = %u", 0ah, 00h
+
+
 
 printf_test:
   push dword 675973885
