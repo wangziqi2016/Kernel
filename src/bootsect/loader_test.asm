@@ -13,6 +13,7 @@ disk_test:
   call disk_op_test
   call disk_buffer_test
   call dist_rw_test
+  call fat12_getnext_test
   retn
 
 disk_param_test:
@@ -100,7 +101,7 @@ disk_buffer_test:
   mov ax, DISK_DEBUG_NONE
   call disk_print_buffer
   push .str1
-  call video_printf_near
+  call video_printf_near  ; Print AX = 4 (invalid LBA)
   add sp, 10
 .return:
   pop si
@@ -115,7 +116,7 @@ dist_rw_test:
   push word 'A'
   mov ax, DISK_OP_WRITE
   call disk_op_word
-  call disk_print_buffer                   ; Should print "1234", 0xAA from previous sect, 0xFA from next
+  call helper_print_ax_cf                  ; Should print "1234", 0xAA from previous sect, 0xFA from next
   mov ax, DISK_OP_READ
   call disk_op_word
   call helper_print_ax_cf                  ; Should print "1234", the value we wrote
@@ -140,12 +141,15 @@ helper_print_ax_cf:
 ; Tests FAT 12 getnext() function
 fat12_getnext_test:
   push si
-  xor si, si
+  mov si, 2
 .body:
   cmp si, 20                               ; Test first 20 sectors (clusters)
   je .return
-
-  dec si
+  mov ax, si
+  call fat12_getnext
+  call helper_print_ax_cf
+  inc si
+  jmp .body
 .return:
   pop si
   ret
