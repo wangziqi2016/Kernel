@@ -88,7 +88,7 @@ disk_buffer_init:
   push bx                         ; Length
   xor ax, ax
   push ax                         ; Value
-  push word MEM_LARGE_BSS_SEG     ; Segment
+  push word LARGE_BSS             ; Segment
   mov ax, [disk_buffer]
   push ax                         ; Offset
   call memset                     ; Sets the buffer space to zero
@@ -305,7 +305,7 @@ disk_op_word:
   mov bp, sp
   push es                               ; [BP - 2]
   push bx                               ; [BP - 4] - Note: Must clear arguments before restoring these two reg
-  push word MEM_LARGE_BSS_SEG
+  push word LARGE_BSS
   pop es                                ; Load ES as the segment of buffer
   push ax                               ; [BP - 6] - Operation code (R/W)
   push ax                               ; [BP - 8] - Buffer data
@@ -410,7 +410,7 @@ disk_insert_buffer:
   add bx, [disk_buffer]         ; BX = table base + entry offset
   mov ax, cx                    ; AX = Table index
   xor si, si                    ; SI begins at 0
-  push word MEM_LARGE_BSS_SEG
+  push word LARGE_BSS
   pop es
   ;mov bx, [disk_buffer]         ; ES:BX = Address of buffer entries
   ;xor ax, ax
@@ -546,7 +546,7 @@ disk_print_buffer:
   push di
   mov di, ax                                   ; DI = options passed via AX
   mov bx, [disk_buffer]
-  push word MEM_LARGE_BSS_SEG
+  push word LARGE_BSS
   pop es                                       ; ES:BX = Buffer pointer
   xor si, si                                   ; SI = index on the buffer table
 .body:
