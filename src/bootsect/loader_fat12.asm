@@ -263,6 +263,7 @@ fat12_getnext:
 ; The destination buffer has the layout of fat12_dir. The caller is responsible for parsing the struct.
 ; Only valid directory entries are copied. They do not include entries beginning with 0x00 (free), 0xE5 (deleted)
 ; and 0x2E (. and .. entry)
+; Long file name entries with attr being 0x0F are also ignored
 ;   [BP + 4] - The FAT12 token
 ;   [BP + 6] - Low word of the token (offset)
 ;   [BP + 8] - High word of the token (sector) -> Note that the above three corresponds to AX, CX, DX of fat12_open
@@ -302,6 +303,9 @@ fat12_readdir:
   cmp al, 2eh                               ; 0x2E - Dot entry
   je .continue
   cmp al, 0e5h                              ; 0xE5 - Deleted entry
+  je .continue
+  mov al, [es:bx + fat12_dir.attr]
+  cmp al, 0fh                               ; Attr 0x0F - Long name entry
   je .continue
   push word FAT12_DIR_LENGTH                ; Size of copy
   push es                                   ; Src segment
