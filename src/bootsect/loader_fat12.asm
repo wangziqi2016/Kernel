@@ -269,7 +269,7 @@ fat12_getnext:
 ;   [BP + 10] - Offset of destination buffer
 ;   [BP + 12] - Segment of destination buffer
 ; Return:
-;   AX = 0 if there are entries; Otherwise this is the last entry
+;   AX = 0 if there are entries; Otherwise this is the last entry (most likely AX = 1)
 ;   CF is set if error; CF is cleared if success
 fat12_readdir:
   push bp
@@ -287,6 +287,8 @@ fat12_readdir:
   push ax                                   ; [BP - 8] Arg LBA hi = AX = 0 b/c we assume FAT12 does not handle > 64K sectors
   push word [bp + 8]                        ; [BP - 10] Arg LBA lo
   push word [si + fat12_param.letter]       ; [BP - 12] Arg letter
+  cmp word [bp + 6], DISK_SECTOR_SIZE       ; This deals with the corner case that offset is sector size (previous 
+  je .continue_no_inc                       ;   ... read returns a valid entry which is the last in the sector)
 .read_sector:
   call disk_insert_buffer                   ; After return AX = Ptr to disk buffer entry
   jc .err                                   ; Don't clear stack here
@@ -308,6 +310,7 @@ fat12_readdir:
   push word [bp + 10]                       ; Dest offset
   call memcpy_nonalias
   add sp, 10
+  add word [bp + 6], FAT12_DIR_LENGTH       ; Increment offset
   xor ax, ax                                ; This will also clear CF
   jmp .return                               ; Finished copy and return
 .continue:
@@ -316,6 +319,7 @@ fat12_readdir:
   add bx, ax                                ; Increment BX also for next read
   cmp [bp + 6], word DISK_SECTOR_SIZE       ; Check if current read offset reached the end of the sector
   jne .read_entry                           ; If we has not reached end of sector then keep reading next entry
+.continue_no_inc:
   xor ax, ax
   mov [bp + 6], ax                          ; Offset is cleared to zero - to the beginning of next sector, if any
   mov ax, [si + fat12_param.data_begin]     ; AX = Sector that data begins (i.e. non-root dir should be after this)
