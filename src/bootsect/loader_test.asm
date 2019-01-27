@@ -164,6 +164,27 @@ fat12_getnext_test:
   call bsod_fatal
 .str1: db "fat12 open error", 0ah, 00h
 
+; Tests fat12_readdir
+fat12_readdir_test:
+  sub sp, DISK_SECTOR_SIZE
+  mov ax, 'B'
+  call fat12_open
+  push ss
+  push sp                                ; Dest buffer
+  push dx
+  push cx
+  push ax                                ; Two tokens, one for root another for FAT12
+.body:
+  call 
+.return:
+  add sp, DISK_SECTOR_SIZE
+  ret
+.err:
+  push ds
+  push .str
+  call bsod_fatal
+.str: db "fat12_readdir err", 0ah, 00h
+
 printf_test:
   push dword 675973885
   push ds
