@@ -294,7 +294,20 @@ fat12_readdir:
   add ax, [bp + 6]                          ; AX = Ptr to current dir entry in the buffer
   mov bx, ax                                ; BX = Ptr to current dir entry in the buffer
 .read_entry:
-  ; TODO: CHECK VALID ENTRY
+  mov al, [es:bx]                           ; Read first byte of the dir entry - note that we must use ES segment
+  test al, al                               ; 0x00 - empty entry
+  jz .continue
+  cmp al, 2eh                               ; 0x2E - Dot entry
+  je .continue
+  cmp al, e5h                               ; 0xE5 - Deleted entry
+  je .continue
+  push word FAT12_DIR_LENGTH                ; Size of copy
+  push es                                   ; Src segment
+  push bx                                   ; Src offset
+  push word [bp + 12]                       ; Dest segment
+  push word [bp + 10]                       ; Dest offset
+  call memcpy_nonalias
+  add sp, 10
 .continue:
   mov ax, fat12_dir.size
   add bx, ax                                ; To next entry in the sector
