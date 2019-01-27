@@ -11,6 +11,16 @@ typedef struct {
   size_t size;
 } img_t;
 
+typedef struct {
+  int cluster_size;        // Number of sectors per cluster; Only supports 1
+  int fat_size;            // Number of sectors in a FAT
+  int fat_num;             // Number of FAT in the image
+  int reserved;            // Number of reserved sectors before the FAT (incl. bootsect)
+  int root_size;           // Number of sectors for root directory
+  int root_begin;          // Sector ID for root
+  int data_begin;          // Sector ID for data
+} fat12_t; 
+
 img_t *img_init(const char *filename) {
   img_t *img = (img_t *)malloc(sizeof(img_t));
   if(img == NULL) error_exit("Cannot allocate img_t\n");
