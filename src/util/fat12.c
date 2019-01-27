@@ -46,6 +46,15 @@ void img_free(img_t *img) {
   free(img);
 }
 
+fat12_t *fat12_init(img_t *img) {
+  fat12_t *fat12 = (fat12_t *)malloc(sizeof(fat12_t));
+  if(fat12 == NULL) error_exit("Cannot allocate fat12_t\n");
+  
+  return fat12;
+}
+
+void fat12_free(fat12_t *fat12) { free(fat12); }
+
 int main() {
   return 0;
 }
