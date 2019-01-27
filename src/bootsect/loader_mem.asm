@@ -115,17 +115,16 @@ mem_enable_a20_via_8042:
   jnz .empty_8042
   retn
 
-  ; This function copies memory regions that are not overlapped
-  ;   [SP + 0] - Dest offset
-  ;   [SP + 2] - Dest segment
-  ;   [SP + 4] - Source offset
-  ;   [SP + 6] - Source segment
-  ;   [SP + 8] - Length
-  ; Note that this function changes the DS register. This is fine for ISR
-  ; as ISR will save DS and load it with sys DS value.
+; This function copies memory regions that are not overlapped
+;   [BP + 4] - Dest offset
+;   [BP + 6] - Dest segment
+;   [BP + 8] - Source offset
+;   [BP + 10] - Source segment
+;   [BP + 12] - Length
+; Note that this function changes the DS register. This is fine for ISR
+; as ISR will save DS and load it with sys DS value.
 memcpy_nonalias:
   push bp
-  ; BP points to SP using entrance point as reference
   mov bp, sp
   push ds 
   push si
@@ -137,11 +136,9 @@ memcpy_nonalias:
   mov di, [bp + 4]
   mov es, [bp + 6]
 .body:  
-  ; Whether we have finished copying
-  test cx, cx
+  test cx, cx         ; Whether we have finished copying
   je .return
-  ; Whether there is only 1 byte left
-  cmp cx, 1
+  cmp cx, 1           ; Whether there is only 1 byte left
   je .last_byte
   mov ax, [ds:si]
   mov [es:di], ax
@@ -150,8 +147,7 @@ memcpy_nonalias:
   add di, 2
   jmp .body
 .last_byte:
-  ; Copy one byte and return
-  mov al, [ds:si]
+  mov al, [ds:si]     ; Copy one byte and return
   mov [es:di], al
 .return:
   pop di
