@@ -6,8 +6,9 @@ _loader_fat12_start:
 ; of 1 word is sufficient, because we can address 32MB. Using offset of 1 word
 ; is problematic because only 64KB can be addressed
 
-FAT12_DIR_LENGTH     equ 32 ; Byte size of directory record 
-FAT12_DIR_SHIFT      equ 5  ; log2(FAT12_DIR_LENGTH)
+FAT12_DIR_LENGTH     equ 32     ; Byte size of directory record 
+FAT12_DIR_SHIFT      equ 5      ; log2(FAT12_DIR_LENGTH)
+FAT12_INV_SECTOR     equ 0ffffh ; Invalid sector returned from getnext
 
 struc fat12_param           ; This defines FAT12 file system metadata
   .disk_param:       resw 1 ; Back pointer to disk parameter
@@ -188,7 +189,7 @@ fat12_open:
 ;   [BP + 4] - Ptr to the current instance of FAT12 table
 ; Return:
 ;   AX - Next sector number, beginning from 0, relative to data area. 0xFFFF means other 
-;        cases (free, invalid, end of chain, etc.)
+;        cases (free, invalid, end of chain, etc.).
 ;   BSOD on error. No invalid sector should be used to call this function
 ;   NOTE: Input value is clsuter number, return value is sector offset from data region
 ;         In order to get the cluster number we must add 2 to sector offset
@@ -275,16 +276,17 @@ fat12_readdir:
   mov bp, sp
   push es                                   ; [BP - 2]
   push bx                                   ; [BP - 4]
+  push si                                   ; [BP - 6]
   mov ax, LARGE_BSS
   mov es, ax
-  mov bx, [bp + 4]                          ; BX = Ptr to fat12_param
-.lba_hi             equ -6                  ; Local var
-.lba_lo             equ -8
-.letter             equ -10
+  mov si, [bp + 4]                          ; SI = Ptr to fat12_param
+.lba_hi             equ -8                  ; Local var
+.lba_lo             equ -10
+.letter             equ -12
   xor ax, ax                                ; AX = 0
-  push ax                                   ; [BP - 6] Arg LBA hi = AX = 0 b/c we assume FAT12 does not handle > 64K sectors
-  push word [bp + 8]                        ; [BP - 8] Arg LBA lo
-  push word [bx + fat12_param.letter]       ; [BP - 10] Arg letter
+  push ax                                   ; [BP - 8] Arg LBA hi = AX = 0 b/c we assume FAT12 does not handle > 64K sectors
+  push word [bp + 8]                        ; [BP - 10] Arg LBA lo
+  push word [si + fat12_param.letter]       ; [BP - 12] Arg letter
 .read_sector:
   call disk_insert_buffer                   ; After return AX = Ptr to disk buffer entry
   jc .err                                   ; Don't clear stack here
@@ -301,15 +303,30 @@ fat12_readdir:
   jne .read_entry                           ; If we has not reached end of sector then keep reading next entry
   xor ax, ax
   mov [bp + 6], ax                          ; Offset is cleared to zero - to the beginning of next sector, if any
-  mov ax, [bx + fat12_param.data_begin]     ; AX = Sector that data begins (i.e. non-root dir should be after this)
-  cmp [bp + lba_lo], ax                     ; Compare the root LBA with data area sector
+  mov ax, [si + fat12_param.data_begin]     ; AX = Sector that data begins (i.e. non-root dir should be after this)
+  cmp [bp + .lba_lo], ax                    ; Compare the root LBA with data area sector
   jb .next_sector_root                      ; If below then it is root and the area is consecutive
-
-next_sector_root:
-
-  and ax, DISK_SECTOR_SIZE_MASK             ; Check whether the lowest 9 bits are zero
-  ;jz .next_sector                           ; If it is the case then go to the next sector
+  mov ax, [bp + 8]                          ; AX = Current sector
+  inc ax
+  inc ax                                    ; AX = Current cluster (begin at 2)
+  push word [bp + 4]                        ; Arg FAT12 token (ptr to fat12_param)
+  call fat12_getnext                        ; Return next sector offset in data area (NOT cluster!)
+  pop cx                                    ; Clear stack; CX is destroyed
+  cmp ax, FAT12_INV_SECTOR                  ; Check validity
+  je .ret_nomore                            ; If the next sectof of the dir is invalid just return
+  add ax, [si + fat12_param.data_begin]     ; AX = LBA to next sector
+  mov [bp + 8], ax
+  mov [bp + .lba_lo], ax                    ; Update both arg and local var
+  jmp .read_sector
+next_sector_root:                           ; AX = data begin sector on entering this block
+  inc [bp + 8]                              ; Modify next sector in return arg
+  inc [bp + .lba_lo]                        ; Modify next sector we are about to read
+  cmp [bp + .lba_lo], ax                    ; Compare the sector after increment
+  je .ret_nomore                            ; If it equals the data region start then we reached the end of root
+  jmp .read_sector
 .return:
+  add sp, 6                                 ; This will reset CF
+  pop si
   pop bx
   pop es
   mov sp, bp
@@ -319,7 +336,7 @@ next_sector_root:
   add sp, 6
   stc                                       ; Set carry bit
   jmp .return
-ret_nomore:                                 ; Jump to here if no more entry is in the directory
+.ret_nomore:                                 ; Jump to here if no more entry is in the directory
   xor ax, ax
   inc ax
   jmp .return
