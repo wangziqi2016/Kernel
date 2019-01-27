@@ -18,8 +18,8 @@ all: $(BIN)
 binpad: binpad.c Makefile
 	$(CXX) binpad.c -o binpad $(CXXFLAGS) $(LDFLAGS)
 
-ofs: ofs.c Makefile
-	$(CXX) ofs.c -o ofs $(CXXFLAGS) $(LDFLAGS)
+fat12: fat12.c Makefile
+	$(CXX) fat12.c -o fat12 $(CXXFLAGS) $(LDFLAGS)
 
 clean:
 	rm -f $(BIN)
