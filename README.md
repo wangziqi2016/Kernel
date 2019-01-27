@@ -1,5 +1,11 @@
 # Kernel
 
+Update (Important!)
+===================
+
+Design and usage documents have been moved to [/src/doc](src/doc/readme.md). Everything
+below this section is no longer maintained and may be inaccurate.
+
 Makefile
 ========
 
