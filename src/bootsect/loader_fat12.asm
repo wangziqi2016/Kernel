@@ -162,7 +162,7 @@ db 00h                                     ; Marks the end of table
 ;        to the disk_param struct
 ;   CX - Low word of the root token (used to access root directory)
 ;   DX - High word of the root token
-;     (i.e. DX:CX is the byte offset of the root directory entry point)
+;     (i.e. DX:CX is the sector:offset of root directory entry point)
 ;   CF is set if letter is invalid or device is not FAT12
 fat12_open:
   push bx
@@ -265,7 +265,7 @@ fat12_getnext:
 ; and 0x2E (. and .. entry)
 ;   [BP + 4] - The FAT12 token
 ;   [BP + 6] - Low word of the token (offset)
-;   [BP + 8] - High word of the token (sector)
+;   [BP + 8] - High word of the token (sector) -> Note that the above three corresponds to AX, CX, DX of fat12_open
 ;   [BP + 10] - Offset of destination buffer
 ;   [BP + 12] - Segment of destination buffer
 ; Return:
@@ -279,8 +279,8 @@ fat12_readdir:
   push si                                   ; [BP - 6]
   mov ax, LARGE_BSS
   mov es, ax
-  mov si, [bp + 4]                          ; SI = Ptr to fat12_param
-.lba_hi             equ -8                  ; Local var
+  mov si, [bp + 4]                          ; SI = Ptr to fat12_param, will not change below
+.lba_hi             equ -8                  ; Local var, also used as arg to buffer read func
 .lba_lo             equ -10
 .letter             equ -12
   xor ax, ax                                ; AX = 0
@@ -308,10 +308,12 @@ fat12_readdir:
   push word [bp + 10]                       ; Dest offset
   call memcpy_nonalias
   add sp, 10
+  xor ax, ax                                ; This will also clear CF
+  jmp .return                               ; Finished copy and return
 .continue:
   mov ax, fat12_dir.size
-  add bx, ax                                ; To next entry in the sector
-  add [bp + 6], ax                          ; Also modify the argument
+  add [bp + 6], ax                          ; Increment offset to point to the next dir entry
+  add bx, ax                                ; Increment BX also for next read
   cmp [bp + 6], word DISK_SECTOR_SIZE       ; Check if current read offset reached the end of the sector
   jne .read_entry                           ; If we has not reached end of sector then keep reading next entry
   xor ax, ax
@@ -338,7 +340,6 @@ fat12_readdir:
   je .ret_nomore                            ; If it equals the data region start then we reached the end of root
   jmp .read_sector
 .return:                                    ; Normal case do not set CF and go here
-  clc
   add sp, 6                                 ; This will reset CF
 .return_after_clear_stack:                  ; Error case set CF and go here
   pop si
@@ -354,9 +355,6 @@ fat12_readdir:
 .ret_nomore:                                ; Jump to here if no more entry is in the directory
   xor ax, ax
   inc ax
-  jmp .return
-.ret_found: 
-  xor ax, ax
   jmp .return
 
 fat12_init_str: db "FAT12 %c DATA %u ROOT %u (RSV %u FATSZ %u #FAT %u)", 0ah, 00h
