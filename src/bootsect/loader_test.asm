@@ -166,7 +166,9 @@ fat12_getnext_test:
 
 ; Tests fat12_readdir
 fat12_readdir_test:
-  sub sp, DISK_SECTOR_SIZE
+  push bp
+  sub sp, FAT12_DIR_LENGTH               ; Local var for one dir entry
+  mov bp, sp                             ; Use BP to access the dir entry
   mov ax, 'B'
   call fat12_open
   push ss
@@ -175,9 +177,19 @@ fat12_readdir_test:
   push cx
   push ax                                ; Two tokens, one for root another for FAT12
 .body:
-  call 
+  call fat12_readdir
+  jc .err
+  test ax, ax
+  jnz .return
+  mov byte [bp + 11], 000ah                  ; Ending entry with \n\0 (8.3 file name ends at 11)
+  push ss
+  push bp
+  call video_putstr
+  add sp, 4
+  jmp .body
 .return:
-  add sp, DISK_SECTOR_SIZE
+  add sp, FAT12_DIR_LENGTH
+  pop bp
   ret
 .err:
   push ds
