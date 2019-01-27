@@ -310,11 +310,16 @@ fat12_readdir:
   push word [bp + 10]                       ; Dest offset
   call memcpy_nonalias
   add sp, 10
+  ;push word [bp + 12]
+  ;push word [bp + 10]
+  ;call video_putstr
+  ;add sp, 4
+  ;while1
   add word [bp + 6], FAT12_DIR_LENGTH       ; Increment offset
   xor ax, ax                                ; This will also clear CF
   jmp .return                               ; Finished copy and return
 .continue:
-  mov ax, fat12_dir.size
+  mov ax, FAT12_DIR_LENGTH
   add [bp + 6], ax                          ; Increment offset to point to the next dir entry
   add bx, ax                                ; Increment BX also for next read
   cmp [bp + 6], word DISK_SECTOR_SIZE       ; Check if current read offset reached the end of the sector
