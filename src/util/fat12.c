@@ -21,12 +21,19 @@ img_t *img_init(const char *filename) {
   img->size = ftell(fp);
   if(img->size == -1L) error_exit("Cannot ftell to obtain file size\n");
   ret = fseek(fp, SEEK_SET, 0);
-  if(ret) error_exit("Cannot fseek to the begin of file")
-  if(ret)
+  if(ret) error_exit("Cannot fseek to the begin of file\n");
+  img->p = (uint8_t *)malloc(img->size);
+  if(img->p == NULL) error_exit("Cannot allocate for the image file\n");
+  ret = fread(img->p, 1, img->size, fp);
+  if(ret != img->size) error_exit("fread fails to read entire image\n");
+  ret = fclose(fp);
+  if(ret) error_exit("fclose fails to close the file\n");
+  return img;
 }
 
 void img_free(img_t *img) {
-
+  free(img->p);
+  free(img);
 }
 
 int main() {
