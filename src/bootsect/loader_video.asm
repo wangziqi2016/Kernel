@@ -47,12 +47,12 @@ video_putstr_near:
   pop ax
   retn
 
-  ; This function prints a line on the current cursor position
-  ; Note that there is no newline at the end of the string unless you
-  ; add it yourself
-  ; The line always use default attribute
-  ;   [SP + 0] - String offset
-  ;   [SP + 2] - String segment
+; This function prints a line on the current cursor position
+; Note that there is no newline at the end of the string unless you
+; add it yourself
+; The line always use default attribute
+;   [BP + 4] - String offset
+;   [BP + 6] - String segment
 video_putstr:
   push bp
   mov bp, sp
