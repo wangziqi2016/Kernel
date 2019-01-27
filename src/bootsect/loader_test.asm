@@ -188,13 +188,17 @@ fat12_readdir_test:
   jc .err
   test ax, ax
   jnz .return
-  mov word [bp + 11], 000ah               ; Ending entry with \n\0 (8.3 file name ends at 11)
+  mov byte [bp + 11], 00h               ; Ending entry with \n\0 (8.3 file name ends at 11)
+  push word [bp + 30]
+  push word [bp + 28]
   push ss
   push bp
-  call video_putstr
-  add sp, 4
+  push .str2
+  call video_printf_near
+  add sp, 10
   jmp .body
 .str1: db "DX:CX %u:%u", 0ah, 00h
+.str2: db "%S %U", 0ah, 00h
 .return:
   add sp, FAT12_DIR_LENGTH + 10
   pop bp
