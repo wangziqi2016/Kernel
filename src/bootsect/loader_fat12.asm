@@ -309,7 +309,7 @@ fat12_readdir:
   mov ax, [bp + 8]                          ; AX = Current sector
   inc ax
   inc ax                                    ; AX = Current cluster (begin at 2)
-  push word [bp + 4]                        ; Arg FAT12 token (ptr to fat12_param)
+  push si                                   ; Arg FAT12 token (ptr to fat12_param)
   call fat12_getnext                        ; Return next sector offset in data area (NOT cluster!)
   pop cx                                    ; Clear stack; CX is destroyed
   cmp ax, FAT12_INV_SECTOR                  ; Check validity
@@ -324,8 +324,10 @@ next_sector_root:                           ; AX = data begin sector on entering
   cmp [bp + .lba_lo], ax                    ; Compare the sector after increment
   je .ret_nomore                            ; If it equals the data region start then we reached the end of root
   jmp .read_sector
-.return:
+.return:                                    ; Normal case do not set CF and go here
+  clc
   add sp, 6                                 ; This will reset CF
+.return_after_clear_stack:                  ; Error case set CF and go here
   pop si
   pop bx
   pop es
@@ -335,10 +337,13 @@ next_sector_root:                           ; AX = data begin sector on entering
 .err:
   add sp, 6
   stc                                       ; Set carry bit
-  jmp .return
-.ret_nomore:                                 ; Jump to here if no more entry is in the directory
+  jmp .return_after_clear_stack
+.ret_nomore:                                ; Jump to here if no more entry is in the directory
   xor ax, ax
   inc ax
+  jmp .return
+ret_found: 
+  xor ax, ax
   jmp .return
 
 fat12_init_str: db "FAT12 %c DATA %u ROOT %u (RSV %u FATSZ %u #FAT %u)", 0ah, 00h
