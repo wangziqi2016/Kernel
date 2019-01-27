@@ -6,4 +6,4 @@ BIOS routines to provide basic system services.
 
 # Documents
 
-General Coding and Design Rules
+[General Coding and Design Rules](general.md)
