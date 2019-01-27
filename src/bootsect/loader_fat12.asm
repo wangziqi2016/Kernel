@@ -299,7 +299,7 @@ fat12_readdir:
   jz .continue
   cmp al, 2eh                               ; 0x2E - Dot entry
   je .continue
-  cmp al, e5h                               ; 0xE5 - Deleted entry
+  cmp al, 0e5h                              ; 0xE5 - Deleted entry
   je .continue
   push word FAT12_DIR_LENGTH                ; Size of copy
   push es                                   ; Src segment
@@ -312,7 +312,7 @@ fat12_readdir:
   mov ax, fat12_dir.size
   add bx, ax                                ; To next entry in the sector
   add [bp + 6], ax                          ; Also modify the argument
-  cmp [bp + 6], DISK_SECTOR_SIZE            ; Check if current read offset reached the end of the sector
+  cmp [bp + 6], word DISK_SECTOR_SIZE       ; Check if current read offset reached the end of the sector
   jne .read_entry                           ; If we has not reached end of sector then keep reading next entry
   xor ax, ax
   mov [bp + 6], ax                          ; Offset is cleared to zero - to the beginning of next sector, if any
@@ -331,9 +331,9 @@ fat12_readdir:
   mov [bp + 8], ax
   mov [bp + .lba_lo], ax                    ; Update both arg and local var
   jmp .read_sector
-next_sector_root:                           ; AX = data begin sector on entering this block
-  inc [bp + 8]                              ; Modify next sector in return arg
-  inc [bp + .lba_lo]                        ; Modify next sector we are about to read
+.next_sector_root:                          ; AX = data begin sector on entering this block
+  inc word [bp + 8]                         ; Modify next sector in return arg
+  inc word [bp + .lba_lo]                   ; Modify next sector we are about to read
   cmp [bp + .lba_lo], ax                    ; Compare the sector after increment
   je .ret_nomore                            ; If it equals the data region start then we reached the end of root
   jmp .read_sector
@@ -355,7 +355,7 @@ next_sector_root:                           ; AX = data begin sector on entering
   xor ax, ax
   inc ax
   jmp .return
-ret_found: 
+.ret_found: 
   xor ax, ax
   jmp .return
 
