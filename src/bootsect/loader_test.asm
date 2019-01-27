@@ -14,6 +14,7 @@ disk_test:
   call disk_buffer_test
   call dist_rw_test
   call fat12_getnext_test
+  call fat12_readdir_test
   retn
 
 disk_param_test:
@@ -171,24 +172,31 @@ fat12_readdir_test:
   mov bp, sp                             ; Use BP to access the dir entry
   mov ax, 'B'
   call fat12_open
-  push ss
-  push sp                                ; Dest buffer
-  push dx
-  push cx
-  push ax                                ; Two tokens, one for root another for FAT12
+  jc .err
+  push ss                                ; BP - 2
+  push bp                                ; BP - 4 Dest buffer -> Note do not use SP b/c it has changed
+  push dx                                ; BP - 6
+  push cx                                ; BP - 8
+  push ax                                ; BP - 10 Two tokens, one for root another for FAT12
 .body:
+  push word [bp - 8]
+  push word [bp - 6]
+  push .str1
+  call video_printf_near
+  add sp, 6
   call fat12_readdir
   jc .err
   test ax, ax
   jnz .return
-  mov byte [bp + 11], 000ah                  ; Ending entry with \n\0 (8.3 file name ends at 11)
+  mov word [bp + 11], 000ah               ; Ending entry with \n\0 (8.3 file name ends at 11)
   push ss
   push bp
   call video_putstr
   add sp, 4
   jmp .body
+.str1: db "DX:CX %u:%u", 0ah, 00h
 .return:
-  add sp, FAT12_DIR_LENGTH
+  add sp, FAT12_DIR_LENGTH + 10
   pop bp
   ret
 .err:
