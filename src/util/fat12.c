@@ -13,6 +13,7 @@
 #define read32(img, offset) (*(uint32_t *)(img->p + offset))
 
 #define FAT12_DIR_SIZE 32
+#define FAT12_SECT_SIZE 512
 
 typedef struct {
   uint8_t *p;
@@ -64,7 +65,8 @@ fat12_t *fat12_init(img_t *img) {
   if(fat12->cluster_size != 1) error_exit("Do not support large cluster (%d)\n", fat12->cluster_size);
   fat12->reserved = read16(img, 14);
   fat12->fat_num = read8(img, 16);
-  fat12->root_size = read16(img, 17) / FAT12_DIR_SIZE;
+  fat12->fat_size = read16(img, 22);
+  fat12->root_size = read16(img, 17) * FAT12_DIR_SIZE / FAT12_SECT_SIZE;
   fat12->root_begin = fat12->reserved + fat12->fat_size * fat12->fat_num; // Root is right after FAT
   fat12->data_begin = fat12->root_begin + fat12->root_size; // Data is right after root
   return fat12;
