@@ -26,6 +26,7 @@
 #define FAT12_NOMORE   1       // No more entry in the directory
 #define FAT12_INV_NAME 1       // Invalid 8.3 file name
 #define FAT12_NOTFOUND 2       // File name not found in current dir
+#define FAT12_NOTDIR   3       // Name is found but it is not an entry
 
 typedef uint16_t cluster_t;
 typedef uint16_t sector_t;
@@ -187,27 +188,33 @@ int fat12_to83(const char *dir_name, char *name83) {
   return FAT12_SUCCESS;
 }
 
-// Changes current sector and offset of the dir entry given the dir name
+// Search by name and return the entry in a directory buffer
 //   dir_name is the name of the dir in name.suffix format
 //     The length of name must not exceed 8 and suffix not 3
 // Returns FAT12_INV_NAME if name is not valid 8.3 format
 //         FAT12_NOTFOUND if name is not found
-int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
+int fat12_findentry(fat12_t *fat12, const char *name, fat12_dir_t *dir_entry) {
   char name83[FAT12_NAME83_SIZE];
-  fat12_dir_t dir_entry;
   if(fat12_to83(dir_name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
   fat12_reset_dir(fat12); // This moves the cursor to the first in the current dir
-  while(fat12_readdir(fat12, &dir_entry) == FAT12_SUCCESS) {
-    if(dir_entry.attr & FAT12_ATTR_SUBDIR && 
-       memcmp(name83, dir_entry.name, FAT12_NAME83_SIZE) == 0) {
-      fat12->cwdsect = fat12->cwdsect_origin = dir_entry.data + fat12->data_begin - 2;
-      fat12->cwdoff = 0;
-      return FAT12_SUCCESS;
-    }
-  }
+  while(fat12_readdir(fat12, dir_entry) == FAT12_SUCCESS)
+    if(memcmp(name83, dir_entry->name, FAT12_NAME83_SIZE) == 0) return FAT12_SUCCESS;
   return FAT12_NOTFOUND;
 }
 
+// Changes current sector and offset of the dir entry given the dir name
+// Same input and return as fat12_findentry
+int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
+  fat12_dir_t dir_entry;
+  int ret = fat12_findentry(fat12, name, &dir_entry);
+  if(ret != FAT12_SUCCESS) return ret;
+  if(dir_entry.attr & FAT12_ATTR_SUBDIR) {
+    fat12->cwdsect = fat12->cwdsect_origin = dir_entry.data + fat12->data_begin - 2;
+    fat12->cwdoff = 0;
+    return FAT12_SUCCESS;
+  }
+  return FAT12_NOTDIR;
+}
 
 #ifdef UNITTEST
 
