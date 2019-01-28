@@ -12,7 +12,7 @@ LDFLAGS =
 
 $(info = Compiling utility...)
 
-BIN = binpad ofs
+BIN = binpad fat12
 all: $(BIN)
 
 binpad: binpad.c Makefile
