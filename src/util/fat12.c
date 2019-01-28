@@ -45,6 +45,7 @@ typedef struct {
   int root_size;           // Number of sectors for root directory
   int root_begin;          // Sector ID for root
   int data_begin;          // Sector ID for data
+  sector_t cwdsect_origin; // Current dir sector when entering the dir
   sector_t cwdsect;        // Current dir sector
   offset_t cwdoff;         // Current dir offset
 } fat12_t; 
@@ -108,7 +109,7 @@ fat12_t *fat12_init(img_t *img) {
   fat12->root_begin = fat12->reserved + fat12->fat_size * fat12->fat_num; // Root is right after FAT
   fat12->data_begin = fat12->root_begin + fat12->root_size; // Data is right after root
   fat12->cluster_num = (img->sect_num - fat12->data_begin) / fat12->cluster_size;
-  fat12->cwdsect = fat12->root_begin; // Point to the first entry of root directory
+  fat12->cwdsect_origin = fat12->cwdsect = fat12->root_begin; // Point to the first entry of root directory
   fat12->cwdoff = 0;
   return fat12;
 }
@@ -117,6 +118,9 @@ void fat12_free(fat12_t *fat12) {
   img_free(fat12->img);
   free(fat12); 
 }
+
+// Resets the directory iterator pointer to the origin
+void fat12_reset_dir(fat12_t *fat12) { fat12->cwdsect = fat12->cwdsect_origin; }
 
 // Returns the next sector offset from the beginning of data area
 // Note that the input is cluater which begins from 2. 
@@ -184,7 +188,10 @@ int fat12_to83(const char *dir_name, char *name83) {
 // Returns FAT12_INV_NAME if name is not valid 8.3 format
 //         FAT12_NOTFOUND if name is not found
 int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
-  char name83[FAT12_NAME83_SIZE]; (void)name83;
+  char name83[FAT12_NAME83_SIZE];
+  fat12_dir_t dir_entry;
+  if(fat12_to83(dir_name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
+  while(fat12_readdir)
   return 0;
 }
 
