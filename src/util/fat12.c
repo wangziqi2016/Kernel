@@ -174,8 +174,16 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
 
 // Converts a C string to 8.3 file format
 // Returns FAT12_INV_NAME if name is not valid 8.3 format
+// Note that this function copies name beginning with '.' unchanged
 int fat12_to83(const char *dir_name, char *name83) {
   int len = 0;
+  if(*dir_name == '.') {
+    while(len < FAT12_NAME83_SIZE) {
+      if(*dir_name == '\0') *name83++ = ' ';
+      else *name83++ = *dir_name++;
+      len++;
+    }
+  }
   while(len < FAT12_NAME_SIZE) {
     if(*dir_name == '.' || *dir_name == '\0') *name83++ = ' ';
     else *name83++ = toupper(*dir_name++);
@@ -213,7 +221,9 @@ int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
   int ret = fat12_findentry(fat12, dir_name, &dir_entry);
   if(ret != FAT12_SUCCESS) return ret;
   if(dir_entry.attr & FAT12_ATTR_SUBDIR) {
-    fat12->cwdsect = fat12->cwdsect_origin = dir_entry.data + fat12->data_begin - 2;
+    if(dir_entry.data == 0) fat12->cwdsect = fat12->root_begin;
+    else fat12->cwdsect = dir_entry.data + fat12->data_begin - 2;
+    fat12->cwdsect_origin = fat12->cwdsect;
     fat12->cwdoff = 0;
     return FAT12_SUCCESS;
   }
