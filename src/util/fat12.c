@@ -4,10 +4,15 @@
 #include <ctype.h>
 #include <string.h>
 
+#define UNITTEST // Uncomment this to compile the application
+
 #define error_exit(fmt, ...) do { fprintf(stderr, "Error: " fmt, ##__VA_ARGS__); error_exit_or_jump(); } while(0);
 
+#define read8(img, offset)  (*(uint8_t *)(img->p + offset))
 #define read16(img, offset) (*(uint16_t *)(img->p + offset))
 #define read32(img, offset) (*(uint32_t *)(img->p + offset))
+
+#define FAT12_DIR_SIZE 32
 
 typedef struct {
   uint8_t *p;
@@ -52,14 +57,45 @@ void img_free(img_t *img) {
 fat12_t *fat12_init(img_t *img) {
   fat12_t *fat12 = (fat12_t *)malloc(sizeof(fat12_t));
   if(fat12 == NULL) error_exit("Cannot allocate fat12_t\n");
-  uint8_t sig = img->p[38];
+  uint8_t sig = read16(img, 38);
   if(sig != 0x28 && sig != 0x29) error_exit("Not a valid FAT12 image (sig %u)\n", (uint32_t)sig);
-  fat12->reserved = *(uint16_t *)(img->p + 14)
+  if(read16(img, 510) != 0xAA55) error_exit("Not a valid bootable media\n");
+  fat12->cluster_size = read8(img, 13);
+  if(fat12->cluster_size != 1) error_exit("Do not support large cluster (%d)\n", fat12->cluster_size);
+  fat12->reserved = read16(img, 14);
+  fat12->fat_num = read8(img, 16);
+  fat12->root_size = read16(img, 17) / FAT12_DIR_SIZE;
+  fat12->root_begin = fat12->reserved + fat12->fat_size * fat12->fat_num; // Root is right after FAT
+  fat12->data_begin = fat12->root_begin + fat12->root_size; // Data is right after root
   return fat12;
 }
 
 void fat12_free(fat12_t *fat12) { free(fat12); }
 
+#ifdef UNITTEST
+
+img_t *img;
+fat12_t fat12;
+
+void test_init() {
+  printf("Reserved %d FAT size %d Root begin %d Data begin %d\n",
+         fat12->reserved, fat12->fat_size, fat12->root_begin, fat12->data_begin);
+}
+
 int main() {
+  img = img_init("../../bin/bootdisk.ima");
+  fat12 = fat12_init(img);
+  test_init();
+  img_free(img);
+  fat12_free(fat12);
   return 0;
 }
+
+#else 
+
+int main() {
+  printf("Not implemented\n");
+  return 0;
+}
+
+#endif
