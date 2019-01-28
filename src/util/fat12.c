@@ -136,9 +136,10 @@ int fat12_readdir_next(fat12_t *fat12) {
 // Read the corresponding entry into the buffer
 // Return: 1 if reached the end of the directory
 int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
+  offset_t off;
   while(1) {
     if(fat12->cwdoff == FAT12_SECT_SIZE) if(fat12_readdir_next(fat12)) return 1;
-    offset_t off = fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff; // Offset to the first byte of the entry
+    off = fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff; // Offset to the first byte of the entry
     fat12->cwdoff += FAT12_DIR_SIZE;
     fat12_dir_t *dir = (fat12_dir_t *)&read8(fat12->img, off);
     if(dir->name[0] != 0x00 && dir->name[0] != 0x2E && dir->name[0] != 0xE5 && 
@@ -154,9 +155,20 @@ img_t *img;
 fat12_t *fat12;
 
 void test_init() {
+  printf("========== test_init ==========\n");
   printf("Reserved %d FAT size %d Root begin %d Data begin %d\n",
          fat12->reserved, fat12->fat_size, fat12->root_begin, fat12->data_begin);
   printf("Cluster num %d\n", fat12->cluster_num);
+  printf("Pass!\n");
+}
+
+void test_readdir() {
+  printf("========== test_init ==========\n");
+  fat12_dir_t buffer;
+  while(!fat12_readdir(fat12, &buffer)) {
+    printf("%.11s    %u\n", buffer.name, buffer.size);
+  }
+  printf("Pass!\n");
 }
 
 int main() {
@@ -164,6 +176,7 @@ int main() {
   printf("Image size: %ld\n", img->size);
   fat12 = fat12_init(img);
   test_init();
+  test_readdir();
   fat12_free(fat12);     // This also frees the image file
   return 0;
 }
