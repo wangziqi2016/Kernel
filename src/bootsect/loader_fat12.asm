@@ -300,8 +300,8 @@ fat12_readdir:
   mov al, [es:bx]                           ; Read first byte of the dir entry - note that we must use ES segment
   test al, al                               ; 0x00 - empty entry
   jz .continue
-  cmp al, 2eh                               ; 0x2E - Dot entry
-  je .continue
+  ;cmp al, 2eh                               ; 0x2E - Dot entry
+  ;je .continue
   cmp al, 0e5h                              ; 0xE5 - Deleted entry
   je .continue
   mov al, [es:bx + fat12_dir.attr]

@@ -161,7 +161,7 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
     off = fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff; // Offset to the first byte of the entry
     fat12->cwdoff += FAT12_DIR_SIZE;
     fat12_dir_t *dir = (fat12_dir_t *)&read8(fat12->img, off);
-    if(dir->name[0] != 0x00 && dir->name[0] != 0x2E && dir->name[0] != 0xE5 && 
+    if(dir->name[0] != 0x00 && /*dir->name[0] != 0x2E &&*/ dir->name[0] != 0xE5 && 
        dir->name[0] != 0x05 && dir->attr != 0x0F) break;
   }
   memcpy(buffer, &read8(fat12->img, off), FAT12_DIR_SIZE);
@@ -195,7 +195,7 @@ int fat12_to83(const char *dir_name, char *name83) {
 //         FAT12_NOTFOUND if name is not found
 int fat12_findentry(fat12_t *fat12, const char *name, fat12_dir_t *dir_entry) {
   char name83[FAT12_NAME83_SIZE];
-  if(fat12_to83(dir_name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
+  if(fat12_to83(name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
   fat12_reset_dir(fat12); // This moves the cursor to the first in the current dir
   while(fat12_readdir(fat12, dir_entry) == FAT12_SUCCESS)
     if(memcmp(name83, dir_entry->name, FAT12_NAME83_SIZE) == 0) return FAT12_SUCCESS;
@@ -206,7 +206,7 @@ int fat12_findentry(fat12_t *fat12, const char *name, fat12_dir_t *dir_entry) {
 // Same input and return as fat12_findentry
 int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
   fat12_dir_t dir_entry;
-  int ret = fat12_findentry(fat12, name, &dir_entry);
+  int ret = fat12_findentry(fat12, dir_name, &dir_entry);
   if(ret != FAT12_SUCCESS) return ret;
   if(dir_entry.attr & FAT12_ATTR_SUBDIR) {
     fat12->cwdsect = fat12->cwdsect_origin = dir_entry.data + fat12->data_begin - 2;
@@ -258,7 +258,12 @@ void test_to83() {
 
 void test_enterdir() {
   printf("========== test_enterdir ==========\n");
-  fat12_enterdir(fat12, "testdir");
+  int ret;
+  ret = fat12_enterdir(fat12, "testdir");
+  printf("ret = %d\n", ret);
+  test_readdir();
+  ret = fat12_enterdir(fat12, "testdir");
+  printf("ret = %d\n", ret);
   test_readdir();
   printf("Pass!\n");
 }
