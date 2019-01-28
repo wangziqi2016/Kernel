@@ -240,6 +240,23 @@ int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
   return FAT12_NOTDIR;
 }
 
+// Opens a file and returns the file descriptor
+// Return:
+//   FAT12_SUCCESS if success
+//   FAT12_NOTFILE if name is found but it is not a file
+//   FAT12_NOTFOUND name is not found in the current dir
+fat12_file_t fat12_open(fat12_t *fat12, const char *filename) {
+  fat12_dir_t dir_entry;
+  fat12_file_t fd;
+  int ret = fat12_findentry(fat12, filename, &dir_entry);
+  if(ret != FAT12_SUCCESS) return ret;
+  if(dir_entry.attr & FAT12_ATTR_SUBDIR) return FAT12_NOTFILE;
+  fd.curr_sect = dir_entry.data;  // This can be zero which means empty file
+  fd.curr_offset = fd.offset = 0; // Always begin from offset 0 
+  fd.size = dir_entry.size;
+  return FAT12_SUCCESS;
+}
+
 int fat12_readfile(fat12_t *fat12, ) {
 
 }
