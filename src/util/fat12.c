@@ -168,8 +168,9 @@ int fat12_to83(const char *dir_name, char *name83) {
     len++;
   }
   if(*dir_name != '.' && *dir_name != '\0') return FAT12_INV_NAME;
+  if(*dir_name == '.') dir_name++;
   while(len < FAT12_NAME83_SIZE) {
-    if(*dir_name == '.' || *dir_name == '\0') *name83++ = ' ';
+    if(*dir_name == '\0') *name83++ = ' ';
     else *name83++ = toupper(*dir_name++);
     len++;
   }
@@ -212,9 +213,19 @@ void test_readdir() {
 
 void test_to83() {
   printf("========== test_to83 ==========\n");
-  char name83[FAT12_NAME83_SIZE];
-  fat12_to83("Makefile", name83);
-  printf("\"%.*s\"", FAT12_NAME83_SIZE, name83);
+  char name83[FAT12_NAME83_SIZE]; int ret;
+  ret = fat12_to83("Makefile", name83);
+  printf("\"%.*s\" ret = %d\n", FAT12_NAME83_SIZE, name83, ret);
+  ret = fat12_to83("name1", name83);
+  printf("\"%.*s\" ret = %d\n", FAT12_NAME83_SIZE, name83, ret);
+  ret = fat12_to83("name1.exe", name83);
+  printf("\"%.*s\" ret = %d\n", FAT12_NAME83_SIZE, name83, ret);
+  ret = fat12_to83("name2.db", name83);
+  printf("\"%.*s\" ret = %d\n", FAT12_NAME83_SIZE, name83, ret);
+  ret = fat12_to83("name3.abcd", name83);
+  printf("\"%.*s\" ret = %d\n", FAT12_NAME83_SIZE, name83, ret);
+  ret = fat12_to83("name3toolong.x", name83);
+  printf("\"%.*s\" ret = %d\n", FAT12_NAME83_SIZE, name83, ret);
   printf("Pass!\n");
 }
 
