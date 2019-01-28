@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 
 #define UNITTEST // Uncomment this to compile the application
 
@@ -159,21 +160,21 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
 
 // Converts a C string to 8.3 file format
 // Returns FAT12_INV_NAME if name is not valid 8.3 format
-void fat12_to83(const char *dir_name, char *name83) {
+int fat12_to83(const char *dir_name, char *name83) {
   int len = 0;
-  while(len < 8) {
-    if(*dir_name == '.' || *dir_name == '\0') *p++ = ' ';
-    else *p++ = *dir_name++;
+  while(len < FAT12_NAME_SIZE) {
+    if(*dir_name == '.' || *dir_name == '\0') *name83++ = ' ';
+    else *name83++ = toupper(*dir_name++);
     len++;
   }
   if(*dir_name != '.' && *dir_name != '\0') return FAT12_INV_NAME;
-  while(len < 3) {
-    if(*dir_name == '.' || *dir_name == '\0') *p++ = ' ';
-    else *p++ = *dir_name++;
+  while(len < FAT12_NAME83_SIZE) {
+    if(*dir_name == '.' || *dir_name == '\0') *name83++ = ' ';
+    else *name83++ = toupper(*dir_name++);
     len++;
   }
   if(*dir_name != '\0') return FAT12_INV_NAME;
-  return FAT12_SUCCESS
+  return FAT12_SUCCESS;
 }
 
 // Changes current sector and offset of the dir entry given the dir name
@@ -201,11 +202,19 @@ void test_init() {
 }
 
 void test_readdir() {
-  printf("========== test_init ==========\n");
+  printf("========== test_readdir ==========\n");
   fat12_dir_t buffer;
   while(!fat12_readdir(fat12, &buffer)) {
     printf("%.11s    %u\n", buffer.name, buffer.size);
   }
+  printf("Pass!\n");
+}
+
+void test_to83() {
+  printf("========== test_to83 ==========\n");
+  char name83[FAT12_NAME83_SIZE];
+  fat12_to83("Makefile", name83);
+  printf("\"%.*s\"", FAT12_NAME83_SIZE, name83);
   printf("Pass!\n");
 }
 
@@ -215,6 +224,7 @@ int main() {
   fat12 = fat12_init(img);
   test_init();
   test_readdir();
+  test_to83();
   fat12_free(fat12);     // This also frees the image file
   return 0;
 }
