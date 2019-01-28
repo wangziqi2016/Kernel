@@ -6,6 +6,9 @@
 
 #define error_exit(fmt, ...) do { fprintf(stderr, "Error: " fmt, ##__VA_ARGS__); error_exit_or_jump(); } while(0);
 
+#define read16(img, offset) (*(uint16_t *)(img->p + offset))
+#define read32(img, offset) (*(uint32_t *)(img->p + offset))
+
 typedef struct {
   uint8_t *p;
   size_t size;
@@ -49,7 +52,9 @@ void img_free(img_t *img) {
 fat12_t *fat12_init(img_t *img) {
   fat12_t *fat12 = (fat12_t *)malloc(sizeof(fat12_t));
   if(fat12 == NULL) error_exit("Cannot allocate fat12_t\n");
-  
+  uint8_t sig = img->p[38];
+  if(sig != 0x28 && sig != 0x29) error_exit("Not a valid FAT12 image (sig %u)\n", (uint32_t)sig);
+  fat12->reserved = *(uint16_t *)(img->p + 14)
   return fat12;
 }
 
