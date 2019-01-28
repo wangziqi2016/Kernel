@@ -20,6 +20,8 @@
 #define FAT12_SUFFIX_SIZE 3
 #define FAT12_NAME83_SIZE 11
 
+#define FAT12_ATTR_SUBDIR 0x10    // Mask for subdirectory
+
 #define FAT12_SUCCESS 0
 #define FAT12_NOMORE   1       // No more entry in the directory
 #define FAT12_INV_NAME 1       // Invalid 8.3 file name
@@ -193,7 +195,8 @@ int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
   if(fat12_to83(dir_name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
   fat12_reset_dir(); // This moves the cursor to the first in the current dir
   while(fat12_readdir(fat12, &dir_entry) == FAT12_SUCCESS) {
-    if(memcmp(name83, dir_entry.name, FAT12_NAME83_SIZE) == 0) {
+    if(buffer.attr & FAT12_ATTR_SUBDIR && 
+       memcmp(name83, dir_entry.name, FAT12_NAME83_SIZE) == 0) {
       fat12->cwdsect = fat12->cwdsect_origin = buffer.data + fat12->data_begin - 2;
       return FAT12_SUCCESS;
     }
