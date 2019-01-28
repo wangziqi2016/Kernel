@@ -34,11 +34,11 @@ img_t *img_init(const char *filename) {
   if(img == NULL) error_exit("Cannot allocate img_t\n");
   FILE *fp = fopen(filename, "rb");
   if(fp == NULL) error_exit("Cannot open file %s\n", filename);
-  int ret = fseek(fp, SEEK_END, 0);
+  int ret = fseek(fp, 0, SEEK_END);
   if(ret) error_exit("Cannot fseek to the end of file\n");
   img->size = ftell(fp);
   if(img->size == -1L) error_exit("Cannot ftell to obtain file size\n");
-  ret = fseek(fp, SEEK_SET, 0);
+  ret = fseek(fp, 0, SEEK_SET);
   if(ret) error_exit("Cannot fseek to the begin of file\n");
   img->p = (uint8_t *)malloc(img->size);
   if(img->p == NULL) error_exit("Cannot allocate for the image file\n");
@@ -78,12 +78,14 @@ img_t *img;
 fat12_t *fat12;
 
 void test_init() {
+  
   printf("Reserved %d FAT size %d Root begin %d Data begin %d\n",
          fat12->reserved, fat12->fat_size, fat12->root_begin, fat12->data_begin);
 }
 
 int main() {
   img = img_init("../../bin/testdisk.ima");
+  printf("Image size: %ld\n", img->size);
   fat12 = fat12_init(img);
   test_init();
   img_free(img);
