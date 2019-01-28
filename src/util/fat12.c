@@ -15,13 +15,19 @@
 #define FAT12_DIR_SIZE 32
 #define FAT12_SECT_SIZE 512
 
+typedef uint16_t cluster_t;
+typedef uint16_t sector_t;
+typedef uint32_t offset_t;
+
 typedef struct {
   uint8_t *p;
   size_t size;
+  int sect_num;            // Number of sectors
 } img_t;
 
 typedef struct {
   int cluster_size;        // Number of sectors per cluster; Only supports 1
+  int cluster_num;         // Number of clusters (in data area, by def.)
   int fat_size;            // Number of sectors in a FAT
   int fat_num;             // Number of FAT in the image
   int reserved;            // Number of reserved sectors before the FAT (incl. bootsect)
@@ -47,6 +53,8 @@ img_t *img_init(const char *filename) {
   if(ret != 1) error_exit("fread fails to read entire image\n");
   ret = fclose(fp);
   if(ret) error_exit("fclose fails to close the file\n");
+  if(img->size % FAT12_SECT_SIZE != 0) error_exit("Image size is not a multiple of %d\n", FAT12_SECT_SIZE);
+  img->sect_num = img->size / FAT12_SECT_SIZE;
   return img;
 }
 
@@ -69,10 +77,17 @@ fat12_t *fat12_init(img_t *img) {
   fat12->root_size = read16(img, 17) * FAT12_DIR_SIZE / FAT12_SECT_SIZE;
   fat12->root_begin = fat12->reserved + fat12->fat_size * fat12->fat_num; // Root is right after FAT
   fat12->data_begin = fat12->root_begin + fat12->root_size; // Data is right after root
+  fat12->cluster_num = (img->sect_num - fat12->data_begin) / fat12->cluster_size;
   return fat12;
 }
 
 void fat12_free(fat12_t *fat12) { free(fat12); }
+
+// Returns the next sector offset from the beginning of data area
+// Note that the input is cluater which begins from 2. 
+sector_t fat12_getnext(cluster_t cluster) {
+  if(cluster < 2 || cluster > )
+}
 
 #ifdef UNITTEST
 
@@ -83,6 +98,7 @@ void test_init() {
   
   printf("Reserved %d FAT size %d Root begin %d Data begin %d\n",
          fat12->reserved, fat12->fat_size, fat12->root_begin, fat12->data_begin);
+  printf("Cluster num %d\n", fat12->cluster_num);
 }
 
 int main() {
