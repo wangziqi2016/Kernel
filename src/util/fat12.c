@@ -134,8 +134,18 @@ int fat12_readdir_next(fat12_t *fat12) {
 }
 
 // Read the corresponding entry into the buffer
-void fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
-  if(fat12->cwdoff == FAT12_SECT_SIZE) fat12_readdir_next(fat12);
+// Return: 1 if reached the end of the directory
+int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
+  while(1) {
+    if(fat12->cwdoff == FAT12_SECT_SIZE) if(fat12_readdir_next(fat12)) return 1;
+    offset_t off = fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff; // Offset to the first byte of the entry
+    fat12->cwdoff += FAT12_DIR_SIZE;
+    fat12_dir_t *dir = (fat12_dir_t *)&read8(fat12->img, off);
+    if(dir->name[0] != 0x00 && dir->name[0] != 0x2E && dir->name[0] != 0xE5 && 
+       dir->name[0] != 0x05 && dir->attr != 0x0F) break;
+  }
+  memcpy(buffer, &read8(fat12->img, off), FAT12_DIR_SIZE);
+  return 0;
 }
 
 #ifdef UNITTEST
