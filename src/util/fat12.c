@@ -1,12 +1,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
+#include <stdint.h>
 #include <string.h>
 
 #define UNITTEST // Uncomment this to compile the application
 
-#define error_exit(fmt, ...) do { fprintf(stderr, "Error: " fmt, ##__VA_ARGS__); error_exit_or_jump(); } while(0);
+#define error_exit(fmt, ...) do { fprintf(stderr, "Error: " fmt, ##__VA_ARGS__); exit(1); } while(0);
 
 #define read8(img, offset)  (*(uint8_t *)(img->p + offset))
 #define read16(img, offset) (*(uint16_t *)(img->p + offset))
@@ -42,8 +42,8 @@ img_t *img_init(const char *filename) {
   if(ret) error_exit("Cannot fseek to the begin of file\n");
   img->p = (uint8_t *)malloc(img->size);
   if(img->p == NULL) error_exit("Cannot allocate for the image file\n");
-  ret = fread(img->p, 1, img->size, fp);
-  if(ret != img->size) error_exit("fread fails to read entire image\n");
+  ret = fread(img->p, img->size, 1, fp);
+  if(ret != 1) error_exit("fread fails to read entire image\n");
   ret = fclose(fp);
   if(ret) error_exit("fclose fails to close the file\n");
   return img;
@@ -57,7 +57,7 @@ void img_free(img_t *img) {
 fat12_t *fat12_init(img_t *img) {
   fat12_t *fat12 = (fat12_t *)malloc(sizeof(fat12_t));
   if(fat12 == NULL) error_exit("Cannot allocate fat12_t\n");
-  uint8_t sig = read16(img, 38);
+  uint8_t sig = read8(img, 38);
   if(sig != 0x28 && sig != 0x29) error_exit("Not a valid FAT12 image (sig %u)\n", (uint32_t)sig);
   if(read16(img, 510) != 0xAA55) error_exit("Not a valid bootable media\n");
   fat12->cluster_size = read8(img, 13);
@@ -75,7 +75,7 @@ void fat12_free(fat12_t *fat12) { free(fat12); }
 #ifdef UNITTEST
 
 img_t *img;
-fat12_t fat12;
+fat12_t *fat12;
 
 void test_init() {
   printf("Reserved %d FAT size %d Root begin %d Data begin %d\n",
@@ -83,7 +83,7 @@ void test_init() {
 }
 
 int main() {
-  img = img_init("../../bin/bootdisk.ima");
+  img = img_init("../../bin/testdisk.ima");
   fat12 = fat12_init(img);
   test_init();
   img_free(img);
