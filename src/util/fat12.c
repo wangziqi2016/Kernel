@@ -122,7 +122,10 @@ void fat12_free(fat12_t *fat12) {
 }
 
 // Resets the directory iterator pointer to the origin
-void fat12_reset_dir(fat12_t *fat12) { fat12->cwdsect = fat12->cwdsect_origin; }
+void fat12_reset_dir(fat12_t *fat12) { 
+  fat12->cwdsect = fat12->cwdsect_origin; 
+  fat12->cwdoff = 0;
+}
 
 // Returns the next sector offset from the beginning of data area
 // Note that the input is cluater which begins from 2. 
@@ -193,11 +196,12 @@ int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
   char name83[FAT12_NAME83_SIZE];
   fat12_dir_t dir_entry;
   if(fat12_to83(dir_name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
-  fat12_reset_dir(); // This moves the cursor to the first in the current dir
+  fat12_reset_dir(fat12); // This moves the cursor to the first in the current dir
   while(fat12_readdir(fat12, &dir_entry) == FAT12_SUCCESS) {
-    if(buffer.attr & FAT12_ATTR_SUBDIR && 
+    if(dir_entry.attr & FAT12_ATTR_SUBDIR && 
        memcmp(name83, dir_entry.name, FAT12_NAME83_SIZE) == 0) {
-      fat12->cwdsect = fat12->cwdsect_origin = buffer.data + fat12->data_begin - 2;
+      fat12->cwdsect = fat12->cwdsect_origin = dir_entry.data + fat12->data_begin - 2;
+      fat12->cwdoff = 0;
       return FAT12_SUCCESS;
     }
   }
@@ -245,6 +249,13 @@ void test_to83() {
   printf("Pass!\n");
 }
 
+void test_enterdir() {
+  printf("========== test_enterdir ==========\n");
+  fat12_enterdir(fat12, "testdir");
+  test_readdir();
+  printf("Pass!\n");
+}
+
 int main() {
   img = img_init("../../bin/testdisk.ima");
   printf("Image size: %ld\n", img->size);
@@ -252,6 +263,7 @@ int main() {
   test_init();
   test_readdir();
   test_to83();
+  test_enterdir();
   fat12_free(fat12);     // This also frees the image file
   return 0;
 }
