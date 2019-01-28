@@ -6,6 +6,7 @@ binpad
 *.pyc
 *.ima
 *.db
+*.tx2
 
 # Prerequisites
 *.d
