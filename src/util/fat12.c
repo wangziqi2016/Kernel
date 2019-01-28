@@ -14,6 +14,7 @@
 
 #define FAT12_DIR_SIZE 32
 #define FAT12_SECT_SIZE 512
+#define FAT12_INV_SECT 0xFFFF
 
 typedef uint16_t cluster_t;
 typedef uint16_t sector_t;
@@ -26,6 +27,7 @@ typedef struct {
 } img_t;
 
 typedef struct {
+  img_t *img;
   int cluster_size;        // Number of sectors per cluster; Only supports 1
   int cluster_num;         // Number of clusters (in data area, by def.)
   int fat_size;            // Number of sectors in a FAT
@@ -66,6 +68,7 @@ void img_free(img_t *img) {
 fat12_t *fat12_init(img_t *img) {
   fat12_t *fat12 = (fat12_t *)malloc(sizeof(fat12_t));
   if(fat12 == NULL) error_exit("Cannot allocate fat12_t\n");
+  fat12->img = img;
   uint8_t sig = read8(img, 38);
   if(sig != 0x28 && sig != 0x29) error_exit("Not a valid FAT12 image (sig %u)\n", (uint32_t)sig);
   if(read16(img, 510) != 0xAA55) error_exit("Not a valid bootable media\n");
@@ -85,8 +88,16 @@ void fat12_free(fat12_t *fat12) { free(fat12); }
 
 // Returns the next sector offset from the beginning of data area
 // Note that the input is cluater which begins from 2. 
-sector_t fat12_getnext(cluster_t cluster) {
-  if(cluster < 2 || cluster > )
+// Return: FAT12_INV_SECT if next is invalid; Sect offset otherwise.
+sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
+  if(cluster < 2 || cluster > fat12->cluster_num + 2) 
+    error_exit("Cluster %d out of range\n", cluster);
+  offset_t off = (fat12->reserved * FAT12_SECT_SIZE) + cluster / 2 * 3;
+  sector_t sect;
+  if(cluster % 2 == 0) sect = read16(fat12->img, off) & 0x0FFF; // Low 12 bit
+  else sect = (read16(fat12->img, off + 1) >> 4); // High 12 bit
+  if(sect < 2 || sect >= 0xFF0) return FAT12_INV_SECT; 
+  return sect - 2;
 }
 
 #ifdef UNITTEST
@@ -95,7 +106,6 @@ img_t *img;
 fat12_t *fat12;
 
 void test_init() {
-  
   printf("Reserved %d FAT size %d Root begin %d Data begin %d\n",
          fat12->reserved, fat12->fat_size, fat12->root_begin, fat12->data_begin);
   printf("Cluster num %d\n", fat12->cluster_num);
