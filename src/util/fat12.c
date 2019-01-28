@@ -221,7 +221,7 @@ int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
   int ret = fat12_findentry(fat12, dir_name, &dir_entry);
   if(ret != FAT12_SUCCESS) return ret;
   if(dir_entry.attr & FAT12_ATTR_SUBDIR) {
-    if(dir_entry.data == 0) fat12->cwdsect = fat12->root_begin;
+    if(dir_entry.data == 0) fat12->cwdsect = fat12->root_begin; // If data is zero the dir must be root (no empty dir)
     else fat12->cwdsect = dir_entry.data + fat12->data_begin - 2;
     fat12->cwdsect_origin = fat12->cwdsect;
     fat12->cwdoff = 0;
@@ -277,9 +277,13 @@ void test_enterdir() {
   printf("ret = %d\n", ret);
   printf("========== Case 1 ==========\n");
   test_readdir();
-  ret = fat12_enterdir(fat12, "..");
+  ret = fat12_enterdir(fat12, ".");
   printf("ret = %d\n", ret);
   printf("========== Case 2 ==========\n");
+  test_readdir();
+  ret = fat12_enterdir(fat12, "..");
+  printf("ret = %d\n", ret);
+  printf("========== Case 3 ==========\n");
   test_readdir();
   printf("Pass!\n");
 }
