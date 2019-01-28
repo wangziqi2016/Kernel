@@ -159,7 +159,7 @@ int fat12_readdir_next(fat12_t *fat12) {
   fat12->cwdoff = 0;
   if(fat12->cwdsect < fat12->data_begin) // Root directory
     return ++fat12->cwdsect == fat12->data_begin; // If next sect is data area then reached the end
-  return (fat12->cwdsect = fat12_getnext(fat12, fat12->cwdsect + 2)) == FAT12_INV_SECT;
+  return (fat12->cwdsect = fat12_getnext(fat12, fat12->cwdsect + 2)) == FAT12_INV_SECT; // TODO: FIX THIS
 }
 
 // Read the corresponding entry into the buffer
@@ -256,7 +256,14 @@ int fat12_open(fat12_t *fat12, const char *filename, fat12_file_t *fd) {
   return FAT12_SUCCESS;
 }
 
-int fat12_readfile(fat12_t *fat12, fat12_file_t *fd) {
+int fat12_read(fat12_t *fat12, fat12_file_t *fd, offset_t len, void *buffer) {
+  offset_t remains = len;
+  char *p = buffer;        // Copy position
+  while(remains) {
+    offset_t sect_len = FAT12_SECT_SIZE - fd->curr_offset;
+    offset_t offset = fd->curr_sect * FAT12_SECT_SIZE + fd->curr_offset;
+    if(sect_len > remains) memcpy(p, &read8(fat12->img, fd->curr_offset), remains);
+  }
   return FAT12_SUCCESS;
 }
 
