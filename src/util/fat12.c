@@ -15,6 +15,14 @@
 #define FAT12_DIR_SIZE 32
 #define FAT12_SECT_SIZE 512
 #define FAT12_INV_SECT 0xFFFF
+#define FAT12_NAME_SIZE 8
+#define FAT12_SUFFIX_SIZE 3
+#define FAT12_NAME83_SIZE 11
+
+#define FAT12_SUCCESS 0
+#define FAT12_NOMORE   1       // No more entry in the directory
+#define FAT12_INV_NAME 1       // Invalid 8.3 file name
+#define FAT12_NOTFOUND 2       // File name not found in current dir
 
 typedef uint16_t cluster_t;
 typedef uint16_t sector_t;
@@ -147,6 +155,23 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
   }
   memcpy(buffer, &read8(fat12->img, off), FAT12_DIR_SIZE);
   return 0;
+}
+
+// Changes current sector and offset of the dir entry given the dir name
+//   dir_name is the name of the dir in name.suffix format
+//     The length of name must not exceed 8 and suffix not 3
+// Returns FAT12_INV_NAME if name is not valid 8.3 format
+//         FAT12_NOTFOUND if name is not found
+int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
+  int len = strlen(dir_name);
+  if(len > FAT12_NAME83_SIZE + 1) return FAT12_INV_NAME;
+  char name83[FAT12_NAME83_SIZE + 2]; // One for '.' another for '\0'
+  strcpy(name83, dir_name);
+  const char *name, *suffix;
+  name = suffix = name83;
+  while(*suffix != '\0' && *suffix != '.') suffix++; // suffix will stop at the end of name
+
+  if(p - name83 > FAT12_NAME_SIZE) return FAT12_INV_NAME;
 }
 
 #ifdef UNITTEST
