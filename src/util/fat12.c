@@ -36,6 +36,8 @@ typedef struct {
   int root_size;           // Number of sectors for root directory
   int root_begin;          // Sector ID for root
   int data_begin;          // Sector ID for data
+  sector_t cwdsect;        // Current dir sector
+  offset_t cwdoff;         // Current dir offset
 } fat12_t; 
 
 img_t *img_init(const char *filename) {
@@ -84,7 +86,10 @@ fat12_t *fat12_init(img_t *img) {
   return fat12;
 }
 
-void fat12_free(fat12_t *fat12) { free(fat12); }
+void fat12_free(fat12_t *fat12) { 
+  image_free(fat12->img);
+  free(fat12); 
+}
 
 // Returns the next sector offset from the beginning of data area
 // Note that the input is cluater which begins from 2. 
@@ -116,8 +121,7 @@ int main() {
   printf("Image size: %ld\n", img->size);
   fat12 = fat12_init(img);
   test_init();
-  img_free(img);
-  fat12_free(fat12);
+  fat12_free(fat12);     // This also frees the image file
   return 0;
 }
 
