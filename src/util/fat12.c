@@ -40,6 +40,22 @@ typedef struct {
   offset_t cwdoff;         // Current dir offset
 } fat12_t; 
 
+typedef struct {
+  char name[8];
+  char suffix[3];
+  uint8_t attr;
+  uint8_t reserved;
+  uint8_t create_time_ms;
+  uint16_t create_time;
+  uint16_t create_date;
+  uint16_t access_date;
+  uint16_t ea_index;
+  uint16_t modified_time;
+  uint16_t modified_date;
+  cluster_t data;                // First cluster
+  uint32_t size;                 // File size in bytes
+} __attribute__((aligned(1), packed)) fat12_dir_t;
+
 img_t *img_init(const char *filename) {
   img_t *img = (img_t *)malloc(sizeof(img_t));
   if(img == NULL) error_exit("Cannot allocate img_t\n");
@@ -83,11 +99,13 @@ fat12_t *fat12_init(img_t *img) {
   fat12->root_begin = fat12->reserved + fat12->fat_size * fat12->fat_num; // Root is right after FAT
   fat12->data_begin = fat12->root_begin + fat12->root_size; // Data is right after root
   fat12->cluster_num = (img->sect_num - fat12->data_begin) / fat12->cluster_size;
+  fat12->cwdsect = fat12->root_begin; // Point to the first entry of root directory
+  fat12->cwdoff = 0;
   return fat12;
 }
 
 void fat12_free(fat12_t *fat12) { 
-  image_free(fat12->img);
+  img_free(fat12->img);
   free(fat12); 
 }
 
@@ -103,6 +121,21 @@ sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
   else sect = (read16(fat12->img, off + 1) >> 4); // High 12 bit
   if(sect < 2 || sect >= 0xFF0) return FAT12_INV_SECT; 
   return sect - 2;
+}
+
+// Helper function that finds the next sector of a directory
+// Special care must be taken for root because it is consecutive
+// Return: 1 if reached the end of the dir
+int fat12_readdir_next(fat12_t *fat12) {
+  fat12->cwdoff = 0;
+  if(fat12->cwdsect < fat12->data_begin) // Root directory
+    return ++fat12->cwdsect == fat12->data_begin; // If next sect is data area then reached the end
+  return (fat12->cwdsect = fat12_getnext(fat12, fat12->cwdsect + 2)) == FAT12_INV_SECT;
+}
+
+// Read the corresponding entry into the buffer
+void fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
+  if(fat12->cwdoff == FAT12_SECT_SIZE) fat12_readdir_next(fat12);
 }
 
 #ifdef UNITTEST
