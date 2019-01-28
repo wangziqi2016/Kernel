@@ -26,7 +26,10 @@
 #define FAT12_NOMORE   1       // No more entry in the directory
 #define FAT12_INV_NAME 1       // Invalid 8.3 file name
 #define FAT12_NOTFOUND 2       // File name not found in current dir
-#define FAT12_NOTDIR   3       // Name is found but it is not an entry
+#define FAT12_NOTDIR   3       // Name is found but it is not a dir entry
+#define FAT12_NOTFILE  4       // Name is found but it is not a file entry
+#define FAT12_INV_OFF  5       // Invalid offset in file read
+#define FAT12_INV_LEN  6       // Invalid length in file read (read pass file end)
 
 typedef uint16_t cluster_t;
 typedef uint16_t sector_t;
@@ -68,6 +71,13 @@ typedef struct {
   cluster_t data;                // First cluster
   uint32_t size;                 // File size in bytes
 } __attribute__((aligned(1), packed)) fat12_dir_t;
+
+typedef struct {
+  sector_t curr_sect;            // Current reading sector
+  offset_t curr_offset;          // Current reading offset within the sector
+  offset_t offset;               // Logical read offset
+  size_t size;                   // File size (updated on write)
+} fat12_file_t;
 
 img_t *img_init(const char *filename) {
   img_t *img = (img_t *)malloc(sizeof(img_t));
@@ -228,6 +238,10 @@ int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
     return FAT12_SUCCESS;
   }
   return FAT12_NOTDIR;
+}
+
+int fat12_readfile(fat12_t *fat12, ) {
+
 }
 
 #ifdef UNITTEST
