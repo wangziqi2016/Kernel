@@ -153,11 +153,15 @@ int fat12_readdir_next(fat12_t *fat12) {
 }
 
 // Read the corresponding entry into the buffer
-// Return: 1 if reached the end of the directory
+// Return: 1 if reached the end of the directory, in this case the pointer will be reset to the beginning
+//         of the directory for next read
 int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
   offset_t off;
   while(1) {
-    if(fat12->cwdoff == FAT12_SECT_SIZE) if(fat12_readdir_next(fat12)) return 1;
+    if(fat12->cwdoff == FAT12_SECT_SIZE && fat12_readdir_next(fat12)) {
+      fat12_reset_dir(fat12); // Note that readdir_next will destroy the cwdsect in this case
+      return 1;
+    }
     off = fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff; // Offset to the first byte of the entry
     fat12->cwdoff += FAT12_DIR_SIZE;
     fat12_dir_t *dir = (fat12_dir_t *)&read8(fat12->img, off);
@@ -232,7 +236,7 @@ void test_init() {
 void test_readdir() {
   printf("========== test_readdir ==========\n");
   fat12_dir_t buffer;
-  while(!fat12_readdir(fat12, &buffer)) {
+  while(fat12_readdir(fat12, &buffer) == FAT12_SUCCESS) {
     printf("%.11s    %u\n", buffer.name, buffer.size);
   }
   printf("Pass!\n");
@@ -261,9 +265,11 @@ void test_enterdir() {
   int ret;
   ret = fat12_enterdir(fat12, "testdir");
   printf("ret = %d\n", ret);
+  printf("========== Case 1 ==========\n");
   test_readdir();
-  ret = fat12_enterdir(fat12, "testdir");
+  ret = fat12_enterdir(fat12, "..");
   printf("ret = %d\n", ret);
+  printf("========== Case 2 ==========\n");
   test_readdir();
   printf("Pass!\n");
 }
