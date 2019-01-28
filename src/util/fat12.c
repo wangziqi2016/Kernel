@@ -191,8 +191,14 @@ int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
   char name83[FAT12_NAME83_SIZE];
   fat12_dir_t dir_entry;
   if(fat12_to83(dir_name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
-  while(fat12_readdir)
-  return 0;
+  fat12_reset_dir(); // This moves the cursor to the first in the current dir
+  while(fat12_readdir(fat12, &dir_entry) == FAT12_SUCCESS) {
+    if(memcmp(name83, dir_entry.name, FAT12_NAME83_SIZE) == 0) {
+      fat12->cwdsect = fat12->cwdsect_origin = buffer.data + fat12->data_begin - 2;
+      return FAT12_SUCCESS;
+    }
+  }
+  return FAT12_NOTFOUND;
 }
 
 
