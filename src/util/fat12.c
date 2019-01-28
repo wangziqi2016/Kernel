@@ -157,22 +157,35 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
   return 0;
 }
 
+// Converts a C string to 8.3 file format
+// Returns FAT12_INV_NAME if name is not valid 8.3 format
+void fat12_to83(const char *dir_name, char *name83) {
+  int len = 0;
+  while(len < 8) {
+    if(*dir_name == '.' || *dir_name == '\0') *p++ = ' ';
+    else *p++ = *dir_name++;
+    len++;
+  }
+  if(*dir_name != '.' && *dir_name != '\0') return FAT12_INV_NAME;
+  while(len < 3) {
+    if(*dir_name == '.' || *dir_name == '\0') *p++ = ' ';
+    else *p++ = *dir_name++;
+    len++;
+  }
+  if(*dir_name != '\0') return FAT12_INV_NAME;
+  return FAT12_SUCCESS
+}
+
 // Changes current sector and offset of the dir entry given the dir name
 //   dir_name is the name of the dir in name.suffix format
 //     The length of name must not exceed 8 and suffix not 3
 // Returns FAT12_INV_NAME if name is not valid 8.3 format
 //         FAT12_NOTFOUND if name is not found
 int fat12_enterdir(fat12_t *fat12, const char *dir_name) {
-  int len = strlen(dir_name);
-  if(len > FAT12_NAME83_SIZE + 1) return FAT12_INV_NAME;
-  char name83[FAT12_NAME83_SIZE + 2]; // One for '.' another for '\0'
-  strcpy(name83, dir_name);
-  const char *name, *suffix;
-  name = suffix = name83;
-  while(*suffix != '\0' && *suffix != '.') suffix++; // suffix will stop at the end of name
-
-  if(p - name83 > FAT12_NAME_SIZE) return FAT12_INV_NAME;
+  char name83[FAT12_NAME83_SIZE]; (void)name83;
+  return 0;
 }
+
 
 #ifdef UNITTEST
 
