@@ -152,9 +152,29 @@ sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
   return sect - 2;
 }
 
-// Allocate one sector for use. Return the sector ID relative to data area
-sectorr_t fat12_alloc_sect(fat12_t *fat12) {
-
+// Allocate one sector for use. Return the sector ID relative to data area. Caller should convert it
+// to cluster ID when storing into data field of directory
+// Return: FAT12_INV_SECT if allocation fails
+sector_t fat12_alloc_sect(fat12_t *fat12) {
+  int sense = 0; // This flips between 0 and 1
+  offset_t fat_end_offset = fat_begin_offset + fat12->fat_size * FAT12_SECT_SIZE;
+  offset_t curr_off = fat12->reserved * FAT12_SECT_SIZE;
+  sector_t sect = 0;  // Sector to be allocated
+  while(curr_off < fat_end_offset) {
+    sector_t entry;
+    if(sense == 0) {
+      entry = read16(fat12->img, curr_off) & 0x0FFF;
+      curr_off++;
+    } else {
+      entry = read16(fat12->img, curr_off) >> 4;
+      curr_off += 2;
+    }
+    printf("Sect %u entry 0x%lX\n", sect, entry);
+    if(entry == 0) return sect;
+    sense = 1 - sense;
+    sect++;
+  }
+  return FAT12_INV_SECT;
 }
 
 // Helper function that finds the next sector of a directory
