@@ -155,9 +155,20 @@ sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
   offset_t off = fat12_fataddr(fat12, cluster);
   sector_t sect = read16(fat12->img, off);
   if(cluster % 2 == 0) sect &= 0x0FFF; // Low 12 bit
-  else sect >>= 4; // High 12 bit
+  else sect >>= 4;                     // High 12 bit
   if(sect < 2 || sect >= 0xFF0) return FAT12_INV_SECT; 
   return sect - 2;
+}
+
+// Sets the cluster's next to a given cluster
+void fat12_setnext(fat12_t *fat12, cluster_t cluster, cluster_t next) {
+  offset_t off = fat12_fataddr(fat12, cluster);
+  sector_t sect = read16(fat12->img, off);
+  next &= 0xFFF;
+  if(cluster % 2 == 0) sect |= next; // Low 12 bit
+  else sect |= (next << 4);          // High 12 bit
+  *(&read16(fat12->img, off)) = sect;
+  return;
 }
 
 // Allocate one sector for use. Return the sector ID relative to data area. Caller should convert it
