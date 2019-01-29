@@ -276,7 +276,8 @@ int fat12_read(fat12_t *fat12, fat12_file_t *fd, offset_t len, void *buffer) {
     p += sect_len;
     fd->offset += sect_len;
     fd->curr_offset = FAT12_SECT_SIZE; // Move logical pointer to sector end
-    sector_t next_sect = fat12_getnext(fat12, fd->curr_sect + 2); // Get next sector
+    sector_t next_sect = fat12_getnext(fat12, fd->curr_sect - fat12->data_begin + 2); // Get next sector
+    //printf("Next %u\n", next_sect);
     if(next_sect != FAT12_INV_SECT) {
       fd->curr_sect = next_sect + fat12->data_begin;
       fd->curr_offset = 0;
@@ -352,10 +353,13 @@ void test_read() {
   fat12_read(fat12, &fd, 1026, buffer);
   buffer[1026] = '\0';
   puts(buffer);
-  printf("----------------------------------------\n");
+  printf("--------------------- sect %u off %u logical off %u\n", 
+         fd.curr_sect, fd.curr_offset, fd.offset);
   fat12_read(fat12, &fd, 1028, buffer);
   buffer[1028] = '\0';
   puts(buffer);
+  printf("--------------------- sect %u off %u logical off %u\n", 
+         fd.curr_sect, fd.curr_offset, fd.offset);
   printf("Pass!\n");
   return;
 }
