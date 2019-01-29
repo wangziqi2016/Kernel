@@ -152,6 +152,11 @@ sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
   return sect - 2;
 }
 
+// Allocate one sector for use. Return the sector ID relative to data area
+sectorr_t fat12_alloc_sect(fat12_t *fat12) {
+
+}
+
 // Helper function that finds the next sector of a directory
 // Special care must be taken for root because it is consecutive
 // Return: 1 if reached the end of the dir
