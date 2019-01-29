@@ -138,16 +138,24 @@ void fat12_reset_dir(fat12_t *fat12) {
   fat12->cwdoff = 0;
 }
 
+// Returns the offset of the FAT entry of a given cluster number from the beginning of the disk
+// Note that FAT begins with cluster 0 (first two entries not used and marked invalid) but 
+// data area begins with cluster 2, first sector is always usable.
+offset_t fat12_fataddr(fat12_t *fat12, cluster_t cluster) {
+  if(cluster < 2 || cluster > fat12->cluster_num + 2) 
+    error_exit("Cluster %d out of range\n", cluster);
+  offset_t off = (fat12->reserved * FAT12_SECT_SIZE) + cluster / 2 * 3;
+  return off + (offset_t)(cluster % 2);
+}
+
 // Returns the next sector offset from the beginning of data area
 // Note that the input is cluater which begins from 2. 
 // Return: FAT12_INV_SECT if next is invalid; Sect offset otherwise.
 sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
-  if(cluster < 2 || cluster > fat12->cluster_num + 2) 
-    error_exit("Cluster %d out of range\n", cluster);
-  offset_t off = (fat12->reserved * FAT12_SECT_SIZE) + cluster / 2 * 3;
-  sector_t sect;
-  if(cluster % 2 == 0) sect = read16(fat12->img, off) & 0x0FFF; // Low 12 bit
-  else sect = (read16(fat12->img, off + 1) >> 4); // High 12 bit
+  offset_t off = fat12_fataddr(fat12, cluster);
+  sector_t sect = read16(fat12->img, off);
+  if(cluster % 2 == 0) sect &= 0x0FFF; // Low 12 bit
+  else sect >>= 4; // High 12 bit
   if(sect < 2 || sect >= 0xFF0) return FAT12_INV_SECT; 
   return sect - 2;
 }
@@ -157,8 +165,8 @@ sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
 // Return: FAT12_INV_SECT if allocation fails
 sector_t fat12_alloc_sect(fat12_t *fat12) {
   int sense = 0; // This flips between 0 and 1
-  offset_t fat_end_offset = fat_begin_offset + fat12->fat_size * FAT12_SECT_SIZE;
   offset_t curr_off = fat12->reserved * FAT12_SECT_SIZE;
+  offset_t fat_end_offset = curr_off + fat12->fat_size * FAT12_SECT_SIZE;
   sector_t sect = 0;  // Sector to be allocated
   while(curr_off < fat_end_offset) {
     sector_t entry;
@@ -169,7 +177,7 @@ sector_t fat12_alloc_sect(fat12_t *fat12) {
       entry = read16(fat12->img, curr_off) >> 4;
       curr_off += 2;
     }
-    printf("Sect %u entry 0x%lX\n", sect, entry);
+    //printf("Sect %u entry 0x%X\n", sect, entry);
     if(entry == 0) return sect;
     sense = 1 - sense;
     sect++;
@@ -389,6 +397,15 @@ void test_read() {
   return;
 }
 
+void test_alloc_sect() {
+  printf("========== test_alloc_sect ==========\n");
+  for(int i = 0;i < 10;i++) {
+    fat12_alloc_sect(fat12);
+  }
+  printf("Pass!\n");
+  return;
+}
+
 int main() {
   img = img_init("../../bin/testdisk.ima");
   printf("Image size: %ld\n", img->size);
@@ -398,6 +415,7 @@ int main() {
   test_to83();
   test_enterdir();
   test_read();
+  test_alloc_sect();
   fat12_free(fat12);     // This also frees the image file
   return 0;
 }
