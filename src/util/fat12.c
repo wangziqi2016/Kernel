@@ -265,6 +265,8 @@ int fat12_read(fat12_t *fat12, fat12_file_t *fd, offset_t len, void *buffer) {
     offset_t sect_len = FAT12_SECT_SIZE - fd->curr_offset;
     offset_t disk_offset = fd->curr_sect * FAT12_SECT_SIZE + fd->curr_offset;
     if(remains <= sect_len) {
+      fd->offset += remains;
+      fd->curr_offset += remains;
       memcpy(p, &read8(fat12->img, disk_offset), remains);
       remains = 0;
       break;
@@ -341,6 +343,23 @@ void test_enterdir() {
   printf("Pass!\n");
 }
 
+void test_read() {
+  printf("========== test_read ==========\n");
+  fat12_file_t fd;
+  char *buffer = (char *)malloc(64 * 1024); // 64KB buffer
+  int ret = fat12_open(fat12, "bootsect.asm", &fd);
+  if(ret != FAT12_SUCCESS) error_exit("Open failed\n");
+  fat12_read(fat12, &fd, 1026, buffer);
+  buffer[1026] = '\0';
+  puts(buffer);
+  printf("----------------------------------------\n");
+  fat12_read(fat12, &fd, 1028, buffer);
+  buffer[1028] = '\0';
+  puts(buffer);
+  printf("Pass!\n");
+  return;
+}
+
 int main() {
   img = img_init("../../bin/testdisk.ima");
   printf("Image size: %ld\n", img->size);
@@ -349,6 +368,7 @@ int main() {
   test_readdir();
   test_to83();
   test_enterdir();
+  test_read();
   fat12_free(fat12);     // This also frees the image file
   return 0;
 }
