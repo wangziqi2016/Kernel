@@ -250,21 +250,37 @@ int fat12_open(fat12_t *fat12, const char *filename, fat12_file_t *fd) {
   int ret = fat12_findentry(fat12, filename, &dir_entry);
   if(ret != FAT12_SUCCESS) return ret;
   if(dir_entry.attr & FAT12_ATTR_SUBDIR) return FAT12_NOTFILE;
-  fd->curr_sect = dir_entry.data;  // This can be zero which means empty file
-  fd->curr_offset = fd->offset = 0; // Always begin from offset 0 
-  fd->size = dir_entry.size;
+  fd->curr_sect = dir_entry.data - 2;  // This can be zero which means empty file
+  fd->curr_offset = fd->offset = 0;    // Always begin from offset 0 
+  fd->size = dir_entry.size;           // Always check this field before reading
   return FAT12_SUCCESS;
 }
 
 int fat12_read(fat12_t *fat12, fat12_file_t *fd, offset_t len, void *buffer) {
-  offset_t remains = len;
+  int invalid_len = (fd->offset + len >= fd->size); // Whether the read should be truncated
+  if(invalid_len) len = fd->size - fd->offset;      // Truncate the length to not exceed file end
   char *p = buffer;        // Copy position
+  offset_t remains = len;
   while(remains) {
     offset_t sect_len = FAT12_SECT_SIZE - fd->curr_offset;
-    offset_t offset = fd->curr_sect * FAT12_SECT_SIZE + fd->curr_offset;
-    if(sect_len > remains) memcpy(p, &read8(fat12->img, fd->curr_offset), remains);
+    offset_t disk_offset = fd->curr_sect * FAT12_SECT_SIZE + fd->curr_offset;
+    if(remains <= sect_len) {
+      memcpy(p, &read8(fat12->img, disk_offset), remains);
+      remains = 0;
+      break;
+    }
+    memcpy(p, &read8(fat12->img, disk_offset), sect_len);
+    remains -= sect_len;
+    p += sect_len;
+    fd->offset += sect_len;
+    fd->curr_offset = FAT12_SECT_SIZE; // Move logical pointer to sector end
+    sector_t next_sect = fat12_getnext(fat12, fd->curr_sect + 2); // Get next sector
+    if(next_sect != FAT12_INV_SECT) {
+      fd->curr_sect = next_sect + fat12->data_begin;
+      fd->curr_offset = 0;
+    } else { break; }
   }
-  return FAT12_SUCCESS;
+  return invalid_len ? FAT12_INV_LEN : FAT12_SUCCESS;
 }
 
 #ifdef UNITTEST
