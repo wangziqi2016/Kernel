@@ -29,7 +29,7 @@
 #define FAT12_ATTR_FILE     0x00    // A regular file. Not a mask
 
 #define FAT12_SUCCESS 0
-#define FAT12_NOMORE   1       // No more entry in the directory
+#define FAT12_DIREND   1       // No more entry in the directory
 #define FAT12_INV_NAME 1       // Invalid 8.3 file name
 #define FAT12_NOTFOUND 2       // File name not found in current dir
 #define FAT12_NOTDIR   3       // Name is found but it is not a dir entry
@@ -157,7 +157,7 @@ offset_t fat12_fataddr(fat12_t *fat12, cluster_t cluster) {
 
 // Returns the next sector offset from the beginning of data area
 // Note that the input is cluater which begins from 2. 
-// Return: FAT12_INV_SECT if next is invalid; Sect offset otherwise.
+// Return: FAT12_INV_SECT if next is invalid; Sect offset from data region otherwise.
 sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
   offset_t off = fat12_fataddr(fat12, cluster);
   sector_t sect = read16(fat12->img, off);
@@ -174,7 +174,10 @@ int fat12_readdir_next(fat12_t *fat12) {
   fat12->cwdoff = 0;
   if(fat12->cwdsect < fat12->data_begin) // Root directory
     return ++fat12->cwdsect == fat12->data_begin; // If next sect is data area then reached the end
-  return (fat12->cwdsect = fat12_getnext(fat12, fat12->cwdsect + 2)) == FAT12_INV_SECT; // TODO: FIX THIS
+  sector_t next = fat12_getnext(fat12, fat12->cwdsect + 2); // Returns relative sect from data begin
+  if(next == FAT12_INV_SECT) return FAT12_DIREND;
+  fat12->cwdsect = next + fat12->data_begin;
+  return FAT12_SUCCESS;
 }
 
 // Read the corresponding entry into the buffer
@@ -194,7 +197,7 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
        dir->name[0] != 0x05 && dir->attr != FAT12_ATTR_LONGNAME) break;
   }
   memcpy(buffer, &read8(fat12->img, off), FAT12_DIR_SIZE);
-  return 0;
+  return FAT12_SUCCESS;
 }
 
 // Converts a C string to 8.3 file format
@@ -347,6 +350,7 @@ sector_t fat12_alloc_sect(fat12_t *fat12) {
 int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
   char name83[FAT12_NAME83_SIZE];
   if(fat12_to83(filename, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
+  return 0;
 }
 
 #ifdef UNITTEST
