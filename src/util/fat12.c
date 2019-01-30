@@ -24,7 +24,6 @@
 #define FAT12_ATTR_HIDDEN   0x02
 #define FAT12_ATTR_SYSTEM   0x04
 #define FAT12_ATTR_SUBDIR   0x10    // Mask for subdirectory
-
 #define FAT12_ATTR_LONGNAME 0x0F    // This is not a mask, but rather an indicator
 #define FAT12_ATTR_FILE     0x00    // A regular file. Not a mask
 
@@ -181,18 +180,21 @@ int fat12_readdir_next(fat12_t *fat12) {
 }
 
 // Read the corresponding entry into the buffer
-// Return: 1 if reached the end of the directory, in this case the pointer will be reset to the beginning
-//         of the directory for next read
-int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
+// Return: FAT12_DIREND if reached the end of the directory, in this case the pointer 
+//         will be reset to the beginning of the directory for next read
+// If ret_free is set, this function returns free entry. Otherwise it returns used entries
+int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer, uint8_t ret_free) {
   offset_t off;
   while(1) {
-    if(fat12->cwdoff == FAT12_SECT_SIZE && fat12_readdir_next(fat12)) {
+    if(fat12->cwdoff == FAT12_SECT_SIZE && fat12_readdir_next(fat12) == FAT12_DIREND) {
       fat12_reset_dir(fat12); // Note that readdir_next will destroy the cwdsect in this case
-      return 1;
+      return FAT12_DIREND;
     }
     off = fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff; // Offset to the first byte of the entry
     fat12->cwdoff += FAT12_DIR_SIZE;
     fat12_dir_t *dir = (fat12_dir_t *)&read8(fat12->img, off);
+    if() 
+      break; // Return free entry
     if(dir->name[0] != 0x00 && /*dir->name[0] != 0x2E &&*/ dir->name[0] != 0xE5 && 
        dir->name[0] != 0x05 && dir->attr != FAT12_ATTR_LONGNAME) break;
   }
@@ -350,6 +352,7 @@ sector_t fat12_alloc_sect(fat12_t *fat12) {
 int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
   char name83[FAT12_NAME83_SIZE];
   if(fat12_to83(filename, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
+  fat12_reset_dir(fat12); // Move to the head of disk entry
   return 0;
 }
 
