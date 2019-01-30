@@ -27,6 +27,9 @@
 #define FAT12_ATTR_LONGNAME 0x0F    // This is not a mask, but rather an indicator
 #define FAT12_ATTR_FILE     0x00    // A regular file. Not a mask
 
+#define FAT12_READDIR_USED   0x00
+#define FAT12_READDIR_FREE   0x01
+
 #define FAT12_SUCCESS 0
 #define FAT12_DIREND   1       // No more entry in the directory
 #define FAT12_INV_NAME 1       // Invalid 8.3 file name
@@ -193,8 +196,10 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer, uint8_t ret_free) {
     off = fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff; // Offset to the first byte of the entry
     fat12->cwdoff += FAT12_DIR_SIZE;
     fat12_dir_t *dir = (fat12_dir_t *)&read8(fat12->img, off);
-    if() 
-      break; // Return free entry
+    if(ret_free) {
+      if(dir->name[0] == 0xE5 || dir->name[0] == 0x00) break; // Return free entry
+      else continue; // Do not check if the above condition is not met
+    }
     if(dir->name[0] != 0x00 && /*dir->name[0] != 0x2E &&*/ dir->name[0] != 0xE5 && 
        dir->name[0] != 0x05 && dir->attr != FAT12_ATTR_LONGNAME) break;
   }
@@ -240,7 +245,7 @@ int fat12_findentry(fat12_t *fat12, const char *name, fat12_dir_t *dir_entry) {
   char name83[FAT12_NAME83_SIZE];
   if(fat12_to83(name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
   fat12_reset_dir(fat12); // This moves the cursor to the first in the current dir
-  while(fat12_readdir(fat12, dir_entry) == FAT12_SUCCESS)
+  while(fat12_readdir(fat12, dir_entry, FAT12_READDIR_USED) == FAT12_SUCCESS)
     if(memcmp(name83, dir_entry->name, FAT12_NAME83_SIZE) == 0) return FAT12_SUCCESS;
   return FAT12_NOTFOUND;
 }
@@ -372,7 +377,7 @@ void test_init() {
 void test_readdir() {
   printf("========== test_readdir ==========\n");
   fat12_dir_t buffer;
-  while(fat12_readdir(fat12, &buffer) == FAT12_SUCCESS) {
+  while(fat12_readdir(fat12, &buffer, FAT12_READDIR_USED) == FAT12_SUCCESS) {
     printf("%.11s    %u\n", buffer.name, buffer.size);
   }
   printf("Pass!\n");
