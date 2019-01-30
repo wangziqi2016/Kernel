@@ -20,7 +20,13 @@
 #define FAT12_SUFFIX_SIZE 3
 #define FAT12_NAME83_SIZE 11
 
-#define FAT12_ATTR_SUBDIR 0x10    // Mask for subdirectory
+#define FAT12_ATTR_READONLY 0x01
+#define FAT12_ATTR_HIDDEN   0x02
+#define FAT12_ATTR_SYSTEM   0x04
+#define FAT12_ATTR_SUBDIR   0x10    // Mask for subdirectory
+
+#define FAT12_ATTR_LONGNAME 0x0F    // This is not a mask, but rather an indicator
+#define FAT12_ATTR_FILE     0x00    // A regular file. Not a mask
 
 #define FAT12_SUCCESS 0
 #define FAT12_NOMORE   1       // No more entry in the directory
@@ -30,6 +36,7 @@
 #define FAT12_NOTFILE  4       // Name is found but it is not a file entry
 #define FAT12_INV_OFF  5       // Invalid offset in file read
 #define FAT12_INV_LEN  6       // Invalid length in file read (read pass file end)
+#define FAT12_NOSPACE  7       // Disk or root directory is full
 
 typedef uint16_t cluster_t;
 typedef uint16_t sector_t;
@@ -160,42 +167,6 @@ sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
   return sect - 2;
 }
 
-// Sets the cluster's next to a given cluster
-void fat12_setnext(fat12_t *fat12, cluster_t cluster, cluster_t next) {
-  offset_t off = fat12_fataddr(fat12, cluster);
-  sector_t sect = read16(fat12->img, off);
-  next &= 0xFFF;
-  if(cluster % 2 == 0) sect |= next; // Low 12 bit
-  else sect |= (next << 4);          // High 12 bit
-  *(&read16(fat12->img, off)) = sect;
-  return;
-}
-
-// Allocate one sector for use. Return the sector ID relative to data area. Caller should convert it
-// to cluster ID when storing into data field of directory
-// Return: FAT12_INV_SECT if allocation fails
-sector_t fat12_alloc_sect(fat12_t *fat12) {
-  int sense = 0; // This flips between 0 and 1
-  offset_t curr_off = fat12->reserved * FAT12_SECT_SIZE;
-  offset_t fat_end_offset = curr_off + fat12->fat_size * FAT12_SECT_SIZE;
-  sector_t sect = 0;  // Sector to be allocated
-  while(curr_off < fat_end_offset) {
-    sector_t entry;
-    if(sense == 0) {
-      entry = read16(fat12->img, curr_off) & 0x0FFF;
-      curr_off++;
-    } else {
-      entry = read16(fat12->img, curr_off) >> 4;
-      curr_off += 2;
-    }
-    //printf("Sect %u entry 0x%X\n", sect, entry);
-    if(entry == 0) return sect;
-    sense = 1 - sense;
-    sect++;
-  }
-  return FAT12_INV_SECT;
-}
-
 // Helper function that finds the next sector of a directory
 // Special care must be taken for root because it is consecutive
 // Return: 1 if reached the end of the dir
@@ -220,7 +191,7 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
     fat12->cwdoff += FAT12_DIR_SIZE;
     fat12_dir_t *dir = (fat12_dir_t *)&read8(fat12->img, off);
     if(dir->name[0] != 0x00 && /*dir->name[0] != 0x2E &&*/ dir->name[0] != 0xE5 && 
-       dir->name[0] != 0x05 && dir->attr != 0x0F) break;
+       dir->name[0] != 0x05 && dir->attr != FAT12_ATTR_LONGNAME) break;
   }
   memcpy(buffer, &read8(fat12->img, off), FAT12_DIR_SIZE);
   return 0;
@@ -229,6 +200,7 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer) {
 // Converts a C string to 8.3 file format
 // Returns FAT12_INV_NAME if name is not valid 8.3 format
 // Note that this function copies name beginning with '.' unchanged
+// No '\0' is appended to the end of the string
 int fat12_to83(const char *dir_name, char *name83) {
   int len = 0;
   if(*dir_name == '.') {
@@ -328,6 +300,53 @@ int fat12_read(fat12_t *fat12, fat12_file_t *fd, offset_t len, void *buffer) {
     } else { break; }
   }
   return invalid_len ? FAT12_INV_LEN : FAT12_SUCCESS;
+}
+
+//-------------- The following is added to support modification to the file system
+
+// Sets the cluster's next to a given cluster
+void fat12_setnext(fat12_t *fat12, cluster_t cluster, cluster_t next) {
+  offset_t off = fat12_fataddr(fat12, cluster);
+  sector_t sect = read16(fat12->img, off);
+  next &= 0xFFF;
+  if(cluster % 2 == 0) sect |= next; // Low 12 bit
+  else sect |= (next << 4);          // High 12 bit
+  *(&read16(fat12->img, off)) = sect;
+  return;
+}
+
+// Allocate one sector for use. Return the sector ID relative to data area. Caller should convert it
+// to cluster ID when storing into data field of directory
+// Return: FAT12_INV_SECT if allocation fails
+sector_t fat12_alloc_sect(fat12_t *fat12) {
+  int sense = 0; // This flips between 0 and 1
+  offset_t curr_off = fat12->reserved * FAT12_SECT_SIZE;
+  offset_t fat_end_offset = curr_off + fat12->fat_size * FAT12_SECT_SIZE;
+  sector_t sect = 0;  // Sector to be allocated
+  while(curr_off < fat_end_offset) {
+    sector_t entry;
+    if(sense == 0) {
+      entry = read16(fat12->img, curr_off) & 0x0FFF;
+      curr_off++;
+    } else {
+      entry = read16(fat12->img, curr_off) >> 4;
+      curr_off += 2;
+    }
+    //printf("Sect %u entry 0x%X\n", sect, entry);
+    if(entry == 0) return sect;
+    sense = 1 - sense;
+    sect++;
+  }
+  return FAT12_INV_SECT;
+}
+
+// Add one new entry to the current directory, can be file or directory
+// Return:
+//   FAT12_INV_NAME if name is invalid
+//   FAT12_NOSPACE  if there is no space left on the disk to create entry
+int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
+  char name83[FAT12_NAME83_SIZE];
+  if(fat12_to83(filename, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
 }
 
 #ifdef UNITTEST
