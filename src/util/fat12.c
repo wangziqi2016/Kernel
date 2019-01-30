@@ -39,6 +39,7 @@
 #define FAT12_INV_OFF  5       // Invalid offset in file read
 #define FAT12_INV_LEN  6       // Invalid length in file read (read pass file end)
 #define FAT12_NOSPACE  7       // Disk or root directory is full
+#define FAT12_NAME_EXISTS 8    // The entry with the same name already exists
 
 typedef uint16_t cluster_t;
 typedef uint16_t sector_t;
@@ -243,6 +244,7 @@ int fat12_to83(const char *dir_name, char *name83) {
 //     The length of name must not exceed 8 and suffix not 3
 // Returns FAT12_INV_NAME if name is not valid 8.3 format
 //         FAT12_NOTFOUND if name is not found
+//         FAT12_SUCCESS if success
 int fat12_findentry(fat12_t *fat12, const char *name, fat12_dir_t *dir_entry) {
   char name83[FAT12_NAME83_SIZE];
   if(fat12_to83(name, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
@@ -356,13 +358,17 @@ sector_t fat12_alloc_sect(fat12_t *fat12) {
 // Return:
 //   FAT12_INV_NAME if name is invalid
 //   FAT12_NOSPACE  if there is no space left on the disk to create entry
+//   FAT12_NAME_EXISTS if there is a name collision
 int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
-  char name83[FAT12_NAME83_SIZE];
-  if(fat12_to83(filename, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
+  fat12_dir_t entry;
+  int search = fat12_findentry(fat12, filename, &entry);
+  if(search == FAT12_INV_NAME) return FAT12_INV_NAME;         // Invalid name for new entry
+  else if(search == FAT12_SUCCESS) return FAT12_NAME_EXISTS;  // Name already exists
   fat12_reset_dir(fat12); // Move to the head of disk entry
   if(fat12_readdir(fat12, NULL, FAT12_READDIR_FREE) == FAT12_DIREND) {
-
+    // TODO: Allocate new sector
   }
+  // Copy 8.3 name and setup attr
   return 0;
 }
 
