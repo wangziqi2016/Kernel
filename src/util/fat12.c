@@ -60,8 +60,8 @@ typedef struct {
   int root_size;           // Number of sectors for root directory
   int root_begin;          // Sector ID for root
   int data_begin;          // Sector ID for data
-  sector_t cwdsect_origin; // Current dir sector when entering the dir
-  sector_t cwdsect;        // Current dir sector
+  sector_t cwdsect_origin; // Current dir sector when entering the dir (absolute)
+  sector_t cwdsect;        // Current dir sector (absolute)
   offset_t cwdoff;         // Current dir offset
 } fat12_t; 
 
@@ -158,7 +158,7 @@ offset_t fat12_fataddr(fat12_t *fat12, cluster_t cluster) {
 }
 
 // Returns the next sector offset from the beginning of data area
-// Note that the input is cluater which begins from 2. 
+// Note that the input is cluster which begins from 2. Cluster starts at the data region
 // Return: FAT12_INV_SECT if next is invalid; Sect offset from data region otherwise.
 sector_t fat12_getnext(fat12_t *fat12, cluster_t cluster) {
   offset_t off = fat12_fataddr(fat12, cluster);
@@ -176,16 +176,18 @@ int fat12_readdir_next(fat12_t *fat12) {
   fat12->cwdoff = 0;
   if(fat12->cwdsect < fat12->data_begin) // Root directory
     return ++fat12->cwdsect == fat12->data_begin; // If next sect is data area then reached the end
-  sector_t next = fat12_getnext(fat12, fat12->cwdsect + 2); // Returns relative sect from data begin
+  sector_t next = fat12_getnext(fat12, fat12->cwdsect - fat12->data_begin + 2); // Returns relative sect from data begin
   if(next == FAT12_INV_SECT) return FAT12_DIREND;
   fat12->cwdsect = next + fat12->data_begin;
   return FAT12_SUCCESS;
 }
 
 // Read the corresponding entry into the buffer
-// Return: FAT12_DIREND if reached the end of the directory, in this case the pointer 
-//         will be reset to the beginning of the directory for next read
-// If ret_free is set, this function returns free entry. Otherwise it returns used entries
+// Return: FAT12_DIREND if reached the end of the directory. The cwd will point
+// to the first invalid byte after the current sector (i.e. offset will be sector size
+// and sect will be the absolute last sector)
+// If ret_free is set, this function ignores buffer and stops at seeing a free 
+// entry. Otherwise it copies the next active entry into the given buffer.
 int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer, uint8_t ret_free) {
   offset_t off;
   while(1) {
@@ -203,7 +205,7 @@ int fat12_readdir(fat12_t *fat12, fat12_dir_t *buffer, uint8_t ret_free) {
     if(dir->name[0] != 0x00 && /*dir->name[0] != 0x2E &&*/ dir->name[0] != 0xE5 && 
        dir->name[0] != 0x05 && dir->attr != FAT12_ATTR_LONGNAME) break;
   }
-  memcpy(buffer, &read8(fat12->img, off), FAT12_DIR_SIZE);
+  if(ret_free != FAT12_READDIR_FREE) memcpy(buffer, &read8(fat12->img, off), FAT12_DIR_SIZE);
   return FAT12_SUCCESS;
 }
 
@@ -358,6 +360,9 @@ int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
   char name83[FAT12_NAME83_SIZE];
   if(fat12_to83(filename, name83) == FAT12_INV_NAME) return FAT12_INV_NAME;
   fat12_reset_dir(fat12); // Move to the head of disk entry
+  if(fat12_readdir(fat12, NULL, FAT12_READDIR_FREE) == FAT12_DIREND) {
+
+  }
   return 0;
 }
 
