@@ -365,7 +365,6 @@ int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
   int search = fat12_findentry(fat12, filename, &entry);
   if(search == FAT12_INV_NAME) return FAT12_INV_NAME;         // Invalid name for new entry
   else if(search == FAT12_SUCCESS) return FAT12_NAME_EXISTS;  // Name already exists
-  fat12_to83(name, name83); // This must succeed because find entry returns
   fat12_reset_dir(fat12);   // Move to the head of disk entry
   if(fat12_readdir(fat12, NULL, FAT12_READDIR_FREE) == FAT12_DIREND) {
     if(fat12->cwdsect == fat12->data_begin) return FAT12_NOSPACE; // Root directory is full
@@ -376,10 +375,26 @@ int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
     fat12_setnext(fat12, last_cluster, new_cluster); // Link to the last cluster
     fat12_setnext(fat12, new_cluster, 0xFF0);        // Mark the end of the linked list
     memset(&read8(fat12->img, (new_sect + fat12->data_begin) * FAT12_SECT_SIZE), 0x00, FAT12_SECT_SIZE);
-    int ret = fat12_readdir(fat12, NULL, FAT12_READDIR_FREE);
-    if(ret == FAT12_DIREND) error_exit("Internal error: Allocation for new directory entry failed\n");
+    fat12->cwdsect = new_sect + fat12->data_begin;   // Change the cwd to the new location
+    fat12->cwdoff = 0;
   }
   // Copy 8.3 name and setup attr
+  fat12_to83(name, name83); // This must succeed because find entry returns
+  fat12_dir_t *new_entry = (fat12_dir_t *)&read8(fat12->img, fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff);
+  memcpy(new_entry->name, name83, FAT12_NAME83_SIZE);
+  new_entry->attr = attr;
+  new_entry->size = 0;
+  new_entry->data = 0;
+  if(attr & FAT12_ATTR_SUBDIR) {
+    sector_t new_dir_sect = fat12_alloc_sect(fat12); // Sector from beginning of data area
+    if(new_dir_sect == FAT12_INV_SECT) {
+      new_entry->name[0] = 0x0; // Mark the new entry just created as invalid
+      return FAT12_NOSPACE;
+    }
+    memset(&read8(fat12->img, (new_dir_sect + fat12->data_begin) * FAT12_SECT_SIZE), 0x00, FAT12_SECT_SIZE);
+    new_entry->data = new_dir_sect + 2; // It takes cluster
+    new_entry->size = FAT12_SECT_SIZE;
+  }
   return 0;
 }
 
