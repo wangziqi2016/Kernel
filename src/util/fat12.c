@@ -378,8 +378,7 @@ int fat12_new(fat12_t *fat12, const char *filename, uint8_t attr) {
     fat12->cwdsect = new_sect + fat12->data_begin;   // Change the cwd to the new location
     fat12->cwdoff = 0;
   }
-  // Copy 8.3 name and setup attr
-  fat12_to83(name, name83); // This must succeed because find entry returns
+  fat12_to83(filename, name83); // This must succeed because find entry returns
   fat12_dir_t *new_entry = (fat12_dir_t *)&read8(fat12->img, fat12->cwdsect * FAT12_SECT_SIZE + fat12->cwdoff);
   memcpy(new_entry->name, name83, FAT12_NAME83_SIZE);
   new_entry->attr = attr;
