@@ -5,7 +5,7 @@
 
 # This should appear before including makefile common
 SRC_DIR = ./src
-BUILD_DIR = ./build
+BUILD_DIR = ./build   
 BIN_DIR = ./bin
 
 # This will let make shutup
